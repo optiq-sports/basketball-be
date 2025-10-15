@@ -10,7 +10,9 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "dev": "tsc && npm run start:dev",
-    "start:dev": "nodemon src/app.ts"
+    "start:dev": "nodemon src/app.ts",
+    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:generate": "npx prisma generate"
   },
   "author": "Optiq Sport",
   "license": "ISC",
@@ -20,10 +22,12 @@
     "eslint": "^9.37.0",
     "globals": "^16.4.0",
     "nodemon": "^3.1.10",
+    "prisma": "^6.17.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1"
   },
   "dependencies": {
+    "@prisma/client": "^6.17.1",
     "express": "^5.1.0"
   }
 }
