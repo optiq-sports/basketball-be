@@ -12,7 +12,8 @@
     "dev": "npm run start:dev",
     "start:dev": "nodemon --watch src --ext ts --exec ts-node --transpile-only src/app.ts",
     "prisma:migrate": "npx prisma migrate dev",
-    "prisma:generate": "npx prisma generate"
+    "prisma:generate": "npx prisma generate",
+    "seed": "ts-node prisma/seed.ts"
   },
   "author": "Optiq Sport",
   "license": "ISC",
