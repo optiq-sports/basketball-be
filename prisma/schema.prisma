@@ -1,7 +1,6 @@
 // ------------------------------------------------------
 // Prisma Schema for Basketball Data Acquisition Platform
 // ------------------------------------------------------
-// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -18,8 +17,8 @@ datasource db {
 // ------------------------------------------------------
 
 enum Role {
-  USER
   ADMIN
+  STATISTICIAN
 }
 
 // ------------------------------------------------------
@@ -27,63 +26,55 @@ enum Role {
 // ------------------------------------------------------
 
 model User {
-  id             String         @id @default(cuid())
-  email          String?        @unique
-  passwordHash   String?
-  role           Role           @default(USER)
-  emailVerified  DateTime?
-  magicToken     String?        @unique
-  magicTokenExp  DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id             String        @id @default(cuid()) @map("id")
+  email          String?       @unique @map("email")
+  password       String?       @map("password")
+  role           Role          @default(STATISTICIAN) @map("role")
+  emailVerified  Boolean       @default(false) @map("email_verified")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   // Relations
   profile        UserProfile?
-  accounts       Account[]
   sessions       Session[]
+
+  @@map("user")
 }
 
 model UserProfile {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  fullName    String?
-  position    String?   // e.g., Point Guard, Center, etc.
-  teamName    String?   // user’s basketball team
-  bio         String?
-  avatarUrl   String?
-  sportType   String    @default("Basketball")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Account {
-  id                 String   @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
-
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id             String    @id @default(cuid())
-  sessionToken   String    @unique
-  userId         String
-  expires        DateTime
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id             String    @id @default(cuid()) @map("id")
+  userId         String    @unique @map("user_id")
+  fullName       String?   @map("full_name")       // "Name Here"
+  age            Int?      @map("age")             // "Age"
+  division       String?   @map("division")        // "Division 1"
+  dobDay         Int?      @map("dob_day")         // "Day"
+  dobMonth       Int?      @map("dob_month")       // "Month"
+  dobYear        Int?      @map("dob_year")        // "Year"
+  phone          String?   @map("phone")           // "Phone"
+  email          String?   @map("email")           // "Email"
+  country        String?   @map("country")         // "Country"
+  state          String?   @map("state")           // "State"
+  homeAddress    String?   @map("home_address")    // "Home Address"
+  bio            String?   @map("bio")             // "Bio" or extra description
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profile")
+}
+
+
+model Session {
+  id             String    @id @default(cuid()) @map("id")
+  access_token   String    @unique @map("access_token")
+  refreshToken   String?   @map("refresh_token")
+  userId         String    @map("user_id")
+  expires        DateTime  @map("expires")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
 }
