@@ -78,3 +78,11 @@ model Session {
 
   @@map("session")
 }
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator seed {
+  provider = "ts-node"
+  output   = "../prisma/seed.ts"
+}
