@@ -1,0 +1,742 @@
+{
+  "info": {
+    "name": "Basketball Management API",
+    "description": "Complete API collection for Basketball Tournament Management System with Role-Based Authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "basketball-be"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "player_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "team_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tournament_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "match_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.access_token) {",
+                  "        pm.collectionVariables.set('access_token', jsonData.data.access_token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Register a new user. Roles: ADMIN, STATISTICIAN"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.access_token) {",
+                  "        pm.collectionVariables.set('access_token', jsonData.data.access_token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "profile"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "Create Player (Standalone)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"LeBron\",\n  \"lastName\": \"James\",\n  \"email\": \"lebron@example.com\",\n  \"position\": \"SMALL_FORWARD\",\n  \"height\": \"6'9\\\"\",\n  \"phone\": \"+1234567890\",\n  \"dateOfBirth\": \"1984-12-30\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/players",
+              "host": ["{{base_url}}"],
+              "path": ["players"]
+            },
+            "description": "Create a standalone player (not assigned to any team). Uses deduplication - will throw error if duplicate found."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Player for Team",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('player_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"firstName\": \"Kobe\",\n  \"lastName\": \"Bryant\",\n  \"jerseyNumber\": 24,\n  \"email\": \"kobe@example.com\",\n  \"position\": \"SHOOTING_GUARD\",\n  \"height\": \"6'6\\\"\",\n  \"dateOfBirth\": \"1978-08-23\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/players/team",
+              "host": ["{{base_url}}"],
+              "path": ["players", "team"]
+            },
+            "description": "Create a player and assign to a team. If player already exists (98%+ similarity), assigns existing player to team."
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Create Players for Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"players\": [\n    {\n      \"firstName\": \"Stephen\",\n      \"lastName\": \"Curry\",\n      \"jerseyNumber\": 30,\n      \"email\": \"steph@example.com\",\n      \"position\": \"POINT_GUARD\",\n      \"height\": \"6'3\\\"\"\n    },\n    {\n      \"firstName\": \"Klay\",\n      \"lastName\": \"Thompson\",\n      \"jerseyNumber\": 11,\n      \"email\": \"klay@example.com\",\n      \"position\": \"SHOOTING_GUARD\",\n      \"height\": \"6'6\\\"\"\n    },\n    {\n      \"firstName\": \"Draymond\",\n      \"lastName\": \"Green\",\n      \"jerseyNumber\": 23,\n      \"position\": \"POWER_FORWARD\",\n      \"height\": \"6'6\\\"\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/players/team/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["players", "team", "bulk"]
+            },
+            "description": "Bulk create players for a team with automatic deduplication. Returns created count, duplicates count, and duplicate matches."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Players",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/players?teamId={{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["players"],
+              "query": [
+                {
+                  "key": "teamId",
+                  "value": "{{team_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get all players. Optionally filter by teamId query parameter."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Player by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/players/{{player_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["players", "{{player_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Player",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"height\": \"6'10\\\"\",\n  \"position\": \"POWER_FORWARD\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/players/{{player_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["players", "{{player_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Player to Team",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jerseyNumber\": 8\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/players/{{player_id}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["players", "{{player_id}}", "teams", "{{team_id}}"]
+            },
+            "description": "Assign an existing player to a team with a jersey number."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Player from Team",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/players/{{player_id}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["players", "{{player_id}}", "teams", "{{team_id}}"]
+            },
+            "description": "Remove player from team (deactivates association, preserves history)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Player",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/players/{{player_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["players", "{{player_id}}"]
+            },
+            "description": "Delete player (deactivates all team associations, preserves stats history). ADMIN only."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Teams",
+      "item": [
+        {
+          "name": "Create Team",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('team_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Los Angeles Lakers\",\n  \"code\": \"LAL\",\n  \"color\": \"#552583\",\n  \"country\": \"USA\",\n  \"state\": \"California\",\n  \"coach\": \"Darvin Ham\",\n  \"assistantCoach\": \"Phil Handy\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/teams",
+              "host": ["{{base_url}}"],
+              "path": ["teams"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Teams",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams",
+              "host": ["{{base_url}}"],
+              "path": ["teams"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Team",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coach\": \"New Coach Name\",\n  \"color\": \"#FF0000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Team",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["teams", "{{team_id}}"]
+            },
+            "description": "Delete team. ADMIN only."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tournaments",
+      "item": [
+        {
+          "name": "Create Tournament",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('tournament_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"City Championship 2025\",\n  \"division\": \"PREMIER\",\n  \"numberOfGames\": 14,\n  \"numberOfQuarters\": 4,\n  \"quarterDuration\": 10,\n  \"overtimeDuration\": 5,\n  \"startDate\": \"2025-01-15T09:00:00Z\",\n  \"endDate\": \"2025-01-20T18:00:00Z\",\n  \"venue\": \"Main Arena\",\n  \"crewChief\": \"John Referee\",\n  \"umpire1\": \"Jane Umpire\",\n  \"umpire2\": \"Bob Umpire\",\n  \"commissioner\": \"Commissioner Smith\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tournaments",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments"]
+            },
+            "description": "Create a new tournament. Tournament code is auto-generated."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Tournaments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tournaments",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tournament by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tournaments/{{tournament_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments", "{{tournament_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tournament by Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tournaments/code/ABC123",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments", "code", "ABC123"]
+            },
+            "description": "Get tournament by its unique code (for public sharing)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Tournament",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue\": \"Updated Venue Name\",\n  \"endDate\": \"2025-01-25T18:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tournaments/{{tournament_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments", "{{tournament_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Teams to Tournament",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamIds\": [\"{{team_id}}\", \"team_id_2\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tournaments/{{tournament_id}}/teams",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments", "{{tournament_id}}", "teams"]
+            },
+            "description": "Add multiple teams to a tournament."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Team from Tournament",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tournaments/{{tournament_id}}/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments", "{{tournament_id}}", "teams", "{{team_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Tournament",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/tournaments/{{tournament_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tournaments", "{{tournament_id}}"]
+            },
+            "description": "Delete tournament. ADMIN only."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Matches",
+      "item": [
+        {
+          "name": "Create Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('match_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tournamentId\": \"{{tournament_id}}\",\n  \"homeTeamId\": \"{{team_id}}\",\n  \"awayTeamId\": \"team_id_2\",\n  \"scheduledDate\": \"2025-01-16T10:00:00Z\",\n  \"status\": \"SCHEDULED\",\n  \"venue\": \"Main Court\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/matches",
+              "host": ["{{base_url}}"],
+              "path": ["matches"]
+            },
+            "description": "Create a new match. Both teams must be part of the tournament."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Matches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/matches?tournamentId={{tournament_id}}&status=LIVE",
+              "host": ["{{base_url}}"],
+              "path": ["matches"],
+              "query": [
+                {
+                  "key": "tournamentId",
+                  "value": "{{tournament_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "LIVE",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get all matches. Optional filters: tournamentId, status (SCHEDULED, LIVE, COMPLETED, CANCELLED, POSTPONED)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Match by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/matches/{{match_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["matches", "{{match_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Match Scores",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quarter1Home\": 25,\n  \"quarter1Away\": 20,\n  \"quarter2Home\": 22,\n  \"quarter2Away\": 24,\n  \"quarter3Home\": 28,\n  \"quarter3Away\": 25,\n  \"quarter4Home\": 30,\n  \"quarter4Away\": 28,\n  \"status\": \"COMPLETED\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/matches/{{match_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["matches", "{{match_id}}"]
+            },
+            "description": "Update match scores quarter by quarter. Total scores are calculated automatically."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Match Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"LIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/matches/{{match_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["matches", "{{match_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Match",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/matches/{{match_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["matches", "{{match_id}}"]
+            },
+            "description": "Delete match. ADMIN only."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

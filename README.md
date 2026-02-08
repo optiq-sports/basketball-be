@@ -1,40 +1,87 @@
-## Optiq Sport Basketball API
+# Basketball Management Platform - Backend API
 
-A TypeScript/Express backend with Prisma ORM and PostgreSQL.
+A high-performance NestJS backend for managing basketball tournaments, teams, players, and matches with role-based authentication.
 
-## Table of Contents
+## 🏀 Overview
 
-- [Overview](#overview)
-- [Requirements](#requirements)
-- [Quick Start](#quick-start)
-  - [1) Install dependencies](#1-install-dependencies)
-  - [2) Start PostgreSQL with Docker](#2-start-postgresql-with-docker)
-  - [3) Configure environment](#3-configure-environment)
-  - [4) Prisma: generate and migrate](#4-prisma-generate-and-migrate)
-  - [5) Run the app](#5-run-the-app)
-- [Database via docker-compose](#database-via-docker-compose)
-- [Prisma (ORM)](#prisma-orm)
-- [NPM scripts](#npm-scripts)
-- [Troubleshooting](#troubleshooting)
-- [Future Sections](#future-sections)
-
-## Overview
-
-- **Runtime**: Node.js + TypeScript
-- **Web**: Express
+This is a **basketball tournament management and statistics platform** backend built with:
+- **Framework**: NestJS (TypeScript)
+- **Runtime**: Bun (or Node.js)
 - **ORM**: Prisma
-- **DB**: PostgreSQL (via Docker)
+- **Database**: PostgreSQL
+- **Authentication**: JWT with role-based access control
 
-## Requirements
+## 📋 Features
 
-- Node.js 18+ and npm
-- Docker and Docker Compose
+### ✅ Implemented (Current Phase)
 
-## Quick Start
+- **Role-Based Authentication**
+  - JWT-based authentication
+  - Roles: `ADMIN`, `STATISTICIAN`
+  - Secure password hashing with bcrypt
+  - Session management
 
-### 1) Install dependencies
+- **CRUD Operations**
+  - **Players**: Full CRUD with team association, jersey number validation
+  - **Teams**: Full CRUD with unique team codes, coach management
+  - **Tournaments**: Full CRUD with automatic code generation, team management
+  - **Matches**: Full CRUD with score tracking, quarter-by-quarter stats
+
+### 🎯 API Endpoints
+
+All endpoints are prefixed with `/api`
+
+#### Authentication (`/api/auth`)
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - Login user
+- `GET /auth/profile` - Get current user profile (protected)
+
+#### Players (`/api/players`)
+- `GET /players` - List all players (optional `?teamId=xxx` filter)
+- `GET /players/:id` - Get player details
+- `POST /players` - Create player (ADMIN/STATISTICIAN)
+- `PATCH /players/:id` - Update player (ADMIN/STATISTICIAN)
+- `DELETE /players/:id` - Delete player (ADMIN only)
+
+#### Teams (`/api/teams`)
+- `GET /teams` - List all teams
+- `GET /teams/:id` - Get team details with players
+- `POST /teams` - Create team (ADMIN/STATISTICIAN)
+- `PATCH /teams/:id` - Update team (ADMIN/STATISTICIAN)
+- `DELETE /teams/:id` - Delete team (ADMIN only)
+
+#### Tournaments (`/api/tournaments`)
+- `GET /tournaments` - List all tournaments
+- `GET /tournaments/:id` - Get tournament details
+- `GET /tournaments/code/:code` - Get tournament by code
+- `POST /tournaments` - Create tournament (ADMIN/STATISTICIAN)
+- `PATCH /tournaments/:id` - Update tournament (ADMIN/STATISTICIAN)
+- `POST /tournaments/:id/teams` - Add teams to tournament
+- `DELETE /tournaments/:id/teams/:teamId` - Remove team from tournament
+- `DELETE /tournaments/:id` - Delete tournament (ADMIN only)
+
+#### Matches (`/api/matches`)
+- `GET /matches` - List matches (optional `?tournamentId=xxx&status=xxx`)
+- `GET /matches/:id` - Get match details with stats
+- `POST /matches` - Create match (ADMIN/STATISTICIAN)
+- `PATCH /matches/:id` - Update match scores/stats (ADMIN/STATISTICIAN)
+- `DELETE /matches/:id` - Delete match (ADMIN only)
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Bun** (recommended) or **Node.js 18+**
+- **Docker** and **Docker Compose**
+- **PostgreSQL** (via Docker)
+
+### 1) Install Dependencies
 
 ```bash
+# Using Bun (recommended)
+bun install
+
+# Or using npm
 npm install
 ```
 
@@ -44,113 +91,250 @@ npm install
 docker compose up -d
 ```
 
-This brings up `postgres` on `localhost:5432` and `pgAdmin` on `localhost:5050`.
+This brings up:
+- `postgres` on `localhost:5432`
+- `pgAdmin` on `http://localhost:5050`
 
-### 3) Configure environment
+### 3) Configure Environment
 
-Create `.env` from `.env-sample` and set `DATABASE_URL`:
+Create `.env` from `.env-sample`:
 
 ```bash
 cp .env-sample .env
 ```
 
-Example content (adjust if you change docker credentials):
+Update the `.env` file with your configuration:
 
 ```env
-DATABASE_URL="postgresql://username:password@localhost:5432/optiq_sport?schema=public"
+DATABASE_URL="postgresql://user:pass@localhost:5432/optiq_sport?schema=public"
+JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
+JWT_EXPIRES_IN="24h"
+JWT_REFRESH_EXPIRES_IN="7d"
+PORT=3000
 ```
 
-### 4) Prisma: generate and migrate
+### 4) Setup Database
 
-Generate the Prisma Client and run migrations:
+Generate Prisma Client and run migrations:
 
 ```bash
-npx prisma generate
-npx prisma migrate dev --name init
+# Generate Prisma Client
+bun run prisma:generate
+# or
+npm run prisma:generate
+
+# Run migrations
+bun run prisma:migrate
+# or
+npm run prisma:migrate
 ```
 
-### 5) Run the app
+### 5) Run the Application
 
-- Development (watch mode):
+**Development mode (with hot reload):**
 
 ```bash
-npm run dev
+bun run start:dev
+# or
+npm run start:dev
 ```
 
-- Production build and start:
+**Production mode:**
 
 ```bash
-npm run start
+# Build
+bun run build
+# or
+npm run build
+
+# Start
+bun run start:prod
 # or
 npm run start:prod
 ```
 
-## Database via docker-compose
+The API will be available at `http://localhost:3000/api`
 
-The compose file defines:
+## 📊 Database Management
 
-- `postgres` (image: `postgres:17.2-alpine`) with a named volume for data persistence
-- `pgadmin` on `http://localhost:5050` (default creds set in `docker-compose.yaml`)
-
-Common commands:
+### Prisma Commands
 
 ```bash
-# Start/stop
+# Generate Prisma Client
+bun run prisma:generate
+
+# Create and run migration
+bun run prisma:migrate
+
+# Open Prisma Studio (visual database browser)
+bun run prisma:studio
+```
+
+### Database via Docker Compose
+
+```bash
+# Start services
 docker compose up -d
+
+# Stop services
 docker compose down
 
 # View logs
 docker compose logs -f postgres
+
+# Access pgAdmin
+# Open http://localhost:5050
+# Email: email@optiqsport.com
+# Password: password
 ```
 
-## Prisma (ORM)
+## 🔐 Authentication & Authorization
 
-- Generate client after schema changes:
+### Roles
+
+- **ADMIN**: Full access to all resources
+- **STATISTICIAN**: Can create/update players, teams, tournaments, and matches
+
+### Using Authentication
+
+1. **Register a user:**
+```bash
+POST /api/auth/register
+{
+  "email": "admin@example.com",
+  "password": "password123",
+  "role": "ADMIN"
+}
+```
+
+2. **Login:**
+```bash
+POST /api/auth/login
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+```
+
+3. **Use the token:**
+Include the `access_token` in the Authorization header:
+```
+Authorization: Bearer <access_token>
+```
+
+## 📁 Project Structure
+
+```
+src/
+├── auth/              # Authentication module
+│   ├── decorators/    # Custom decorators (Roles, CurrentUser)
+│   ├── dto/           # Data Transfer Objects
+│   ├── guards/        # Auth guards (JWT, Roles, Local)
+│   ├── strategies/    # Passport strategies
+│   ├── auth.controller.ts
+│   ├── auth.service.ts
+│   └── auth.module.ts
+├── players/           # Players module
+├── teams/             # Teams module
+├── tournaments/       # Tournaments module
+├── matches/           # Matches module
+├── prisma/            # Prisma service
+├── app.module.ts      # Root module
+└── main.ts            # Application entry point
+```
+
+## 🛠️ Available Scripts
 
 ```bash
-npx prisma generate
+# Development
+bun run start:dev      # Start in watch mode
+bun run start:debug    # Start in debug mode
+
+# Production
+bun run build          # Build the project
+bun run start:prod     # Start production server
+
+# Database
+bun run prisma:generate    # Generate Prisma Client
+bun run prisma:migrate     # Run migrations
+bun run prisma:studio      # Open Prisma Studio
+
+# Code Quality
+bun run lint           # Lint code
+bun run format         # Format code with Prettier
 ```
 
-- Create/run a development migration:
+## 🧪 Testing
 
 ```bash
-npx prisma migrate dev --name some_change
+# Unit tests
+bun run test
+
+# E2E tests
+bun run test:e2e
+
+# Test coverage
+bun run test:cov
 ```
 
-- Open Prisma Studio (visual data browser):
+## 📝 API Documentation
+
+The API follows RESTful conventions. All endpoints require authentication except:
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+
+### Example Request
 
 ```bash
-npx prisma studio
+# Create a team
+curl -X POST http://localhost:3000/api/teams \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Lakers",
+    "code": "LAL",
+    "color": "#552583"
+  }'
 ```
 
-## NPM scripts
+## 🔧 Troubleshooting
+
+### Database Connection Issues
+
+1. Ensure Docker is running
+2. Check that PostgreSQL container is up: `docker compose ps`
+3. Verify `DATABASE_URL` in `.env` matches docker-compose credentials
+
+### Prisma Client Not Found
 
 ```bash
-npm run dev         # nodemon + ts-node (development)
-npm run start       # build then start (production flow)
-npm run start:prod  # build then node dist/app.js
-npm run lint        # lint sources
-npm run lint:fix    # fix lint issues
-npm run prisma:generate
-npm run prisma:migrate
+bun run prisma:generate
 ```
 
-## Troubleshooting
+### Port Already in Use
 
-- ts-node not found when running dev: ensure dev deps are installed
+Change the `PORT` in `.env` file or stop the process using port 3000.
 
-```bash
-npm install --save-dev ts-node @types/node
-```
+## 🚧 Future Enhancements
 
-- Database connection fails: confirm Docker is running and `DATABASE_URL` matches `docker-compose.yaml` credentials and port.
+- [ ] Match statistics tracking (points, rebounds, assists per player)
+- [ ] Shot chart data storage
+- [ ] Tournament standings calculation
+- [ ] Player performance analytics
+- [ ] Real-time score updates (WebSocket)
+- [ ] File upload for team logos and player photos
+- [ ] Email notifications
+- [ ] API rate limiting
+- [ ] Swagger/OpenAPI documentation
 
-## Future Sections
+## 📄 License
 
-Add more sections below as the project evolves:
+ISC
 
-- Architecture & module layout
-- API reference / OpenAPI
-- Auth & security
-- Deployment
-- Observability (metrics, logs, tracing)
+## 👥 Author
+
+Optiq Sport
+
+---
+
+**Note**: This is the backend implementation for Phase 1, focusing on authentication and core CRUD operations. Future phases will include advanced statistics, analytics, and real-time features.

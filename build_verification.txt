@@ -1,0 +1,25 @@
+$ nest build
+[96msrc/app.e2e-spec.ts[0m:[93m25[0m:[93m12[0m - [91merror[0m[90m TS2349: [0mThis expression is not callable.
+  Type '{ default: SuperTestStatic; Test: typeof Test; agent: typeof TestAgent & ((app?: App, options?: AgentOptions) => TestAgent<Test>); }' has no call signatures.
+
+[7m25[0m     return request(app.getHttpServer())
+[7m  [0m [91m           ~~~~~~~[0m
+
+  [96msrc/app.e2e-spec.ts[0m:[93m3[0m:[93m1[0m
+    [7m3[0m import * as request from 'supertest';
+    [7m [0m [96m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+    Type originates at this import. A namespace-style import cannot be called or constructed, and will cause a failure at runtime. Consider using a default import or import require here instead.
+[96msrc/app.e2e-spec.ts[0m:[93m41[0m:[93m12[0m - [91merror[0m[90m TS2349: [0mThis expression is not callable.
+  Type '{ default: SuperTestStatic; Test: typeof Test; agent: typeof TestAgent & ((app?: App, options?: AgentOptions) => TestAgent<Test>); }' has no call signatures.
+
+[7m41[0m     return request(app.getHttpServer())
+[7m  [0m [91m           ~~~~~~~[0m
+
+  [96msrc/app.e2e-spec.ts[0m:[93m3[0m:[93m1[0m
+    [7m3[0m import * as request from 'supertest';
+    [7m [0m [96m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+    Type originates at this import. A namespace-style import cannot be called or constructed, and will cause a failure at runtime. Consider using a default import or import require here instead.
+
+Found 2 error(s).
+
+error: script "build" exited with code 1

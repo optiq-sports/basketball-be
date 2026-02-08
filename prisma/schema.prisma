@@ -1,10 +1,10 @@
 // ------------------------------------------------------
 // Prisma Schema for Basketball Data Acquisition Platform
+// Production-Grade Schema with Player Deduplication Support
 // ------------------------------------------------------
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -19,6 +19,29 @@ datasource db {
 enum Role {
   ADMIN
   STATISTICIAN
+}
+
+enum TournamentDivision {
+  PREMIER
+  DIVISION_1
+  DIVISION_2
+  DIVISION_3
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+  POSTPONED
+}
+
+enum PlayerPosition {
+  POINT_GUARD
+  SHOOTING_GUARD
+  SMALL_FORWARD
+  POWER_FORWARD
+  CENTER
 }
 
 // ------------------------------------------------------
@@ -44,18 +67,18 @@ model User {
 model UserProfile {
   id             String    @id @default(cuid()) @map("id")
   userId         String    @unique @map("user_id")
-  fullName       String?   @map("full_name")       // "Name Here"
-  age            Int?      @map("age")             // "Age"
-  division       String?   @map("division")        // "Division 1"
-  dobDay         Int?      @map("dob_day")         // "Day"
-  dobMonth       Int?      @map("dob_month")       // "Month"
-  dobYear        Int?      @map("dob_year")        // "Year"
-  phone          String?   @map("phone")           // "Phone"
-  email          String?   @map("email")           // "Email"
-  country        String?   @map("country")         // "Country"
-  state          String?   @map("state")           // "State"
-  homeAddress    String?   @map("home_address")    // "Home Address"
-  bio            String?   @map("bio")             // "Bio" or extra description
+  fullName       String?   @map("full_name")
+  age            Int?      @map("age")
+  division       String?   @map("division")
+  dobDay         Int?      @map("dob_day")
+  dobMonth       Int?      @map("dob_month")
+  dobYear        Int?      @map("dob_year")
+  phone          String?   @map("phone")
+  email          String?   @map("email")
+  country        String?   @map("country")
+  state          String?   @map("state")
+  homeAddress    String?   @map("home_address")
+  bio            String?   @map("bio")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -63,7 +86,6 @@ model UserProfile {
 
   @@map("user_profile")
 }
-
 
 model Session {
   id             String    @id @default(cuid()) @map("id")
@@ -78,11 +100,193 @@ model Session {
 
   @@map("session")
 }
-generator client {
-  provider = "prisma-client-js"
+
+model Team {
+  id             String      @id @default(cuid()) @map("id")
+  name           String      @map("name")
+  code           String      @unique @map("code")
+  color          String?     @map("color")
+  logo           String?     @map("logo")
+  country        String?     @map("country")
+  state          String?     @map("state")
+  coach          String?     @map("coach")
+  assistantCoach String?     @map("assistant_coach")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  playerTeams    PlayerTeam[]
+  tournamentTeams TournamentTeam[]
+  homeMatches    Match[]     @relation("HomeTeam")
+  awayMatches    Match[]     @relation("AwayTeam")
+  matchPlayers   MatchPlayer[] @relation("MatchPlayerTeam")
+
+  @@map("team")
 }
 
-generator seed {
-  provider = "ts-node"
-  output   = "../prisma/seed.ts"
+// Player is now an independent entity - can play for multiple teams
+model Player {
+  id             String      @id @default(cuid()) @map("id")
+  firstName      String      @map("first_name")
+  lastName       String      @map("last_name")
+  email          String?     @unique @map("email")
+  position       PlayerPosition? @map("position")
+  height         String?     @map("height")
+  photo          String?     @map("photo")
+  dateOfBirth    DateTime?   @map("date_of_birth")
+  phone          String?     @map("phone")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations - Player can have multiple team associations
+  playerTeams    PlayerTeam[]
+  matchPlayers   MatchPlayer[]
+  matchStats     MatchStat[]
+
+  @@index([firstName, lastName])
+  @@index([email])
+  @@map("player")
+}
+
+// Junction table: Player-Team relationship (many-to-many)
+// Tracks which players are/were part of which teams
+model PlayerTeam {
+  id             String      @id @default(cuid()) @map("id")
+  playerId       String      @map("player_id")
+  teamId         String      @map("team_id")
+  jerseyNumber   Int         @map("jersey_number")
+  isActive       Boolean     @default(true) @map("is_active")
+  joinedAt       DateTime    @default(now()) @map("joined_at")
+  leftAt         DateTime?   @map("left_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  player         Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team           Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, isActive])
+  @@index([playerId, teamId])
+  @@map("player_team")
+}
+
+model Tournament {
+  id             String          @id @default(cuid()) @map("id")
+  name           String          @map("name")
+  division       TournamentDivision @map("division")
+  numberOfGames  Int             @map("number_of_games")
+  numberOfQuarters Int           @default(4) @map("number_of_quarters")
+  quarterDuration Int            @map("quarter_duration")
+  overtimeDuration Int?          @map("overtime_duration")
+  startDate      DateTime        @map("start_date")
+  endDate        DateTime?       @map("end_date")
+  venue          String?         @map("venue")
+  flyer          String?         @map("flyer")
+  crewChief      String?         @map("crew_chief")
+  umpire1        String?         @map("umpire_1")
+  umpire2        String?         @map("umpire_2")
+  commissioner   String?         @map("commissioner")
+  code           String          @unique @map("code")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  teams          TournamentTeam[]
+  matches        Match[]
+
+  @@map("tournament")
+}
+
+model TournamentTeam {
+  id             String      @id @default(cuid()) @map("id")
+  tournamentId   String      @map("tournament_id")
+  teamId         String      @map("team_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  tournament     Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team           Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamId])
+  @@map("tournament_team")
+}
+
+model Match {
+  id             String      @id @default(cuid()) @map("id")
+  tournamentId   String      @map("tournament_id")
+  homeTeamId     String      @map("home_team_id")
+  awayTeamId     String      @map("away_team_id")
+  scheduledDate  DateTime    @map("scheduled_date")
+  status         MatchStatus @default(SCHEDULED) @map("status")
+  homeScore      Int         @default(0) @map("home_score")
+  awayScore      Int         @default(0) @map("away_score")
+  quarter1Home   Int?        @map("quarter_1_home")
+  quarter1Away   Int?        @map("quarter_1_away")
+  quarter2Home   Int?        @map("quarter_2_home")
+  quarter2Away   Int?        @map("quarter_2_away")
+  quarter3Home   Int?        @map("quarter_3_home")
+  quarter3Away   Int?        @map("quarter_3_away")
+  quarter4Home   Int?        @map("quarter_4_home")
+  quarter4Away   Int?        @map("quarter_4_away")
+  overtimeHome   Int?        @map("overtime_home")
+  overtimeAway   Int?        @map("overtime_away")
+  venue          String?     @map("venue")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  tournament     Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  homeTeam       Team        @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  awayTeam       Team        @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  matchPlayers   MatchPlayer[]
+  stats          MatchStat[]
+
+  @@map("match")
+}
+
+// Junction table: Which player played for which team in which match
+// Critical for accurate stats tracking when players switch teams
+model MatchPlayer {
+  id             String      @id @default(cuid()) @map("id")
+  matchId        String      @map("match_id")
+  playerId       String      @map("player_id")
+  teamId         String      @map("team_id")
+  jerseyNumber   Int         @map("jersey_number")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  match          Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player         Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team           Team        @relation("MatchPlayerTeam", fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId, teamId])
+  @@index([matchId, teamId])
+  @@map("match_player")
+}
+
+model MatchStat {
+  id             String      @id @default(cuid()) @map("id")
+  matchId        String      @map("match_id")
+  playerId       String      @map("player_id")
+  teamId         String      @map("team_id")
+  points         Int         @default(0) @map("points")
+  rebounds       Int         @default(0) @map("rebounds")
+  assists        Int         @default(0) @map("assists")
+  blocks         Int         @default(0) @map("blocks")
+  steals         Int         @default(0) @map("steals")
+  fouls          Int         @default(0) @map("fouls")
+  turnovers      Int         @default(0) @map("turnovers")
+  minutesPlayed  Int?        @map("minutes_played")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  match          Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player         Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId, teamId])
+  @@index([playerId, teamId])
+  @@map("match_stat")
 }

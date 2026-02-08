@@ -1,0 +1,391 @@
+$ nest build
+[96mprisma/seed.ts[0m:[93m23[0m:[93m11[0m - [91merror[0m[90m TS2561: [0mObject literal may only specify known properties, but 'full_name' does not exist in type '(Without<UserProfileCreateWithoutUserInput, UserProfileUncheckedCreateWithoutUserInput> & UserProfileUncheckedCreateWithoutUserInput) | (Without<...> & UserProfileCreateWithoutUserInput)'. Did you mean to write 'fullName'?
+
+[7m23[0m           full_name: 'Test Admin',
+[7m  [0m [91m          ~~~~~~~~~[0m
+
+  [96mnode_modules/.prisma/client/index.d.ts[0m:[93m18790[0m:[93m5[0m
+    [7m18790[0m     create?: XOR<UserProfileCreateWithoutUserInput, UserProfileUncheckedCreateWithoutUserInput>
+    [7m     [0m [96m    ~~~~~~[0m
+    The expected type comes from property 'create' which is declared here on type 'UserProfileUncheckedCreateNestedOneWithoutUserInput | UserProfileCreateNestedOneWithoutUserInput'
+[96msrc/app.e2e-spec.ts[0m:[93m6[0m:[93m1[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m6[0m describe('AppController (e2e)', () => {
+[7m [0m [91m~~~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m9[0m:[93m3[0m - [91merror[0m[90m TS2304: [0mCannot find name 'beforeAll'.
+
+[7m9[0m   beforeAll(async () => {
+[7m [0m [91m  ~~~~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m20[0m:[93m3[0m - [91merror[0m[90m TS2304: [0mCannot find name 'afterAll'.
+
+[7m20[0m   afterAll(async () => {
+[7m  [0m [91m  ~~~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m24[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m24[0m   it('/api/auth/register (POST) - should register a new user', () => {
+[7m  [0m [91m  ~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m25[0m:[93m12[0m - [91merror[0m[90m TS2349: [0mThis expression is not callable.
+  Type '{ default: SuperTestStatic; Test: typeof Test; agent: typeof TestAgent & ((app?: App, options?: AgentOptions) => TestAgent<Test>); }' has no call signatures.
+
+[7m25[0m     return request(app.getHttpServer())
+[7m  [0m [91m           ~~~~~~~[0m
+
+  [96msrc/app.e2e-spec.ts[0m:[93m3[0m:[93m1[0m
+    [7m3[0m import * as request from 'supertest';
+    [7m [0m [96m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+    Type originates at this import. A namespace-style import cannot be called or constructed, and will cause a failure at runtime. Consider using a default import or import require here instead.
+[96msrc/app.e2e-spec.ts[0m:[93m34[0m:[93m9[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m34[0m         expect(res.body).toHaveProperty('data');
+[7m  [0m [91m        ~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m35[0m:[93m9[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m35[0m         expect(res.body.data).toHaveProperty('access_token');
+[7m  [0m [91m        ~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m36[0m:[93m9[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m36[0m         expect(res.body.data).toHaveProperty('user');
+[7m  [0m [91m        ~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m40[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m40[0m   it('/api/auth/login (POST) - should login user', () => {
+[7m  [0m [91m  ~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m41[0m:[93m12[0m - [91merror[0m[90m TS2349: [0mThis expression is not callable.
+  Type '{ default: SuperTestStatic; Test: typeof Test; agent: typeof TestAgent & ((app?: App, options?: AgentOptions) => TestAgent<Test>); }' has no call signatures.
+
+[7m41[0m     return request(app.getHttpServer())
+[7m  [0m [91m           ~~~~~~~[0m
+
+  [96msrc/app.e2e-spec.ts[0m:[93m3[0m:[93m1[0m
+    [7m3[0m import * as request from 'supertest';
+    [7m [0m [96m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+    Type originates at this import. A namespace-style import cannot be called or constructed, and will cause a failure at runtime. Consider using a default import or import require here instead.
+[96msrc/app.e2e-spec.ts[0m:[93m49[0m:[93m9[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m49[0m         expect(res.body).toHaveProperty('data');
+[7m  [0m [91m        ~~~~~~[0m
+[96msrc/app.e2e-spec.ts[0m:[93m50[0m:[93m9[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m50[0m         expect(res.body.data).toHaveProperty('access_token');
+[7m  [0m [91m        ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m9[0m:[93m1[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m9[0m jest.mock('bcrypt');
+[7m [0m [91m~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m11[0m:[93m1[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m11[0m describe('AuthService', () => {
+[7m  [0m [91m~~~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m18[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m18[0m       findUnique: jest.fn(),
+[7m  [0m [91m                  ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m19[0m:[93m15[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m19[0m       create: jest.fn(),
+[7m  [0m [91m              ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m22[0m:[93m15[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m22[0m       create: jest.fn(),
+[7m  [0m [91m              ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m27[0m:[93m11[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m27[0m     sign: jest.fn(),
+[7m  [0m [91m          ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m31[0m:[93m10[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m31[0m     get: jest.fn().mockReturnValue('test-secret'),
+[7m  [0m [91m         ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m34[0m:[93m3[0m - [91merror[0m[90m TS2304: [0mCannot find name 'beforeEach'.
+
+[7m34[0m   beforeEach(async () => {
+[7m  [0m [91m  ~~~~~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m58[0m:[93m3[0m - [91merror[0m[90m TS2304: [0mCannot find name 'afterEach'.
+
+[7m58[0m   afterEach(() => {
+[7m  [0m [91m  ~~~~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m59[0m:[93m5[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m59[0m     jest.clearAllMocks();
+[7m  [0m [91m    ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m62[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m62[0m   describe('login', () => {
+[7m  [0m [91m  ~~~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m63[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m63[0m     it('should return access token on successful login', async () => {
+[7m  [0m [91m    ~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m77[0m:[93m26[0m - [91merror[0m[90m TS2503: [0mCannot find namespace 'jest'.
+
+[7m77[0m       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+[7m  [0m [91m                         ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m83[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m83[0m       expect(result).toHaveProperty('access_token');
+[7m  [0m [91m      ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m84[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m84[0m       expect(result).toHaveProperty('user');
+[7m  [0m [91m      ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m85[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m85[0m       expect(mockJwtService.sign).toHaveBeenCalled();
+[7m  [0m [91m      ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m88[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m88[0m     it('should throw UnauthorizedException on invalid credentials', async () => {
+[7m  [0m [91m    ~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m96[0m:[93m13[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m96[0m       await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+[7m  [0m [91m            ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m100[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m100[0m   describe('register', () => {
+[7m   [0m [91m  ~~~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m101[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m101[0m     it('should create new user and return tokens', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m108[0m:[93m23[0m - [91merror[0m[90m TS2503: [0mCannot find namespace 'jest'.
+
+[7m108[0m       (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
+[7m   [0m [91m                      ~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m119[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m119[0m       expect(result).toHaveProperty('access_token');
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m120[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m120[0m       expect(result).toHaveProperty('user');
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m121[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m121[0m       expect(mockPrismaService.user.create).toHaveBeenCalled();
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m124[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m124[0m     it('should throw ConflictException if user already exists', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/auth/auth.service.spec.ts[0m:[93m135[0m:[93m13[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m135[0m       await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+[7m   [0m [91m            ~~~~~~[0m
+[96msrc/logger/logger.ts[0m:[93m1[0m:[93m21[0m - [91merror[0m[90m TS2307: [0mCannot find module 'winston' or its corresponding type declarations.
+
+[7m1[0m import winston from "winston";
+[7m [0m [91m                    ~~~~~~~~~[0m
+[96msrc/matches/matches.service.ts[0m:[93m100[0m:[93m17[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'team' does not exist in type 'PlayerInclude<DefaultArgs>'.
+
+[7m100[0m                 team: true,
+[7m   [0m [91m                ~~~~[0m
+[96msrc/matches/matches.service.ts[0m:[93m117[0m:[93m13[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'players' does not exist in type 'TeamInclude<DefaultArgs>'.
+
+[7m117[0m             players: {
+[7m   [0m [91m            ~~~~~~~[0m
+[96msrc/matches/matches.service.ts[0m:[93m124[0m:[93m13[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'players' does not exist in type 'TeamInclude<DefaultArgs>'.
+
+[7m124[0m             players: {
+[7m   [0m [91m            ~~~~~~~[0m
+[96msrc/matches/matches.service.ts[0m:[93m133[0m:[93m17[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'team' does not exist in type 'PlayerInclude<DefaultArgs>'.
+
+[7m133[0m                 team: true,
+[7m   [0m [91m                ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m7[0m:[93m1[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m7[0m describe('PlayersService', () => {
+[7m [0m [91m~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m14[0m:[93m15[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m14[0m       create: jest.fn(),
+[7m  [0m [91m              ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m15[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m15[0m       findUnique: jest.fn(),
+[7m  [0m [91m                  ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m16[0m:[93m17[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m16[0m       findMany: jest.fn(),
+[7m  [0m [91m                ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m17[0m:[93m15[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m17[0m       update: jest.fn(),
+[7m  [0m [91m              ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m18[0m:[93m15[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m18[0m       delete: jest.fn(),
+[7m  [0m [91m              ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m21[0m:[93m15[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m21[0m       create: jest.fn(),
+[7m  [0m [91m              ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m22[0m:[93m18[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m22[0m       findFirst: jest.fn(),
+[7m  [0m [91m                 ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m23[0m:[93m17[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m23[0m       findMany: jest.fn(),
+[7m  [0m [91m                ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m24[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m24[0m       updateMany: jest.fn(),
+[7m  [0m [91m                  ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m27[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m27[0m       findUnique: jest.fn(),
+[7m  [0m [91m                  ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m29[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m29[0m     $transaction: jest.fn(),
+[7m  [0m [91m                  ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m33[0m:[93m26[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m33[0m     findDuplicatePlayer: jest.fn(),
+[7m  [0m [91m                         ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m34[0m:[93m26[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m34[0m     findDuplicatesBatch: jest.fn(),
+[7m  [0m [91m                         ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m37[0m:[93m3[0m - [91merror[0m[90m TS2304: [0mCannot find name 'beforeEach'.
+
+[7m37[0m   beforeEach(async () => {
+[7m  [0m [91m  ~~~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m57[0m:[93m3[0m - [91merror[0m[90m TS2304: [0mCannot find name 'afterEach'.
+
+[7m57[0m   afterEach(() => {
+[7m  [0m [91m  ~~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m58[0m:[93m5[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m58[0m     jest.clearAllMocks();
+[7m  [0m [91m    ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m61[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m61[0m   describe('create', () => {
+[7m  [0m [91m  ~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m62[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m62[0m     it('should create a new player successfully', async () => {
+[7m  [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m85[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m85[0m       expect(result).toBeDefined();
+[7m  [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m86[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m86[0m       expect(mockPrismaService.player.create).toHaveBeenCalled();
+[7m  [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m89[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m89[0m     it('should throw ConflictException if duplicate player found', async () => {
+[7m  [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m101[0m:[93m13[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m101[0m       await expect(service.create(createPlayerDto)).rejects.toThrow(ConflictException);
+[7m   [0m [91m            ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m105[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m105[0m   describe('createForTeam', () => {
+[7m   [0m [91m  ~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m106[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m106[0m     it('should create player and assign to team', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m123[0m:[93m21[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m123[0m             create: jest.fn().mockResolvedValue({
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m128[0m:[93m25[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m128[0m             findUnique: jest.fn().mockResolvedValue(null),
+[7m   [0m [91m                        ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m131[0m:[93m21[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m131[0m             create: jest.fn().mockResolvedValue({}),
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m138[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m138[0m       expect(result).toBeDefined();
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m139[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m139[0m       expect(mockPrismaService.$transaction).toHaveBeenCalled();
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m142[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m142[0m     it('should throw NotFoundException if team does not exist', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m152[0m:[93m13[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m152[0m       await expect(service.createForTeam(createDto)).rejects.toThrow(NotFoundException);
+[7m   [0m [91m            ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m156[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m156[0m   describe('bulkCreateForTeam', () => {
+[7m   [0m [91m  ~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m157[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m157[0m     it('should create multiple players with deduplication', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m175[0m:[93m21[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m175[0m             create: jest.fn().mockResolvedValue({ id: 'player1', firstName: 'John', lastName: 'Doe' }),
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m176[0m:[93m25[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m176[0m             findUnique: jest.fn().mockResolvedValue(null),
+[7m   [0m [91m                        ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m179[0m:[93m21[0m - [91merror[0m[90m TS2304: [0mCannot find name 'jest'.
+
+[7m179[0m             create: jest.fn().mockResolvedValue({}),
+[7m   [0m [91m                    ~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m186[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m186[0m       expect(result).toBeDefined();
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m187[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m187[0m       expect(result.created).toBeGreaterThan(0);
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m191[0m:[93m3[0m - [91merror[0m[90m TS2593: [0mCannot find name 'describe'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m191[0m   describe('findOne', () => {
+[7m   [0m [91m  ~~~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m192[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m192[0m     it('should return player if found', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m206[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m206[0m       expect(result).toBeDefined();
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m207[0m:[93m7[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m207[0m       expect(result.id).toBe(playerId);
+[7m   [0m [91m      ~~~~~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m210[0m:[93m5[0m - [91merror[0m[90m TS2593: [0mCannot find name 'it'. Do you need to install type definitions for a test runner? Try `npm i --save-dev @types/jest` or `npm i --save-dev @types/mocha` and then add 'jest' or 'mocha' to the types field in your tsconfig.
+
+[7m210[0m     it('should throw NotFoundException if player not found', async () => {
+[7m   [0m [91m    ~~[0m
+[96msrc/players/players.service.spec.ts[0m:[93m213[0m:[93m13[0m - [91merror[0m[90m TS2304: [0mCannot find name 'expect'.
+
+[7m213[0m       await expect(service.findOne('invalid')).rejects.toThrow(NotFoundException);
+[7m   [0m [91m            ~~~~~~[0m
+[96msrc/players/players.service.ts[0m:[93m358[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'Promise<PlayerResponseDto>[]' is not assignable to type 'PlayerResponseDto[]'.
+  Type 'Promise<PlayerResponseDto>' is missing the following properties from type 'PlayerResponseDto': id, firstName, lastName, createdAt, updatedAt
+
+[7m358[0m     return players.map((p) => this.formatPlayerResponse(p));
+[7m   [0m [91m    ~~~~~~[0m
+[96msrc/tournaments/tournaments.service.ts[0m:[93m82[0m:[93m17[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'players' does not exist in type 'TeamInclude<DefaultArgs>'.
+
+[7m82[0m                 players: {
+[7m  [0m [91m                ~~~~~~~[0m
+[96msrc/tournaments/tournaments.service.ts[0m:[93m119[0m:[93m17[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'players' does not exist in type 'TeamInclude<DefaultArgs>'.
+
+[7m119[0m                 players: {
+[7m   [0m [91m                ~~~~~~~[0m
+
+Found 92 error(s).
+
+error: script "build" exited with code 1
