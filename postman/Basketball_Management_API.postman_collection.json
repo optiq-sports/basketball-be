@@ -156,14 +156,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"LeBron\",\n  \"lastName\": \"James\",\n  \"email\": \"lebron@example.com\",\n  \"position\": \"SMALL_FORWARD\",\n  \"height\": \"6'9\\\"\",\n  \"phone\": \"+1234567890\",\n  \"dateOfBirth\": \"1984-12-30\"\n}"
+              "raw": "{\n  \"firstName\": \"LeBron\",\n  \"lastName\": \"James\",\n  \"email\": \"lebron@example.com\",\n  \"position\": \"SMALL_FORWARD\",\n  \"height\": \"6'9\\\"\",\n  \"phone\": \"+1234567890\",\n  \"dateOfBirth\": \"1984-12-30\",\n  \"nationality\": \"USA\",\n  \"confirmDuplicate\": false\n}"
             },
             "url": {
               "raw": "{{base_url}}/players",
               "host": ["{{base_url}}"],
               "path": ["players"]
             },
-            "description": "Create a standalone player (not assigned to any team). Uses deduplication - will throw error if duplicate found."
+            "description": "Create a standalone player. Steps: 1. Exact match (First Name, Last Name, DOB) -> Throw Error. 2. Fuzzy Match (75%) -> Return potential duplicate warning. 3. confirmDuplicate: true -> Forces creation."
           },
           "response": []
         },
@@ -194,14 +194,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"firstName\": \"Kobe\",\n  \"lastName\": \"Bryant\",\n  \"jerseyNumber\": 24,\n  \"email\": \"kobe@example.com\",\n  \"position\": \"SHOOTING_GUARD\",\n  \"height\": \"6'6\\\"\",\n  \"dateOfBirth\": \"1978-08-23\"\n}"
+              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"firstName\": \"Kobe\",\n  \"lastName\": \"Bryant\",\n  \"jerseyNumber\": 24,\n  \"email\": \"kobe@example.com\",\n  \"position\": \"SHOOTING_GUARD\",\n  \"height\": \"6'6\\\"\",\n  \"dateOfBirth\": \"1978-08-23\",\n  \"nationality\": \"USA\",\n  \"confirmDuplicate\": false\n}"
             },
             "url": {
               "raw": "{{base_url}}/players/team",
               "host": ["{{base_url}}"],
               "path": ["players", "team"]
             },
-            "description": "Create a player and assign to a team. If player already exists (98%+ similarity), assigns existing player to team."
+            "description": "Create a player and assign to a team. Uses 3-step deduplication logic. Potential duplicates (75% score) require confirmDuplicate: true."
           },
           "response": []
         },
@@ -217,7 +217,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"players\": [\n    {\n      \"firstName\": \"Stephen\",\n      \"lastName\": \"Curry\",\n      \"jerseyNumber\": 30,\n      \"email\": \"steph@example.com\",\n      \"position\": \"POINT_GUARD\",\n      \"height\": \"6'3\\\"\"\n    },\n    {\n      \"firstName\": \"Klay\",\n      \"lastName\": \"Thompson\",\n      \"jerseyNumber\": 11,\n      \"email\": \"klay@example.com\",\n      \"position\": \"SHOOTING_GUARD\",\n      \"height\": \"6'6\\\"\"\n    },\n    {\n      \"firstName\": \"Draymond\",\n      \"lastName\": \"Green\",\n      \"jerseyNumber\": 23,\n      \"position\": \"POWER_FORWARD\",\n      \"height\": \"6'6\\\"\"\n    }\n  ]\n}"
+              "raw": "{\n  \"teamId\": \"{{team_id}}\",\n  \"players\": [\n    {\n      \"firstName\": \"Stephen\",\n      \"lastName\": \"Curry\",\n      \"jerseyNumber\": 30,\n      \"email\": \"steph@example.com\",\n      \"position\": \"POINT_GUARD\",\n      \"height\": \"6'3\\\"\",\n      \"nationality\": \"USA\"\n    },\n    {\n      \"firstName\": \"Klay\",\n      \"lastName\": \"Thompson\",\n      \"jerseyNumber\": 11,\n      \"email\": \"klay@example.com\",\n      \"position\": \"SHOOTING_GUARD\",\n      \"height\": \"6'6\\\"\",\n      \"nationality\": \"USA\"\n    },\n    {\n      \"firstName\": \"Draymond\",\n      \"lastName\": \"Green\",\n      \"jerseyNumber\": 23,\n      \"position\": \"POWER_FORWARD\",\n      \"height\": \"6'6\\\"\",\n      \"nationality\": \"USA\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{base_url}}/players/team/bulk",
@@ -332,6 +332,53 @@
               "path": ["players", "{{player_id}}"]
             },
             "description": "Delete player (deactivates all team associations, preserves stats history). ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Players (Excel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/players/team/{{team_id}}/upload",
+              "host": ["{{base_url}}"],
+              "path": ["players", "team", "{{team_id}}", "upload"]
+            },
+            "description": "Upload an Excel file (.xlsx) containing player data. Automatically handles exact matches (links to team) and flags potential duplicates for skip. Roles: ADMIN, STATISTICIAN."
+          },
+          "response": []
+        },
+        {
+          "name": "Merge Players",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duplicatePlayerId\": \"id_to_be_deleted\",\n  \"targetPlayerId\": \"id_to_be_kept\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/players/merge",
+              "host": ["{{base_url}}"],
+              "path": ["players", "merge"]
+            },
+            "description": "Merge two player profiles. Moves all team associations and stats to the target player, then deletes the duplicate. Roles: ADMIN."
           },
           "response": []
         }

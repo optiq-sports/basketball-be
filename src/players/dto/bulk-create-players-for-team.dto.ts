@@ -10,9 +10,9 @@ import {
   IsDateString,
   Min,
   Max,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { PlayerPosition } from '@prisma/client';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { PlayerPosition } from "@prisma/client";
 
 class PlayerDataDto {
   @IsString()
@@ -51,6 +51,10 @@ class PlayerDataDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  nationality?: string;
 }
 
 export class BulkCreatePlayersForTeamDto {
@@ -63,4 +67,3 @@ export class BulkCreatePlayersForTeamDto {
   @Type(() => PlayerDataDto)
   players: PlayerDataDto[];
 }
-

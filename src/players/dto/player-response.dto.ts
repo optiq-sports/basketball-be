@@ -24,6 +24,7 @@ export class PlayerResponseDto {
   photo?: string;
   dateOfBirth?: Date;
   phone?: string;
+  nationality?: string;
   createdAt: Date;
   updatedAt: Date;
   playerTeams?: PlayerTeamResponseDto[];

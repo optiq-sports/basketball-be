@@ -9,18 +9,21 @@ import {
   UseGuards,
   Query,
   Put,
-} from '@nestjs/common';
-import { PlayersService } from './players.service';
-import { CreatePlayerDto } from './dto/create-player.dto';
-import { CreatePlayerForTeamDto } from './dto/create-player-for-team.dto';
-import { BulkCreatePlayersForTeamDto } from './dto/bulk-create-players-for-team.dto';
-import { UpdatePlayerDto } from './dto/update-player.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+  UseInterceptors,
+  UploadedFile,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { PlayersService } from "./players.service";
+import { CreatePlayerDto } from "./dto/create-player.dto";
+import { CreatePlayerForTeamDto } from "./dto/create-player-for-team.dto";
+import { BulkCreatePlayersForTeamDto } from "./dto/bulk-create-players-for-team.dto";
+import { UpdatePlayerDto } from "./dto/update-player.dto";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { Role } from "@prisma/client";
 
-@Controller('players')
+@Controller("players")
 @UseGuards(JwtAuthGuard)
 export class PlayersController {
   constructor(private readonly playersService: PlayersService) {}
@@ -38,7 +41,7 @@ export class PlayersController {
   /**
    * Create a player and assign to a team (with deduplication)
    */
-  @Post('team')
+  @Post("team")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.STATISTICIAN)
   createForTeam(@Body() createPlayerDto: CreatePlayerForTeamDto) {
@@ -49,7 +52,7 @@ export class PlayersController {
    * Bulk create players for a team (with deduplication)
    * This is the main endpoint for importing players
    */
-  @Post('team/bulk')
+  @Post("team/bulk")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.STATISTICIAN)
   bulkCreateForTeam(@Body() bulkDto: BulkCreatePlayersForTeamDto) {
@@ -57,41 +60,55 @@ export class PlayersController {
   }
 
   /**
+   * Upload players via Excel/CSV
+   */
+  @Post("team/:teamId/upload")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN)
+  @UseInterceptors(FileInterceptor("file"))
+  uploadPlayers(
+    @Param("teamId") teamId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.playersService.processBulkUpload(teamId, file);
+  }
+
+  /**
    * Get all players (optionally filtered by team)
    */
   @Get()
-  findAll(@Query('teamId') teamId?: string) {
+  findAll(@Query("teamId") teamId?: string) {
     return this.playersService.findAll(teamId);
   }
 
   /**
    * Get player by ID
    */
-  @Get(':id')
-  findOne(@Param('id') id: string) {
+  @Get(":id")
+  findOne(@Param("id") id: string) {
     return this.playersService.findOne(id);
   }
 
   /**
    * Update player
    */
-  @Patch(':id')
+  @Patch(":id")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.STATISTICIAN)
-  update(@Param('id') id: string, @Body() updatePlayerDto: UpdatePlayerDto) {
+  update(@Param("id") id: string, @Body() updatePlayerDto: UpdatePlayerDto) {
     return this.playersService.update(id, updatePlayerDto);
   }
 
   /**
    * Assign player to team
    */
-  @Put(':id/teams/:teamId')
+  @Put(":id/teams/:teamId")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.STATISTICIAN)
   assignToTeam(
-    @Param('id') playerId: string,
-    @Param('teamId') teamId: string,
-    @Body('jerseyNumber') jerseyNumber: number,
+    @Param("id") playerId: string,
+    @Param("teamId") teamId: string,
+    @Body("jerseyNumber") jerseyNumber: number,
   ) {
     return this.playersService.assignToTeam(playerId, teamId, jerseyNumber);
   }
@@ -99,20 +116,38 @@ export class PlayersController {
   /**
    * Remove player from team
    */
-  @Delete(':id/teams/:teamId')
+  @Delete(":id/teams/:teamId")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.STATISTICIAN)
-  removeFromTeam(@Param('id') playerId: string, @Param('teamId') teamId: string) {
+  removeFromTeam(
+    @Param("id") playerId: string,
+    @Param("teamId") teamId: string,
+  ) {
     return this.playersService.removeFromTeam(playerId, teamId);
   }
 
   /**
    * Remove player (deactivates all team associations)
    */
-  @Delete(':id')
+  @Delete(":id")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  remove(@Param('id') id: string) {
+  remove(@Param("id") id: string) {
     return this.playersService.remove(id);
+  }
+
+  /**
+   * Merge two player profiles
+   */
+  @Post("merge")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  mergePlayers(
+    @Body() data: { duplicatePlayerId: string; targetPlayerId: string },
+  ) {
+    return this.playersService.mergePlayers(
+      data.duplicatePlayerId,
+      data.targetPlayerId,
+    );
   }
 }

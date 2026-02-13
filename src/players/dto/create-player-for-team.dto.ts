@@ -8,8 +8,8 @@ import {
   IsDateString,
   Min,
   Max,
-} from 'class-validator';
-import { PlayerPosition } from '@prisma/client';
+} from "class-validator";
+import { PlayerPosition } from "@prisma/client";
 
 export class CreatePlayerForTeamDto {
   @IsString()
@@ -52,5 +52,11 @@ export class CreatePlayerForTeamDto {
   @IsOptional()
   @IsString()
   phone?: string;
-}
 
+  @IsOptional()
+  @IsString()
+  nationality?: string;
+
+  @IsOptional()
+  confirmDuplicate?: boolean;
+}
