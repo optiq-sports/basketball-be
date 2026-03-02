@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateAdminDto } from "./dto/create-admin.dto";
@@ -13,7 +14,18 @@ import { Role, UserStatus } from "@prisma/client";
 export class AdminService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createAdminDto: CreateAdminDto) {
+  async create(currentUser: any, createAdminDto: CreateAdminDto) {
+    if (currentUser.role === Role.ADMIN) {
+      if (
+        createAdminDto.role === Role.SUPER_ADMIN ||
+        createAdminDto.role === Role.ADMIN
+      ) {
+        throw new ForbiddenException(
+          "Admins cannot create other Admins or Super Admins",
+        );
+      }
+    }
+
     const existingUser = await this.prisma.user.findUnique({
       where: { email: createAdminDto.email },
     });
@@ -71,7 +83,18 @@ export class AdminService {
     return user;
   }
 
-  async update(id: string, updateAdminDto: UpdateAdminDto) {
+  async update(currentUser: any, id: string, updateAdminDto: UpdateAdminDto) {
+    if (currentUser.role === Role.ADMIN) {
+      if (
+        updateAdminDto.role === Role.SUPER_ADMIN ||
+        updateAdminDto.role === Role.ADMIN
+      ) {
+        throw new ForbiddenException(
+          "Admins cannot update other Admins or Super Admins",
+        );
+      }
+    }
+
     const data: any = { ...updateAdminDto };
     if (updateAdminDto.password) {
       data.password = await bcrypt.hash(updateAdminDto.password, 10);

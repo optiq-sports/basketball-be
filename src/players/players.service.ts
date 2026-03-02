@@ -827,6 +827,10 @@ export class PlayersService {
           position: row["Position"]
             ? (row["Position"] as PlayerPosition)
             : undefined,
+          gender:
+            row["Gender"] || row["gender"]
+              ? String(row["Gender"] || row["gender"]).trim()
+              : undefined,
         };
 
         // 1. Deduplication Check
@@ -850,15 +854,17 @@ export class PlayersService {
           // If EXACT match, we COULD link to team?
           // "Step 1 - Exact Match Found -> Use existing UUID"
           // Let's Link it!
-          if (teamId && candidate.jerseyNumber) {
-            // Check jersey availability
-            const existingJersey = await this.prisma.playerTeam.findFirst({
-              where: {
-                teamId,
-                jerseyNumber: candidate.jerseyNumber,
-                isActive: true,
-              },
-            });
+          if (teamId) {
+            // Check jersey availability if provided
+            const existingJersey = candidate.jerseyNumber
+              ? await this.prisma.playerTeam.findFirst({
+                  where: {
+                    teamId,
+                    jerseyNumber: candidate.jerseyNumber,
+                    isActive: true,
+                  },
+                })
+              : null;
 
             if (!existingJersey) {
               // Check if already in team
@@ -875,7 +881,7 @@ export class PlayersService {
                   data: {
                     playerId: duplicateCheck.existingPlayer.id,
                     teamId,
-                    jerseyNumber: candidate.jerseyNumber,
+                    jerseyNumber: candidate.jerseyNumber || 0, // Fallback to 0 or null if optional
                     isActive: true,
                   },
                 });
@@ -920,16 +926,17 @@ export class PlayersService {
               phone: candidate.phone,
               dateOfBirth: candidate.dateOfBirth,
               nationality: candidate.nationality,
+              gender: candidate.gender,
               position: candidate.position,
             } as any,
           });
 
-          if (teamId && candidate.jerseyNumber) {
+          if (teamId) {
             await this.prisma.playerTeam.create({
               data: {
                 playerId: newPlayer.id,
                 teamId,
-                jerseyNumber: candidate.jerseyNumber,
+                jerseyNumber: candidate.jerseyNumber || 0,
                 isActive: true,
               },
             });

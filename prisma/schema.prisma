@@ -145,6 +145,7 @@ model Player {
   dateOfBirth    DateTime?   @map("date_of_birth")
   nationality    String?     @map("nationality")
   phone          String?     @map("phone")
+  gender         String?     @map("gender")
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
@@ -166,6 +167,7 @@ model PlayerTeam {
   teamId         String      @map("team_id")
   jerseyNumber   Int         @map("jersey_number")
   isActive       Boolean     @default(true) @map("is_active")
+  isCaptain      Boolean     @default(false) @map("is_captain")
   joinedAt       DateTime    @default(now()) @map("joined_at")
   leftAt         DateTime?   @map("left_at")
   createdAt      DateTime    @default(now()) @map("created_at")

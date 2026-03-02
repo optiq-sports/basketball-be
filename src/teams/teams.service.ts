@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateTeamDto } from './dto/create-team.dto';
-import { UpdateTeamDto } from './dto/update-team.dto';
-import { Team } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateTeamDto } from "./dto/create-team.dto";
+import { UpdateTeamDto } from "./dto/update-team.dto";
+import { Team } from "@prisma/client";
 
 @Injectable()
 export class TeamsService {
@@ -11,7 +16,9 @@ export class TeamsService {
   constructor(private prisma: PrismaService) {}
 
   async create(createTeamDto: CreateTeamDto): Promise<Team> {
-    this.logger.log(`Creating team: ${createTeamDto.name} (${createTeamDto.code})`);
+    this.logger.log(
+      `Creating team: ${createTeamDto.name} (${createTeamDto.code})`,
+    );
 
     // Check if team code already exists
     const existingTeam = await this.prisma.team.findUnique({
@@ -19,7 +26,9 @@ export class TeamsService {
     });
 
     if (existingTeam) {
-      throw new ConflictException(`Team with code ${createTeamDto.code} already exists`);
+      throw new ConflictException(
+        `Team with code ${createTeamDto.code} already exists`,
+      );
     }
 
     return this.prisma.team.create({
@@ -35,7 +44,7 @@ export class TeamsService {
           include: {
             player: true,
           },
-          orderBy: { jerseyNumber: 'asc' },
+          orderBy: { jerseyNumber: "asc" },
         },
         _count: {
           select: {
@@ -45,7 +54,7 @@ export class TeamsService {
           },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
@@ -58,7 +67,7 @@ export class TeamsService {
           include: {
             player: true,
           },
-          orderBy: { jerseyNumber: 'asc' },
+          orderBy: { jerseyNumber: "asc" },
         },
         tournamentTeams: {
           include: {
@@ -97,7 +106,9 @@ export class TeamsService {
       });
 
       if (existingTeam) {
-        throw new ConflictException(`Team with code ${updateTeamDto.code} already exists`);
+        throw new ConflictException(
+          `Team with code ${updateTeamDto.code} already exists`,
+        );
       }
     }
 
@@ -110,7 +121,7 @@ export class TeamsService {
           include: {
             player: true,
           },
-          orderBy: { jerseyNumber: 'asc' },
+          orderBy: { jerseyNumber: "asc" },
         },
       },
     });
@@ -122,5 +133,32 @@ export class TeamsService {
       where: { id },
     });
     this.logger.log(`Deleted team: ${team.name} (${team.code})`);
+  }
+
+  async setCaptain(teamId: string, playerId: string, isCaptain: boolean) {
+    const playerTeam = await this.prisma.playerTeam.findFirst({
+      where: {
+        teamId,
+        playerId,
+        isActive: true,
+      },
+    });
+
+    if (!playerTeam) {
+      throw new NotFoundException(`Player not found in this team`);
+    }
+
+    if (isCaptain) {
+      await this.prisma.playerTeam.updateMany({
+        where: { teamId, isActive: true },
+        data: { isCaptain: false },
+      });
+    }
+
+    return this.prisma.playerTeam.update({
+      where: { id: playerTeam.id },
+      data: { isCaptain },
+      include: { player: true },
+    });
   }
 }

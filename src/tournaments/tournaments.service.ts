@@ -20,6 +20,20 @@ export class TournamentsService {
   }
 
   async create(createTournamentDto: CreateTournamentDto): Promise<Tournament> {
+    // Check for idempotency: Prevent duplicates with same name and division
+    const duplicate = await this.prisma.tournament.findFirst({
+      where: {
+        name: createTournamentDto.name,
+        division: createTournamentDto.division,
+      },
+    });
+
+    if (duplicate) {
+      throw new ConflictException(
+        `A tournament with the name "${createTournamentDto.name}" and division "${createTournamentDto.division}" already exists.`,
+      );
+    }
+
     // Generate unique tournament code
     let code: string;
     let isUnique = false;
