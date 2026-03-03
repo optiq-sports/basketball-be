@@ -82,8 +82,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/register",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "register"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
             },
             "description": "Register a new user. Roles: ADMIN, STATISTICIAN"
           },
@@ -120,8 +125,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/login",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             }
           },
           "response": []
@@ -133,8 +143,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/auth/profile",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "profile"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
             }
           },
           "response": []
@@ -160,8 +175,12 @@
             },
             "url": {
               "raw": "{{base_url}}/players",
-              "host": ["{{base_url}}"],
-              "path": ["players"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players"
+              ]
             },
             "description": "Create a standalone player. Steps: 1. Exact match (First Name, Last Name, DOB) -> Throw Error. 2. Fuzzy Match (75%) -> Return potential duplicate warning. 3. confirmDuplicate: true -> Forces creation."
           },
@@ -198,8 +217,13 @@
             },
             "url": {
               "raw": "{{base_url}}/players/team",
-              "host": ["{{base_url}}"],
-              "path": ["players", "team"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "team"
+              ]
             },
             "description": "Create a player and assign to a team. Uses 3-step deduplication logic. Potential duplicates (75% score) require confirmDuplicate: true."
           },
@@ -221,8 +245,14 @@
             },
             "url": {
               "raw": "{{base_url}}/players/team/bulk",
-              "host": ["{{base_url}}"],
-              "path": ["players", "team", "bulk"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "team",
+                "bulk"
+              ]
             },
             "description": "Bulk create players for a team with automatic deduplication. Returns created count, duplicates count, and duplicate matches."
           },
@@ -235,8 +265,12 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/players?teamId={{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["players"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players"
+              ],
               "query": [
                 {
                   "key": "teamId",
@@ -256,8 +290,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/players/{{player_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["players", "{{player_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "{{player_id}}"
+              ]
             }
           },
           "response": []
@@ -278,8 +317,13 @@
             },
             "url": {
               "raw": "{{base_url}}/players/{{player_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["players", "{{player_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "{{player_id}}"
+              ]
             }
           },
           "response": []
@@ -300,8 +344,15 @@
             },
             "url": {
               "raw": "{{base_url}}/players/{{player_id}}/teams/{{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["players", "{{player_id}}", "teams", "{{team_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "{{player_id}}",
+                "teams",
+                "{{team_id}}"
+              ]
             },
             "description": "Assign an existing player to a team with a jersey number."
           },
@@ -314,8 +365,15 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/players/{{player_id}}/teams/{{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["players", "{{player_id}}", "teams", "{{team_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "{{player_id}}",
+                "teams",
+                "{{team_id}}"
+              ]
             },
             "description": "Remove player from team (deactivates association, preserves history)."
           },
@@ -328,8 +386,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/players/{{player_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["players", "{{player_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "{{player_id}}"
+              ]
             },
             "description": "Delete player (deactivates all team associations, preserves stats history). ADMIN only."
           },
@@ -352,8 +415,15 @@
             },
             "url": {
               "raw": "{{base_url}}/players/team/{{team_id}}/upload",
-              "host": ["{{base_url}}"],
-              "path": ["players", "team", "{{team_id}}", "upload"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "team",
+                "{{team_id}}",
+                "upload"
+              ]
             },
             "description": "Upload an Excel file (.xlsx) containing player data. Automatically handles exact matches (links to team) and flags potential duplicates for skip. Roles: ADMIN, STATISTICIAN."
           },
@@ -375,8 +445,13 @@
             },
             "url": {
               "raw": "{{base_url}}/players/merge",
-              "host": ["{{base_url}}"],
-              "path": ["players", "merge"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "players",
+                "merge"
+              ]
             },
             "description": "Merge two player profiles. Moves all team associations and stats to the target player, then deletes the duplicate. Roles: ADMIN."
           },
@@ -418,8 +493,12 @@
             },
             "url": {
               "raw": "{{base_url}}/teams",
-              "host": ["{{base_url}}"],
-              "path": ["teams"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "teams"
+              ]
             }
           },
           "response": []
@@ -431,8 +510,12 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/teams",
-              "host": ["{{base_url}}"],
-              "path": ["teams"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "teams"
+              ]
             }
           },
           "response": []
@@ -444,8 +527,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/teams/{{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["teams", "{{team_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "teams",
+                "{{team_id}}"
+              ]
             }
           },
           "response": []
@@ -466,8 +554,13 @@
             },
             "url": {
               "raw": "{{base_url}}/teams/{{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["teams", "{{team_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "teams",
+                "{{team_id}}"
+              ]
             }
           },
           "response": []
@@ -479,10 +572,46 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/teams/{{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["teams", "{{team_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "teams",
+                "{{team_id}}"
+              ]
             },
             "description": "Delete team. ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Team Captain",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isCaptain\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/teams/{{team_id}}/players/{{player_id}}/captain",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "teams",
+                "{{team_id}}",
+                "players",
+                "{{player_id}}",
+                "captain"
+              ]
+            },
+            "description": "Set a player as the team captain. This will automatically unset any existing captain for the team."
           },
           "response": []
         }
@@ -522,8 +651,12 @@
             },
             "url": {
               "raw": "{{base_url}}/tournaments",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments"
+              ]
             },
             "description": "Create a new tournament. Tournament code is auto-generated."
           },
@@ -536,8 +669,12 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/tournaments",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments"
+              ]
             }
           },
           "response": []
@@ -549,8 +686,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/tournaments/{{tournament_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments", "{{tournament_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments",
+                "{{tournament_id}}"
+              ]
             }
           },
           "response": []
@@ -562,8 +704,14 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/tournaments/code/ABC123",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments", "code", "ABC123"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments",
+                "code",
+                "ABC123"
+              ]
             },
             "description": "Get tournament by its unique code (for public sharing)."
           },
@@ -585,8 +733,13 @@
             },
             "url": {
               "raw": "{{base_url}}/tournaments/{{tournament_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments", "{{tournament_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments",
+                "{{tournament_id}}"
+              ]
             }
           },
           "response": []
@@ -607,8 +760,14 @@
             },
             "url": {
               "raw": "{{base_url}}/tournaments/{{tournament_id}}/teams",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments", "{{tournament_id}}", "teams"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments",
+                "{{tournament_id}}",
+                "teams"
+              ]
             },
             "description": "Add multiple teams to a tournament."
           },
@@ -621,8 +780,15 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/tournaments/{{tournament_id}}/teams/{{team_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments", "{{tournament_id}}", "teams", "{{team_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments",
+                "{{tournament_id}}",
+                "teams",
+                "{{team_id}}"
+              ]
             }
           },
           "response": []
@@ -634,8 +800,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/tournaments/{{tournament_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["tournaments", "{{tournament_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tournaments",
+                "{{tournament_id}}"
+              ]
             },
             "description": "Delete tournament. ADMIN only."
           },
@@ -677,8 +848,12 @@
             },
             "url": {
               "raw": "{{base_url}}/matches",
-              "host": ["{{base_url}}"],
-              "path": ["matches"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "matches"
+              ]
             },
             "description": "Create a new match. Both teams must be part of the tournament."
           },
@@ -691,8 +866,12 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/matches?tournamentId={{tournament_id}}&status=LIVE",
-              "host": ["{{base_url}}"],
-              "path": ["matches"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "matches"
+              ],
               "query": [
                 {
                   "key": "tournamentId",
@@ -717,8 +896,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/matches/{{match_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["matches", "{{match_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "matches",
+                "{{match_id}}"
+              ]
             }
           },
           "response": []
@@ -739,8 +923,13 @@
             },
             "url": {
               "raw": "{{base_url}}/matches/{{match_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["matches", "{{match_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "matches",
+                "{{match_id}}"
+              ]
             },
             "description": "Update match scores quarter by quarter. Total scores are calculated automatically."
           },
@@ -762,8 +951,13 @@
             },
             "url": {
               "raw": "{{base_url}}/matches/{{match_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["matches", "{{match_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "matches",
+                "{{match_id}}"
+              ]
             }
           },
           "response": []
@@ -775,8 +969,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/matches/{{match_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["matches", "{{match_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "matches",
+                "{{match_id}}"
+              ]
             },
             "description": "Delete match. ADMIN only."
           },
@@ -786,4 +985,3 @@
     }
   ]
 }
-

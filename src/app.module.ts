@@ -13,6 +13,7 @@ import { StatisticianModule } from "./statistician/statistician.module";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TransformInterceptor } from "./common/interceptors/transform.intercepto
     MatchesModule,
     AdminModule,
     StatisticianModule,
+    UploadModule,
   ],
   providers: [
     {
