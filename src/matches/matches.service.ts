@@ -79,7 +79,13 @@ export class MatchesService {
     return this.prisma.match.create({
       data: {
         ...createMatchDto,
-        scheduledDate: new Date(createMatchDto.scheduledDate),
+        scheduledDate: new Date(
+          createMatchDto.scheduledDate.endsWith("Z") ||
+            createMatchDto.scheduledDate.includes("+") ||
+            createMatchDto.scheduledDate.includes("-")
+            ? createMatchDto.scheduledDate
+            : `${createMatchDto.scheduledDate}Z`,
+        ),
         status: createMatchDto.status || MatchStatus.SCHEDULED,
       },
       include: {
@@ -174,7 +180,13 @@ export class MatchesService {
 
     const updateData: any = { ...updateMatchDto };
     if (updateMatchDto.scheduledDate) {
-      updateData.scheduledDate = new Date(updateMatchDto.scheduledDate);
+      updateData.scheduledDate = new Date(
+        updateMatchDto.scheduledDate.endsWith("Z") ||
+          updateMatchDto.scheduledDate.includes("+") ||
+          updateMatchDto.scheduledDate.includes("-")
+          ? updateMatchDto.scheduledDate
+          : `${updateMatchDto.scheduledDate}Z`,
+      );
     }
 
     // Calculate total score if quarter scores are provided

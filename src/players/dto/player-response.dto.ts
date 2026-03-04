@@ -1,4 +1,4 @@
-import { Player, PlayerPosition, PlayerTeam } from '@prisma/client';
+import { Player, PlayerPosition, PlayerTeam } from "@prisma/client";
 
 export class PlayerTeamResponseDto {
   id: string;
@@ -35,16 +35,13 @@ export class BulkCreatePlayersResponseDto {
   duplicates: number;
   players: PlayerResponseDto[];
   duplicateMatches: Array<{
-    candidate: {
-      firstName: string;
-      lastName: string;
-    };
+    candidate: any; // Full candidate object passed in
     existingPlayer: {
       id: string;
       firstName: string;
       lastName: string;
     };
     similarityScore: number;
+    status: string; // EXACT_MATCH or POTENTIAL_DUPLICATE
   }>;
 }
-

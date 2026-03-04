@@ -345,16 +345,14 @@ export class PlayersService {
           // EXACT MATCH -> Use existing
           result.duplicates++;
           result.duplicateMatches.push({
-            candidate: {
-              firstName: playerData.firstName,
-              lastName: playerData.lastName,
-            },
+            candidate: playerData,
             existingPlayer: {
               id: duplicateCheck.existingPlayer.id,
               firstName: duplicateCheck.existingPlayer.firstName,
               lastName: duplicateCheck.existingPlayer.lastName,
             },
             similarityScore: 100,
+            status: "EXACT_MATCH",
           });
           player = duplicateCheck.existingPlayer;
         } else if (
@@ -362,33 +360,20 @@ export class PlayersService {
           duplicateCheck.existingPlayer
         ) {
           // POTENTIAL DUPLICATE in BULK upload
-          // We can't ask for confirmation mid-stream easily.
-          // Policy: Log as duplicate reference, but DO NOT CREATE NEW.
-          // Or should we create new?
-          // "Admin uploads... System runs checks... Flags potential duplicate"
-          // For Bulk, usually we want to accept exacts, and maybe REJECT potentials for manual review?
-          // Let's implement: Use Existing if Exact, otherwise Create New but flag? NO that creates duplicates.
-          // Safer: Treat Potentials as Duplicates to be manual resolved.
+          // Policy: Log as duplicate reference, DO NOT CREATE OR LINK.
+          // Return candidate info to the UI for manual review.
           result.duplicates++;
           result.duplicateMatches.push({
-            candidate: {
-              firstName: playerData.firstName,
-              lastName: playerData.lastName,
-            },
+            candidate: playerData,
             existingPlayer: {
               id: duplicateCheck.existingPlayer.id,
               firstName: duplicateCheck.existingPlayer.firstName,
               lastName: duplicateCheck.existingPlayer.lastName,
             },
             similarityScore: duplicateCheck.similarityScore,
+            status: "POTENTIAL_DUPLICATE",
           });
-          player = duplicateCheck.existingPlayer; // Link to the potential match? Risk of wrong link.
-          // Correct approach for bulk: If uncertain, DO NOT LINK, DO NOT CREATE? Or Create and Flag?
-          // "If similarity score > threshold... Admin must choose"
-          // Since we can't choose, let's LINK to the best match but log it.
-          // OR we can create a new player and user moves to merge later.
-          // Let's stick to: Link to best match for now to avoid blocking, but maybe we should rely on Exact only?
-          // Let's use the EXISTING logic which was "Use Existing".
+          continue; // Skip creating or linking this player
         } else {
           // Create new player
           if (playerData.email) {
@@ -851,10 +836,9 @@ export class PlayersService {
             action: "SKIPPED", // We skip duplicates in bulk upload to avoid mess
           });
 
-          // If EXACT match, we COULD link to team?
-          // "Step 1 - Exact Match Found -> Use existing UUID"
-          // Let's Link it!
-          if (teamId) {
+          // Step 1 - Exact Match Found -> Use existing UUID/Link it
+          // Step 2 - Potential Match Found -> Skip and flag for Admin review
+          if (teamId && duplicateCheck.matchType === "EXACT_MATCH") {
             // Check jersey availability if provided
             const existingJersey = candidate.jerseyNumber
               ? await this.prisma.playerTeam.findFirst({
