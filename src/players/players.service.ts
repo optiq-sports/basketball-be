@@ -839,18 +839,26 @@ export class PlayersService {
           // Step 1 - Exact Match Found -> Use existing UUID/Link it
           // Step 2 - Potential Match Found -> Skip and flag for Admin review
           if (teamId && duplicateCheck.matchType === "EXACT_MATCH") {
+            let canLink = true;
             // Check jersey availability if provided
-            const existingJersey = candidate.jerseyNumber
-              ? await this.prisma.playerTeam.findFirst({
-                  where: {
-                    teamId,
-                    jerseyNumber: candidate.jerseyNumber,
-                    isActive: true,
-                  },
-                })
-              : null;
+            if (candidate.jerseyNumber) {
+              const existingJersey = await this.prisma.playerTeam.findFirst({
+                where: {
+                  teamId,
+                  jerseyNumber: candidate.jerseyNumber,
+                  isActive: true,
+                },
+              });
+              if (existingJersey) {
+                result.errors.push({
+                  row: rowNumber,
+                  error: `Jersey ${candidate.jerseyNumber} taken`,
+                });
+                canLink = false;
+              }
+            }
 
-            if (!existingJersey) {
+            if (canLink) {
               // Check if already in team
               const alreadyInTeam = await this.prisma.playerTeam.findFirst({
                 where: {
@@ -874,11 +882,6 @@ export class PlayersService {
                 result.details[result.details.length - 1].action =
                   "ALREADY_IN_TEAM";
               }
-            } else {
-              result.errors.push({
-                row: rowNumber,
-                error: `Jersey ${candidate.jerseyNumber} taken`,
-              });
             }
           }
         } else {
