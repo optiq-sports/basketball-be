@@ -1,0 +1,198 @@
+# Basketball Platform — Frontend API Guide
+
+## Base URL
+All endpoints are prefixed with `/api`.
+- **Local Dev**: `http://localhost:3000/api`
+- **Production**: `https://your-render-url.onrender.com/api`
+
+---
+
+## Authentication
+
+All endpoints (except login/register) require a **Bearer token** in the `Authorization` header.
+
+```
+Authorization: Bearer <access_token>
+```
+
+### Login
+**POST** `/api/auth/login`
+```json
+{ "email": "admin@example.com", "password": "password123" }
+```
+Response includes `user.name` (use this for the welcome message):
+```json
+{
+  "access_token": "...",
+  "user": { "id": "...", "email": "...", "name": "John Doe", "role": "ADMIN" }
+}
+```
+
+> **Roles**: `SUPER_ADMIN`, `ADMIN`, `STATISTICIAN`
+
+---
+
+## Role-Based Access Rules
+
+| Tab / Feature | Who Can See It |
+|---|---|
+| **Users Tab** (create/delete admins) | `SUPER_ADMIN` only |
+| Players, Teams, Tournaments, Matches | `ADMIN` + `STATISTICIAN` |
+| Delete operations | `ADMIN` only |
+| Statistician workspace | Own separate UI (not admin) |
+
+---
+
+## Image Uploads (Team Logo, Player Photo)
+
+All images go through a **two-step process**:
+1. **Upload the file → get a URL**
+2. **Save the URL in the entity**
+
+### Step 1 — Upload File
+**POST** `/api/upload`
+- Content-Type: `multipart/form-data`
+- Field name: `file`
+
+Response:
+```json
+{ "url": "https://res.cloudinary.com/...", "public_id": "..." }
+```
+
+### Step 2 — Save URL
+Pass the returned `url` as the `logo` (for teams) or `photo` (for players) field when creating or updating:
+
+**PATCH /api/teams/:id** → `{ "logo": "https://res.cloudinary.com/..." }`
+
+**PATCH /api/players/:id** → `{ "photo": "https://res.cloudinary.com/..." }`
+
+---
+
+## Players
+
+### Get All Players
+**GET** `/api/players`
+
+| Query Param | Type | Description |
+|---|---|---|
+| `teamId` | string | Filter to players on a specific team |
+| `unassigned` | `"true"` | **NEW** — Returns only players with NO active team. Use this for the "Add Player" dropdown in Teams tab |
+
+### Update Player (Edit Modal)
+**PATCH** `/api/players/:id`
+
+You can now also update jersey number in one request by including `teamId`:
+```json
+{
+  "firstName": "John",
+  "lastName": "Smith",
+  "photo": "https://res.cloudinary.com/...",
+  "teamId": "team-uuid-here",
+  "jerseyNumber": 23
+}
+```
+
+### Merge Duplicate Players
+**POST** `/api/players/merge`
+```json
+{ "duplicatePlayerId": "...", "targetPlayerId": "..." }
+```
+
+---
+
+## Teams
+
+### Get All Teams
+**GET** `/api/teams`
+
+| Query Param | Type | Description |
+|---|---|---|
+| `tournamentId` | string | **NEW** — Returns only teams registered in that tournament. Use this for Home/Away dropdowns when creating a match |
+
+### Set Team Captain
+**PATCH** `/api/teams/:teamId/players/:playerId/captain`
+```json
+{ "isCaptain": true }
+```
+> Setting `isCaptain: true` automatically removes captain status from any other player on that team.
+
+---
+
+## Tournaments
+
+### Tournament Divisions (exact enum values)
+
+| Value | Label |
+|---|---|
+| `PREMIER` | Premier Division |
+| `DIVISION_1` | Division 1 |
+| `DIVISION_2` | Division 2 |
+| `DIVISION_3` | Division 3 |
+
+### Create Tournament
+**POST** `/api/tournaments`
+```json
+{
+  "name": "Spring League 2025",
+  "division": "PREMIER",
+  "numberOfGames": 10,
+  "quarterDuration": 10,
+  "startDate": "2025-03-01"
+}
+```
+
+---
+
+## Bulk Upload Players (Excel/CSV)
+
+**POST** `/api/players/team/:teamId/upload`
+- Content-Type: `multipart/form-data`, field name: `file`
+
+**Required columns** (column order doesn't matter):
+
+| Column Header | Required | Notes |
+|---|---|---|
+| `First Name` | ✅ | |
+| `Last Name` | ✅ | |
+| `Email` | Optional | Used for deduplication |
+| [Height](file:///c:/Users/USER/Documents/GitHub/basketball-be/src/common/services/player-deduplication.service.ts#266-290) | Optional | e.g. `6'2"` |
+| `Phone` | Optional | |
+| `Date of Birth` | Optional | ISO format: `YYYY-MM-DD` |
+| `Nationality` | Optional | |
+| `Jersey Number` | Optional | |
+| `Position` | Optional | `POINT_GUARD`, `SHOOTING_GUARD`, `SMALL_FORWARD`, `POWER_FORWARD`, `CENTER` |
+| `Gender` | Optional | e.g. `Male`, `Female` |
+
+**Response** includes:
+- `created`: number of new players created
+- `duplicatesFound`: number skipped/flagged
+- `details`: array with per-row actions (`CREATED`, `LINKED`, `ALREADY_IN_TEAM`, `SKIPPED`)
+- `errors`: rows that failed with reasons
+
+---
+
+## Matches
+
+### Create Match
+**POST** `/api/matches`
+> Use `GET /api/teams?tournamentId=<id>` to get valid home/away team options!
+
+```json
+{
+  "tournamentId": "...",
+  "homeTeamId": "...",
+  "awayTeamId": "...",
+  "scheduledDate": "2025-03-15T19:30:00Z"
+}
+```
+> ⚠️ Always send `scheduledDate` in **UTC** (append `Z` or include timezone offset) to avoid the 1-hour display shift.
+
+### Match Status Values
+
+| Value | Meaning |
+|---|---|
+| `SCHEDULED` | Default |
+| `LIVE` | In progress |
+| `COMPLETED` | Finished |
+| `CANCELLED` | Cancelled |
+| `POSTPONED` | Rescheduled |
