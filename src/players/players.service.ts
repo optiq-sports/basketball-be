@@ -447,19 +447,28 @@ export class PlayersService {
   }
 
   /**
-   * Get all players (optionally filtered by team)
+   * Get all players (optionally filtered by team or unassigned)
    */
-  async findAll(teamId?: string): Promise<PlayerResponseDto[]> {
-    const where = teamId
-      ? {
-          playerTeams: {
-            some: {
-              teamId,
-              isActive: true,
-            },
-          },
-        }
-      : {};
+  async findAll(
+    teamId?: string,
+    unassigned?: boolean,
+  ): Promise<PlayerResponseDto[]> {
+    let where: any = {};
+
+    if (teamId) {
+      where = {
+        playerTeams: {
+          some: { teamId, isActive: true },
+        },
+      };
+    } else if (unassigned) {
+      // Players with NO active team assignments
+      where = {
+        playerTeams: {
+          none: { isActive: true },
+        },
+      };
+    }
 
     const players = await this.prisma.player.findMany({
       where,
@@ -549,12 +558,15 @@ export class PlayersService {
       }
     }
 
+    // Pull out team-related fields so they don't hit the player table
+    const { teamId, jerseyNumber, ...playerFields } = updatePlayerDto;
+
     const updatedPlayer = await this.prisma.player.update({
       where: { id },
       data: {
-        ...updatePlayerDto,
-        dateOfBirth: updatePlayerDto.dateOfBirth
-          ? new Date(updatePlayerDto.dateOfBirth)
+        ...playerFields,
+        dateOfBirth: playerFields.dateOfBirth
+          ? new Date(playerFields.dateOfBirth)
           : undefined,
       },
       include: {
@@ -571,6 +583,14 @@ export class PlayersService {
         },
       },
     });
+
+    // If a specific team jersey update is requested, apply it to the PlayerTeam record
+    if (teamId && jerseyNumber !== undefined) {
+      await this.prisma.playerTeam.updateMany({
+        where: { playerId: id, teamId, isActive: true },
+        data: { jerseyNumber },
+      });
+    }
 
     return this.formatPlayerResponse(updatedPlayer);
   }

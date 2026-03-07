@@ -74,11 +74,14 @@ export class PlayersController {
   }
 
   /**
-   * Get all players (optionally filtered by team)
+   * Get all players (optionally filtered by team or unassigned)
    */
   @Get()
-  findAll(@Query("teamId") teamId?: string) {
-    return this.playersService.findAll(teamId);
+  findAll(
+    @Query("teamId") teamId?: string,
+    @Query("unassigned") unassigned?: string,
+  ) {
+    return this.playersService.findAll(teamId, unassigned === "true");
   }
 
   /**

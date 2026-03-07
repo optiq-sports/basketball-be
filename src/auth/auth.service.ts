@@ -1,12 +1,16 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../prisma/prisma.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { AuthResponseDto } from './dto/auth-response.dto';
-import { Role } from '@prisma/client';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import * as bcrypt from "bcrypt";
+import { PrismaService } from "../prisma/prisma.service";
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
+import { AuthResponseDto } from "./dto/auth-response.dto";
+import { Role } from "@prisma/client";
 
 @Injectable()
 export class AuthService {
@@ -38,7 +42,7 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException("Invalid credentials");
     }
 
     const payload = {
@@ -49,7 +53,8 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
+      expiresIn:
+        this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d",
     });
 
     // Store session
@@ -68,6 +73,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        name: user.profile?.fullName || user.name || null,
         role: user.role,
       },
     };
@@ -79,7 +85,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      throw new ConflictException("User with this email already exists");
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -101,7 +107,8 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
+      expiresIn:
+        this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d",
     });
 
     await this.prisma.session.create({
@@ -119,6 +126,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        name: user.profile?.fullName || user.name || null,
         role: user.role,
       },
     };
@@ -132,4 +140,3 @@ export class AuthService {
     }
   }
 }
-

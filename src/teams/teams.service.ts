@@ -36,8 +36,11 @@ export class TeamsService {
     });
   }
 
-  async findAll(): Promise<Team[]> {
+  async findAll(tournamentId?: string): Promise<Team[]> {
     return this.prisma.team.findMany({
+      where: tournamentId
+        ? { tournamentTeams: { some: { tournamentId } } }
+        : undefined,
       include: {
         playerTeams: {
           where: { isActive: true },
