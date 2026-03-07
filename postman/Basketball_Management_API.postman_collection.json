@@ -292,6 +292,18 @@
                                                                                     "key":  "teamId",
                                                                                     "value":  "{{team_id}}",
                                                                                     "disabled":  true
+                                                                                },
+                                                                                {
+                                                                                    "key":  "unassigned",
+                                                                                    "value":  "true",
+                                                                                    "description":  "Optional: return only players not assigned to any team",
+                                                                                    "disabled":  true
+                                                                                },
+                                                                                {
+                                                                                    "key":  "teamId",
+                                                                                    "value":  "{{team_id}}",
+                                                                                    "description":  "Optional: filter players by team ID",
+                                                                                    "disabled":  true
                                                                                 }
                                                                             ]
                                                               },
