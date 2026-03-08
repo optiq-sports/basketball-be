@@ -1,0 +1,95 @@
+# Frontend Integration Guide: March 2026 API Updates
+
+This guide covers the latest enhancements to the Basketball API, focusing on file uploads, player profile data, and team management.
+
+## 1. Tournament Flyer Upload
+
+**Endpoint**: `PATCH /tournaments/:id/flyer`  
+**Content-Type**: `multipart/form-data`
+
+### Request
+Use a `FormData` object to send the file.
+- **Key**: `flyer` (File)
+
+```javascript
+const formData = new FormData();
+formData.append('flyer', flyerFile);
+
+await axios.patch(`/tournaments/${tournamentId}/flyer`, formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+```
+
+### Response
+Returns the updated [Tournament](file:///c:/Users/USER/Documents/GitHub/basketball-be/src/tournaments/tournaments.module.ts#6-13) object with the `flyer` URL.
+```json
+{
+  "id": "...",
+  "name": "Summer Slam",
+  "flyer": "https://cloudinary.com/..."
+}
+```
+
+---
+
+## 2. Updated Player Responses
+
+Player responses now include **top-level team info** for the player's primary active team, reducing the need to parse the `playerTeams` array for basic display.
+
+**Endpoints Affected**: `GET /players`, `GET /players/:id`, `GET /teams/:id/players`
+
+### Updated Response Fields
+- `teamId`: `string | null` (Primary active team ID)
+- `teamName`: `string | null` (Primary active team name)
+- `jerseyNumber`: `number | null` (Jersey number in the primary team)
+- `isCaptain`: `boolean | null` (Captain status in the primary team)
+
+### Player Teams Array
+The `playerTeams` array also now explicitly includes `isCaptain` for each association.
+
+---
+
+## 3. Team Captain Management
+
+**Endpoint**: `PATCH /teams/:id/players/:playerId/captain`  
+**Content-Type**: `application/json`
+
+### Request
+- `isCaptain`: `boolean`
+
+```json
+{
+  "isCaptain": true
+}
+```
+
+### Key Behavior
+- Setting a player as captain (`isCaptain: true`) **automatically removes** captain status from any other player in that team.
+- **Returns**: The full [Team](file:///c:/Users/USER/Documents/GitHub/basketball-be/src/tournaments/tournaments.service.ts#199-239) object with the updated roster, making it easy to refresh the UI state.
+
+---
+
+## 4. Statistician Profile Enhancements
+
+### Image Upload
+**Endpoint**: `PATCH /statistician/:id/photo`  
+**Content-Type**: `multipart/form-data`
+
+- **Key**: `photo` (File)
+
+### Create/Update Statistician
+You can now pass a `photo` URL directly in JSON requests.
+**Endpoint**: `POST /statistician` or `PATCH /statistician/:id`
+
+```json
+{
+  "email": "stat@example.com",
+  "photo": "https://example.com/avatar.jpg",
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+*Note: If `photo` is provided in a JSON request, it is automatically prepended to the user's `photos` array.*
+
+### Response Structure
+Statisticians (and Admins) now consistently return a `profile` object containing the `photos` array.
