@@ -1,9 +1,10 @@
-import { Player, PlayerPosition, PlayerTeam } from "@prisma/client";
+import { PlayerPosition } from "@prisma/client";
 
 export class PlayerTeamResponseDto {
   id: string;
   teamId: string;
   jerseyNumber: number;
+  isCaptain: boolean;
   isActive: boolean;
   joinedAt: Date;
   leftAt?: Date;
@@ -25,6 +26,11 @@ export class PlayerResponseDto {
   dateOfBirth?: Date;
   phone?: string;
   nationality?: string;
+  // Top-level team shortcut fields (from first active team assignment)
+  teamId?: string;
+  teamName?: string;
+  jerseyNumber?: number;
+  isCaptain?: boolean;
   createdAt: Date;
   updatedAt: Date;
   playerTeams?: PlayerTeamResponseDto[];

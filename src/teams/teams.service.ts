@@ -151,6 +151,7 @@ export class TeamsService {
       throw new NotFoundException(`Player not found in this team`);
     }
 
+    // If setting as captain, first strip captain status from all other players in the team
     if (isCaptain) {
       await this.prisma.playerTeam.updateMany({
         where: { teamId, isActive: true },
@@ -158,10 +159,13 @@ export class TeamsService {
       });
     }
 
-    return this.prisma.playerTeam.update({
+    // Set the target player's captain status
+    await this.prisma.playerTeam.update({
       where: { id: playerTeam.id },
       data: { isCaptain },
-      include: { player: true },
     });
+
+    // Return the full team with updated roster so caller can see all isCaptain flags
+    return this.findOne(teamId);
   }
 }

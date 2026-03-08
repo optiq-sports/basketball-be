@@ -40,8 +40,12 @@ export class StatisticianService {
       state,
       homeAddress,
       photos,
+      photo,
       bio,
     } = createStatisticianDto;
+
+    // Build photos array: if single photo URL provided, prepend it
+    const photosArray = photo ? [photo, ...(photos || [])] : photos || [];
 
     return this.prisma.$transaction(async (prisma) => {
       const user = await prisma.user.create({
@@ -66,16 +70,19 @@ export class StatisticianService {
           dobMonth,
           dobYear,
           phone,
-          email, // Redundant but in schema
+          email,
           country,
           state,
           homeAddress,
-          photos: photos || [],
+          photos: photosArray,
           bio,
         },
       });
 
-      return user;
+      return prisma.user.findUnique({
+        where: { id: user.id },
+        include: { profile: true },
+      });
     });
   }
 
@@ -111,6 +118,7 @@ export class StatisticianService {
       state,
       homeAddress,
       photos,
+      photo,
       bio,
     } = updateStatisticianDto;
 
@@ -132,8 +140,19 @@ export class StatisticianService {
     if (country) profileData.country = country;
     if (state) profileData.state = state;
     if (homeAddress) profileData.homeAddress = homeAddress;
-    if (photos) profileData.photos = photos;
     if (bio) profileData.bio = bio;
+
+    // Handle photo updates: single URL prepended to the array
+    if (photo || photos) {
+      const existing = await this.prisma.userProfile.findUnique({
+        where: { userId: id },
+        select: { photos: true },
+      });
+      const base = photos ?? existing?.photos ?? [];
+      profileData.photos = photo
+        ? [photo, ...base.filter((p) => p !== photo)]
+        : base;
+    }
 
     return this.prisma.user.update({
       where: { id },
@@ -141,6 +160,31 @@ export class StatisticianService {
         ...userData,
         profile: {
           update: profileData,
+        },
+      },
+      include: { profile: true },
+    });
+  }
+
+  async updatePhoto(id: string, photoUrl: string) {
+    // Ensure user exists
+    await this.findOne(id);
+    // Prepend the new photo URL, replacing any existing first photo if same URL
+    const existing = await this.prisma.userProfile.findUnique({
+      where: { userId: id },
+      select: { photos: true },
+    });
+    const currentPhotos = existing?.photos ?? [];
+    const updatedPhotos = [
+      photoUrl,
+      ...currentPhotos.filter((p) => p !== photoUrl),
+    ];
+
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        profile: {
+          update: { photos: updatedPhotos },
         },
       },
       include: { profile: true },

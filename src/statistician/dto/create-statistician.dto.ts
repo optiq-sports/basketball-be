@@ -66,5 +66,9 @@ export class CreateStatisticianDto {
 
   @IsString()
   @IsOptional()
+  photo?: string;
+
+  @IsString()
+  @IsOptional()
   bio?: string;
 }

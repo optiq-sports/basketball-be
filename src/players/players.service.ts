@@ -735,6 +735,13 @@ export class PlayersService {
       });
     }
 
+    // Derive top-level team fields from the first active association
+    // (prefer the teamId passed in, otherwise just take the first active one)
+    const primaryTeam =
+      playerTeams?.find(
+        (pt) => pt.isActive && (teamId ? pt.teamId === teamId : true),
+      ) ?? playerTeams?.find((pt) => pt.isActive);
+
     return {
       id: player.id,
       firstName: player.firstName,
@@ -745,13 +752,18 @@ export class PlayersService {
       photo: player.photo,
       dateOfBirth: player.dateOfBirth,
       phone: player.phone,
-      nationality: player.nationality, // Add nationality to response
+      nationality: player.nationality,
+      teamId: primaryTeam?.teamId ?? null,
+      teamName: primaryTeam?.team?.name ?? null,
+      jerseyNumber: primaryTeam?.jerseyNumber ?? null,
+      isCaptain: primaryTeam?.isCaptain ?? null,
       createdAt: player.createdAt,
       updatedAt: player.updatedAt,
       playerTeams: playerTeams?.map((pt) => ({
         id: pt.id,
         teamId: pt.teamId,
         jerseyNumber: pt.jerseyNumber,
+        isCaptain: pt.isCaptain,
         isActive: pt.isActive,
         joinedAt: pt.joinedAt,
         leftAt: pt.leftAt,

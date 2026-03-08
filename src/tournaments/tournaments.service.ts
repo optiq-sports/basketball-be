@@ -250,8 +250,23 @@ export class TournamentsService {
     });
   }
 
+  async updateFlyer(id: string, flyerUrl: string): Promise<Tournament> {
+    await this.findOne(id);
+    return this.prisma.tournament.update({
+      where: { id },
+      data: { flyer: flyerUrl },
+      include: {
+        teams: {
+          include: {
+            team: true,
+          },
+        },
+      },
+    });
+  }
+
   async remove(id: string): Promise<void> {
-    const tournament = await this.findOne(id);
+    await this.findOne(id);
     await this.prisma.tournament.delete({
       where: { id },
     });

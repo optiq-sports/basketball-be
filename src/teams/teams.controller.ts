@@ -12,6 +12,7 @@ import {
 import { TeamsService } from "./teams.service";
 import { CreateTeamDto } from "./dto/create-team.dto";
 import { UpdateTeamDto } from "./dto/update-team.dto";
+import { SetCaptainDto } from "./dto/set-captain.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -52,9 +53,9 @@ export class TeamsController {
   setCaptain(
     @Param("id") id: string,
     @Param("playerId") playerId: string,
-    @Body("isCaptain") isCaptain: boolean,
+    @Body() body: SetCaptainDto,
   ) {
-    return this.teamsService.setCaptain(id, playerId, isCaptain);
+    return this.teamsService.setCaptain(id, playerId, body.isCaptain);
   }
 
   @Delete(":id")
