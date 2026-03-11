@@ -32,6 +32,7 @@ enum TournamentDivision {
   DIVISION_1
   DIVISION_2
   DIVISION_3
+  JUNIOR
 }
 
 enum MatchStatus {
