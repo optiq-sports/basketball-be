@@ -888,6 +888,42 @@
                                                    ]
                                   },
                                   {
+                                      "name":  "Upload Tournament Flyer",
+                                      "request":  {
+                                                      "method":  "PATCH",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "formdata",
+                                                                   "formdata":  [
+                                                                                  {
+                                                                                      "key":  "flyer",
+                                                                                      "type":  "file",
+                                                                                      "src":  [
+
+                                                                                              ]
+                                                                                  }
+                                                                              ]
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/tournaments/{{tournament_id}}/flyer",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "tournaments",
+                                                                               "{{tournament_id}}",
+                                                                               "flyer"
+                                                                           ]
+                                                              },
+                                                      "description":  "Upload or replace the tournament flyer image. Use form-data key: flyer. Roles: ADMIN, STATISTICIAN."
+                                                  },
+                                      "response":  [
+
+                                                   ]
+                                  },
+                                  {
                                       "name":  "Delete Tournament",
                                       "request":  {
                                                       "method":  "DELETE",
@@ -1098,6 +1134,345 @@
                                                    ]
                                   }
                               ]
-                 }
+                },
+                {
+                    "name":  "Admin",
+                    "item":  [
+                                 {
+                                     "name":  "Create Admin",
+                                     "request":  {
+                                                     "method":  "POST",
+                                                     "header":  [
+                                                                    {
+                                                                        "key":  "Content-Type",
+                                                                        "value":  "application/json"
+                                                                    }
+                                                                ],
+                                                     "body":  {
+                                                                  "mode":  "raw",
+                                                                  "raw":  "{\n  \"email\": \"admin2@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"role\": \"ADMIN\"\n}"
+                                                              },
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/admin",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "admin"
+                                                                          ]
+                                                             },
+                                                     "description":  "Create a new admin user. Requires SUPER_ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Get All Admins",
+                                     "request":  {
+                                                     "method":  "GET",
+                                                     "header":  [
+
+                                                                ],
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/admin",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "admin"
+                                                                          ]
+                                                             },
+                                                     "description":  "List all admin users. Requires SUPER_ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Get Admin by ID",
+                                     "request":  {
+                                                     "method":  "GET",
+                                                     "header":  [
+
+                                                                ],
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/admin/{{admin_id}}",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "admin",
+                                                                              "{{admin_id}}"
+                                                                          ]
+                                                             },
+                                                     "description":  "Get details for a single admin user. Requires SUPER_ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Update Admin",
+                                     "request":  {
+                                                     "method":  "PATCH",
+                                                     "header":  [
+                                                                    {
+                                                                        "key":  "Content-Type",
+                                                                        "value":  "application/json"
+                                                                    }
+                                                                ],
+                                                     "body":  {
+                                                                  "mode":  "raw",
+                                                                  "raw":  "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"role\": \"ADMIN\"\n}"
+                                                              },
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/admin/{{admin_id}}",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "admin",
+                                                                              "{{admin_id}}"
+                                                                          ]
+                                                             },
+                                                     "description":  "Update an admin user. Requires SUPER_ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Delete Admin",
+                                     "request":  {
+                                                     "method":  "DELETE",
+                                                     "header":  [
+
+                                                                ],
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/admin/{{admin_id}}",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "admin",
+                                                                              "{{admin_id}}"
+                                                                          ]
+                                                             },
+                                                     "description":  "Delete an admin user. Requires SUPER_ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 }
+                             ]
+                },
+                {
+                    "name":  "Statistician",
+                    "item":  [
+                                 {
+                                     "name":  "Create Statistician",
+                                     "request":  {
+                                                     "method":  "POST",
+                                                     "header":  [
+                                                                    {
+                                                                        "key":  "Content-Type",
+                                                                        "value":  "application/json"
+                                                                    }
+                                                                ],
+                                                     "body":  {
+                                                                  "mode":  "raw",
+                                                                  "raw":  "{\n  \"email\": \"stats1@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"Sam\",\n  \"lastName\": \"Stats\"\n}"
+                                                              },
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/statistician",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "statistician"
+                                                                          ]
+                                                             },
+                                                     "description":  "Create a statistician user. Requires SUPER_ADMIN or ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Get All Statisticians",
+                                     "request":  {
+                                                     "method":  "GET",
+                                                     "header":  [
+
+                                                                ],
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/statistician",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "statistician"
+                                                                          ]
+                                                             },
+                                                     "description":  "List all statisticians. Requires SUPER_ADMIN or ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Get Statistician by ID",
+                                     "request":  {
+                                                     "method":  "GET",
+                                                     "header":  [
+
+                                                                ],
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/statistician/{{statistician_id}}",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "statistician",
+                                                                              "{{statistician_id}}"
+                                                                          ]
+                                                             },
+                                                     "description":  "Get a single statistician by ID. Requires SUPER_ADMIN or ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Update Statistician",
+                                     "request":  {
+                                                     "method":  "PATCH",
+                                                     "header":  [
+                                                                    {
+                                                                        "key":  "Content-Type",
+                                                                        "value":  "application/json"
+                                                                    }
+                                                                ],
+                                                     "body":  {
+                                                                  "mode":  "raw",
+                                                                  "raw":  "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Stats\"\n}"
+                                                              },
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/statistician/{{statistician_id}}",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "statistician",
+                                                                              "{{statistician_id}}"
+                                                                          ]
+                                                             },
+                                                     "description":  "Update a statistician profile. Requires SUPER_ADMIN or ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Upload Statistician Photo",
+                                     "request":  {
+                                                     "method":  "PATCH",
+                                                     "header":  [
+
+                                                                ],
+                                                     "body":  {
+                                                                  "mode":  "formdata",
+                                                                  "formdata":  [
+                                                                                     {
+                                                                                         "key":  "photo",
+                                                                                         "type":  "file",
+                                                                                         "src":  [
+
+                                                                                                 ]
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/statistician/{{statistician_id}}/photo",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "statistician",
+                                                                              "{{statistician_id}}",
+                                                                              "photo"
+                                                                          ]
+                                                             },
+                                                     "description":  "Upload or replace statistician profile photo. Use form-data key: photo. Requires SUPER_ADMIN or ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 },
+                                 {
+                                     "name":  "Delete Statistician",
+                                     "request":  {
+                                                     "method":  "DELETE",
+                                                     "header":  [
+
+                                                                ],
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/statistician/{{statistician_id}}",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "statistician",
+                                                                              "{{statistician_id}}"
+                                                                          ]
+                                                             },
+                                                     "description":  "Delete a statistician. Requires SUPER_ADMIN or ADMIN role."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 }
+                             ]
+                },
+                {
+                    "name":  "Upload",
+                    "item":  [
+                                 {
+                                     "name":  "Generic File Upload",
+                                     "request":  {
+                                                     "method":  "POST",
+                                                     "header":  [
+
+                                                                ],
+                                                     "body":  {
+                                                                  "mode":  "formdata",
+                                                                  "formdata":  [
+                                                                                     {
+                                                                                         "key":  "file",
+                                                                                         "type":  "file",
+                                                                                         "src":  [
+
+                                                                                                 ]
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                                     "url":  {
+                                                                 "raw":  "{{base_url}}/upload",
+                                                                 "host":  [
+                                                                              "{{base_url}}"
+                                                                          ],
+                                                                 "path":  [
+                                                                              "upload"
+                                                                          ]
+                                                             },
+                                                     "description":  "Upload a generic file to the configured storage provider. Use form-data key: file."
+                                                 },
+                                     "response":  [
+
+                                                  ]
+                                 }
+                             ]
+                }
              ]
 }
