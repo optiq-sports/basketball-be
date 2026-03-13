@@ -18,6 +18,11 @@ export class RolesGuard implements CanActivate {
     }
 
     const { user } = context.switchToHttp().getRequest();
+    // Super admin override: always allow SUPER_ADMIN on role-protected routes
+    if (user?.role === Role.SUPER_ADMIN) {
+      return true;
+    }
+
     return requiredRoles.some((role) => user?.role === role);
   }
 }
