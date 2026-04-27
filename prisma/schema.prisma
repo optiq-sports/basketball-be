@@ -51,6 +51,14 @@ enum PlayerPosition {
   CENTER
 }
 
+enum GameSessionStatus {
+  PENDING
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 // ------------------------------------------------------
 // MODELS
 // ------------------------------------------------------
@@ -69,6 +77,7 @@ model User {
   // Relations
   profile        UserProfile?
   sessions       Session[]
+  gameEvents     GameEvent[]
 
   @@map("user")
 }
@@ -254,6 +263,7 @@ model Match {
   awayTeam       Team        @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
   matchPlayers   MatchPlayer[]
   stats          MatchStat[]
+  gameSessions   GameSession[]
 
   @@map("match")
 }
@@ -302,4 +312,103 @@ model MatchStat {
   @@unique([matchId, playerId, teamId])
   @@index([playerId, teamId])
   @@map("match_stat")
+}
+
+model GameSession {
+  id                    String            @id @default(cuid()) @map("id")
+  matchId               String            @unique @map("match_id")
+  status                GameSessionStatus @default(PENDING) @map("status")
+  quarter               Int               @default(1) @map("quarter")
+  clockSecondsRemaining Int               @default(600) @map("clock_seconds_remaining")
+  homeScore             Int               @default(0) @map("home_score")
+  awayScore             Int               @default(0) @map("away_score")
+  possessionTeamId      String?           @map("possession_team_id")
+  version               Int               @default(0) @map("version")
+  startedAt             DateTime?         @map("started_at")
+  endedAt               DateTime?         @map("ended_at")
+  jumpBallWinnerTeamId  String?           @map("jump_ball_winner_team_id")
+  homeOnLeft            Boolean           @default(true) @map("home_on_left")
+  homeAttacksLeft       Boolean           @default(true) @map("home_attacks_left")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  match             Match              @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  events            GameEvent[]
+  idempotencyKeys   IdempotencyRecord[]
+  lineupStates      LineupState[]
+  projectionStates  ProjectionState[]
+
+  @@index([status, updatedAt])
+  @@map("game_session")
+}
+
+model GameEvent {
+  id               String   @id @default(cuid()) @map("id")
+  sessionId        String   @map("session_id")
+  sequence         Int      @map("sequence")
+  eventType        String   @map("event_type")
+  payload          Json     @map("payload")
+  actorUserId      String   @map("actor_user_id")
+  expectedVersion  Int      @map("expected_version")
+  resultingVersion Int      @map("resulting_version")
+  idempotencyKeyId String?  @map("idempotency_key_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  session        GameSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  actor          User              @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  idempotencyKey IdempotencyRecord? @relation(fields: [idempotencyKeyId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId, createdAt])
+  @@map("game_event")
+}
+
+model IdempotencyRecord {
+  id               String    @id @default(cuid()) @map("id")
+  key              String    @map("key")
+  sessionId        String    @map("session_id")
+  requestHash      String?   @map("request_hash")
+  commandType      String    @map("command_type")
+  responseSnapshot Json      @map("response_snapshot")
+  expiresAt        DateTime  @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  events  GameEvent[]
+
+  @@unique([sessionId, key])
+  @@index([expiresAt])
+  @@map("idempotency_record")
+}
+
+model LineupState {
+  id         String   @id @default(cuid()) @map("id")
+  sessionId  String   @map("session_id")
+  quarter    Int      @map("quarter")
+  homeLineup Json     @map("home_lineup")
+  awayLineup Json     @map("away_lineup")
+  capturedAt DateTime @default(now()) @map("captured_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, capturedAt])
+  @@map("lineup_state")
+}
+
+model ProjectionState {
+  id             String   @id @default(cuid()) @map("id")
+  sessionId      String   @map("session_id")
+  projectionType String   @map("projection_type")
+  payload        Json     @map("payload")
+  version        Int      @default(0) @map("version")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, projectionType])
+  @@index([sessionId, updatedAt])
+  @@map("projection_state")
 }
