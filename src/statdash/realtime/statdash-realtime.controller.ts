@@ -9,7 +9,7 @@ import { StatdashRealtimeService } from "./statdash-realtime.service";
 
 @Controller("statdash/realtime")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.STATISTICIAN)
+@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.STATISTICIAN)
 export class StatdashRealtimeController {
   constructor(private readonly statdashRealtimeService: StatdashRealtimeService) {}
 
