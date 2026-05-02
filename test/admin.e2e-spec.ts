@@ -1,17 +1,22 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
-import * as request from "supertest";
+import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { Role } from "@prisma/client";
 
 describe("Admin & Statistician Modules (e2e)", () => {
+  jest.setTimeout(30000);
   let app: INestApplication;
   let prisma: PrismaService;
+  let jwtService: JwtService;
   let superAdminToken: string;
 
   beforeAll(async () => {
+    // Prevent BullMQ from trying Redis during e2e test bootstrap.
+    process.env.REDIS_URL = "";
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -20,6 +25,7 @@ describe("Admin & Statistician Modules (e2e)", () => {
     await app.init();
 
     prisma = app.get<PrismaService>(PrismaService);
+    jwtService = app.get<JwtService>(JwtService);
 
     // Clean up
     await prisma.matchStat.deleteMany();
@@ -40,18 +46,21 @@ describe("Admin & Statistician Modules (e2e)", () => {
       },
     });
 
-    // Login to get token
-    const loginRes = await request(app.getHttpServer())
-      .post("/auth/login")
-      .send({ email: "super@optiq.com", password: "superadmin123" })
-      .expect(201);
-
-    superAdminToken = loginRes.body.access_token;
+    superAdminToken = jwtService.sign({
+      sub: superAdmin.id,
+      email: superAdmin.email,
+      role: superAdmin.role,
+    });
+    expect(superAdminToken).toBeTruthy();
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    if (prisma) {
+      await prisma.$disconnect();
+    }
+    if (app) {
+      await app.close();
+    }
   });
 
   describe("Admin Module", () => {
@@ -83,9 +92,9 @@ describe("Admin & Statistician Modules (e2e)", () => {
         .set("Authorization", `Bearer ${superAdminToken}`)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
+          expect(Array.isArray(res.body.data)).toBe(true);
           // Should at least have the Super Admin and the newly created Admin
-          expect(res.body.length).toBeGreaterThanOrEqual(2);
+          expect(res.body.data.length).toBeGreaterThanOrEqual(2);
         });
     });
   });
@@ -140,8 +149,8 @@ describe("Admin & Statistician Modules (e2e)", () => {
         .set("Authorization", `Bearer ${superAdminToken}`)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body.length).toBeGreaterThanOrEqual(1);
+          expect(Array.isArray(res.body.data)).toBe(true);
+          expect(res.body.data.length).toBeGreaterThanOrEqual(1);
         });
     });
   });

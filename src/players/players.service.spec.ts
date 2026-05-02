@@ -67,8 +67,8 @@ describe('PlayersService', () => {
       };
 
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        isDuplicate: false,
-        existingPlayer: null,
+        matchType: 'NO_MATCH',
+        existingPlayer: undefined,
         similarityScore: 0,
       });
 
@@ -93,7 +93,7 @@ describe('PlayersService', () => {
       };
 
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        isDuplicate: true,
+        matchType: 'EXACT_MATCH',
         existingPlayer: { id: 'existing1', firstName: 'John', lastName: 'Doe' },
         similarityScore: 98.5,
       });
@@ -114,7 +114,7 @@ describe('PlayersService', () => {
       mockPrismaService.team.findUnique.mockResolvedValue({ id: 'team1', name: 'Lakers' });
       mockPrismaService.playerTeam.findFirst.mockResolvedValue(null);
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        isDuplicate: false,
+        matchType: 'NO_MATCH',
       });
 
       mockPrismaService.$transaction.mockImplementation(async (callback) => {
@@ -166,7 +166,7 @@ describe('PlayersService', () => {
       mockPrismaService.team.findUnique.mockResolvedValue({ id: 'team1' });
       mockPrismaService.playerTeam.findMany.mockResolvedValue([]);
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        isDuplicate: false,
+        matchType: 'NO_MATCH',
       });
 
       mockPrismaService.$transaction.mockImplementation(async (callback) => {
