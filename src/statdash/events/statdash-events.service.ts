@@ -70,6 +70,12 @@ type StatdashTxClient = Prisma.TransactionClient & {
 };
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+/** Neon / serverless DB can exceed Prisma's default ~5s interactive transaction cap. */
+const STATDASH_COMMAND_TX_OPTIONS = {
+  maxWait: 15_000,
+  timeout: 30_000,
+} as const;
+
 @Injectable()
 export class StatdashEventsService {
   private readonly logger = new Logger(StatdashEventsService.name);
@@ -101,7 +107,6 @@ export class StatdashEventsService {
       }
       return cachedIdempotency.response as CommandResult;
     }
-
     const lockAcquired = await this.redisService.acquireSessionLock(
       command.sessionId,
       lockOwner,
@@ -113,9 +118,9 @@ export class StatdashEventsService {
         message: "Session is currently processing another command",
       });
     }
-
     try {
-      const response = await this.prisma.$transaction(async (tx: StatdashTxClient) => {
+      const response = await this.prisma.$transaction(
+        async (tx: StatdashTxClient) => {
       const session = await tx.gameSession.findUnique({
         where: { id: command.sessionId },
         include: { match: true },
@@ -126,7 +131,6 @@ export class StatdashEventsService {
           message: "Session does not exist",
         });
       }
-
       const existingIdempotency = await tx.idempotencyRecord.findUnique({
         where: {
           sessionId_key: {
@@ -291,7 +295,9 @@ export class StatdashEventsService {
       );
 
       return response;
-      });
+      },
+      STATDASH_COMMAND_TX_OPTIONS,
+    );
 
       try {
         if (Array.isArray(response.emittedEvents) && response.emittedEvents.length > 0) {
@@ -355,7 +361,8 @@ export class StatdashEventsService {
   }
 
   async correctEvent(eventId: string, dto: CorrectEventDto, actorUserId: string) {
-    const response = await this.prisma.$transaction(async (tx: StatdashTxClient) => {
+    const response = await this.prisma.$transaction(
+      async (tx: StatdashTxClient) => {
       const targetEvent = await tx.gameEvent.findUnique({
         where: { id: eventId },
       });
@@ -425,7 +432,9 @@ export class StatdashEventsService {
         correctedEventId: targetEvent.id,
       };
       return response;
-    });
+    },
+    STATDASH_COMMAND_TX_OPTIONS,
+    );
 
     try {
       this.statdashRealtimeService.publish({
@@ -469,7 +478,8 @@ export class StatdashEventsService {
   }
 
   async reverseEvent(eventId: string, dto: ReverseEventDto, actorUserId: string) {
-    const response = await this.prisma.$transaction(async (tx: StatdashTxClient) => {
+    const response = await this.prisma.$transaction(
+      async (tx: StatdashTxClient) => {
       const targetEvent = await tx.gameEvent.findUnique({
         where: { id: eventId },
       });
@@ -532,7 +542,9 @@ export class StatdashEventsService {
         reversedEventId: targetEvent.id,
       };
       return response;
-    });
+    },
+    STATDASH_COMMAND_TX_OPTIONS,
+    );
 
     try {
       this.statdashRealtimeService.publish({
