@@ -113,6 +113,21 @@ describe("Statdash critical rules", () => {
     expect(result.scoreDelta).toEqual({ home: 1, away: 0 });
   });
 
+  it("rejects freeThrowsAwarded without freeThrows attempts", () => {
+    expect(() =>
+      applyFoulFreeThrowRules(
+        {
+          teamId: "away_team",
+          foulerPlayerId: "a1",
+          fouledPlayerId: "home_team_9",
+          foulType: "offensive",
+          freeThrowsAwarded: 2,
+        },
+        context,
+      ),
+    ).toThrow(BadRequestException);
+  });
+
   it("enforces turnover steal requirements and opponent-only stealer", () => {
     expect(() =>
       applyTurnoverStealRules({

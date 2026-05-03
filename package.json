@@ -5,8 +5,9 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "prisma generate && prisma migrate deploy && nest build",
+    "build:app": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
+    "start": "npm run build:app && node --enable-source-maps dist/main.js",
     "dev": "nest start --watch",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",

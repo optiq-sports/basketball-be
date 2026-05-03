@@ -19,26 +19,67 @@ type FoulFtPayload = {
   };
 };
 
+function resolveFreeThrowAttempts(raw: Record<string, unknown>): FreeThrowAttempt[] {
+  const fromApi = raw.freeThrows;
+  if (Array.isArray(fromApi) && fromApi.length > 0) {
+    const awarded =
+      typeof raw.freeThrowsAwarded === "number" ? raw.freeThrowsAwarded : undefined;
+    if (awarded !== undefined && awarded !== fromApi.length) {
+      throw new BadRequestException({
+        code: "SD_FOUL_FT_COUNT_MISMATCH",
+        message:
+          "freeThrows length must match freeThrowsAwarded when both are provided.",
+      });
+    }
+    return fromApi as FreeThrowAttempt[];
+  }
+  const awarded =
+    typeof raw.freeThrowsAwarded === "number" ? raw.freeThrowsAwarded : 0;
+  if (awarded === 0) {
+    return [];
+  }
+  throw new BadRequestException({
+    code: "SD_FOUL_FREE_THROWS_REQUIRED",
+    message:
+      "When freeThrowsAwarded is greater than 0, send freeThrows: [{ attemptNumber, result: 'made' | 'missed' }, ...] with one entry per attempt.",
+  });
+}
+
+/** Composite id `${teamId}_${jersey}` → team id; otherwise caller context must supply teamId for FT scoring. */
+function shootingTeamIdForFreeThrows(fouledPlayerId: string, fallbackTeamId: string): string {
+  const u = fouledPlayerId.lastIndexOf("_");
+  if (u > 0) {
+    return fouledPlayerId.slice(0, u);
+  }
+  return fallbackTeamId;
+}
+
 export function applyFoulFreeThrowRules(
-  payload: FoulFtPayload,
+  payload: FoulFtPayload | Record<string, unknown>,
   context: RuleContext,
 ): RuleResult {
+  const raw = payload as Record<string, unknown>;
+  const freeThrows = resolveFreeThrowAttempts(raw);
+  const teamId = String(raw.teamId ?? "");
+  const fouledPlayerId = String(raw.fouledPlayerId ?? "");
+  const shootingTeamId = shootingTeamIdForFreeThrows(fouledPlayerId, teamId);
+
   const emittedEvents: RuleResult["emittedEvents"] = [
     {
       eventType: "foul",
       payload: {
-        teamId: payload.teamId,
-        foulerPlayerId: payload.foulerPlayerId,
-        fouledPlayerId: payload.fouledPlayerId,
-        foulType: payload.foulType,
-        freeThrowsAwarded: payload.freeThrows.length,
+        teamId,
+        foulerPlayerId: String(raw.foulerPlayerId ?? ""),
+        fouledPlayerId,
+        foulType: String(raw.foulType ?? ""),
+        freeThrowsAwarded: freeThrows.length,
       },
     },
   ];
   const scoreDelta = { home: 0, away: 0 };
 
-  for (let i = 0; i < payload.freeThrows.length; i += 1) {
-    const ft = payload.freeThrows[i];
+  for (let i = 0; i < freeThrows.length; i += 1) {
+    const ft = freeThrows[i];
     if (ft.attemptNumber !== i + 1) {
       throw new BadRequestException({
         code: "SD_FREE_THROW_ORDER_INVALID",
@@ -49,34 +90,35 @@ export function applyFoulFreeThrowRules(
     emittedEvents.push({
       eventType: "free_throw",
       payload: {
-        teamId: payload.teamId,
-        playerId: payload.fouledPlayerId,
+        teamId: shootingTeamId,
+        playerId: fouledPlayerId,
         attemptNumber: ft.attemptNumber,
-        totalAttempts: payload.freeThrows.length,
+        totalAttempts: freeThrows.length,
         result: ft.result,
       },
     });
 
     if (ft.result === "made") {
-      if (payload.teamId === context.session.match.homeTeamId) {
+      if (shootingTeamId === context.session.match.homeTeamId) {
         scoreDelta.home += 1;
-      } else if (payload.teamId === context.session.match.awayTeamId) {
+      } else if (shootingTeamId === context.session.match.awayTeamId) {
         scoreDelta.away += 1;
       }
     }
   }
 
-  const lastAttempt = payload.freeThrows[payload.freeThrows.length - 1];
-  if (lastAttempt?.result === "missed" && payload.lastMissedFreeThrowRebound) {
-    if (payload.lastMissedFreeThrowRebound.reboundType === "dead_ball") {
+  const lastAttempt = freeThrows[freeThrows.length - 1];
+  const rebound = raw.lastMissedFreeThrowRebound as FoulFtPayload["lastMissedFreeThrowRebound"];
+  if (lastAttempt?.result === "missed" && rebound) {
+    if (rebound.reboundType === "dead_ball") {
       emittedEvents.push({
         eventType: "dead_ball",
         payload: {
-          reason: payload.lastMissedFreeThrowRebound.deadBallReason ?? "out_of_bounds",
+          reason: rebound.deadBallReason ?? "out_of_bounds",
         },
       });
     } else {
-      if (!payload.lastMissedFreeThrowRebound.playerId) {
+      if (!rebound.playerId) {
         throw new BadRequestException({
           code: "SD_FT_REBOUND_PLAYER_REQUIRED",
           message: "playerId required for free throw rebound flow",
@@ -85,9 +127,9 @@ export function applyFoulFreeThrowRules(
       emittedEvents.push({
         eventType: "rebound",
         payload: {
-          teamId: payload.teamId,
-          playerId: payload.lastMissedFreeThrowRebound.playerId,
-          reboundType: payload.lastMissedFreeThrowRebound.reboundType,
+          teamId: shootingTeamId,
+          playerId: rebound.playerId,
+          reboundType: rebound.reboundType,
         },
       });
     }
