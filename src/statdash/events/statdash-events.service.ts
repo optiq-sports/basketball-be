@@ -225,7 +225,9 @@ export class StatdashEventsService {
       let nextSequence = (currentMax._max.sequence ?? 0) + 1;
 
       const emittedEvents = [];
-      for (const draft of ruleResult.emittedEvents) {
+      const batchSize = ruleResult.emittedEvents.length;
+      for (let i = 0; i < batchSize; i += 1) {
+        const draft = ruleResult.emittedEvents[i];
         const event = await tx.gameEvent.create({
           data: {
             sessionId: session.id,
@@ -234,14 +236,14 @@ export class StatdashEventsService {
             payload: draft.payload as Prisma.InputJsonValue,
             actorUserId,
             expectedVersion: command.expectedVersion,
-            resultingVersion: command.expectedVersion + ruleResult.emittedEvents.length,
+            resultingVersion: command.expectedVersion + i + 1,
           },
         });
         emittedEvents.push(event);
         nextSequence += 1;
       }
 
-      const resultingVersion = command.expectedVersion + ruleResult.emittedEvents.length;
+      const resultingVersion = command.expectedVersion + batchSize;
       const updatedSession = await tx.gameSession.update({
         where: { id: session.id },
         data: {
@@ -291,46 +293,59 @@ export class StatdashEventsService {
       return response;
       });
 
-      if (Array.isArray(response.emittedEvents) && response.emittedEvents.length > 0) {
-        this.statdashRealtimeService.publish({
-          sessionId: response.sessionId,
-          source: "command",
-          state: {
-            version: response.version,
-            score: response.score,
-          },
-          deltaEvents: response.emittedEvents,
-        });
-      }
-
-      await Promise.all([
-        this.redisService.setIdempotencyResultCached(
-          command.sessionId,
-          command.idempotencyKey,
-          requestHash,
-          response,
-        ),
-        this.redisService.invalidateSessionSnapshotCache(command.sessionId),
-        this.redisService.invalidateProjectionCache(command.sessionId),
-        this.queueService.enqueueProjectionRebuild(
-          command.sessionId,
-          "command_write",
-          `${response.version}`,
-        ),
-        this.queueService.enqueueMatchStatSync(
-          command.sessionId,
-          `${response.version}`,
-        ),
-      ]);
-
-      if (Array.isArray(response.emittedEvents)) {
-        for (const event of response.emittedEvents) {
-          await this.redisService.appendRecentEventCache(
-            command.sessionId,
-            event,
-            25,
-          );
+      try {
+        if (Array.isArray(response.emittedEvents) && response.emittedEvents.length > 0) {
+          this.statdashRealtimeService.publish({
+            sessionId: response.sessionId,
+            source: "command",
+            state: {
+              version: response.version,
+              score: response.score,
+            },
+            deltaEvents: response.emittedEvents,
+          });
         }
+
+        await Promise.all([
+          this.redisService.setIdempotencyResultCached(
+            command.sessionId,
+            command.idempotencyKey,
+            requestHash,
+            response,
+          ),
+          this.redisService.invalidateSessionSnapshotCache(command.sessionId),
+          this.redisService.invalidateProjectionCache(command.sessionId),
+          this.queueService.enqueueProjectionRebuild(
+            command.sessionId,
+            "command_write",
+            `${response.version}`,
+          ),
+          this.queueService.enqueueMatchStatSync(
+            command.sessionId,
+            `${response.version}`,
+          ),
+        ]);
+
+        if (Array.isArray(response.emittedEvents)) {
+          for (const event of response.emittedEvents) {
+            await this.redisService.appendRecentEventCache(
+              command.sessionId,
+              event,
+              25,
+            );
+          }
+        }
+      } catch (sideEffectErr) {
+        this.logger.error(
+          JSON.stringify({
+            event: "statdash.command.side_effects_failed",
+            sessionId: command.sessionId,
+            commandType: command.commandType,
+            message:
+              sideEffectErr instanceof Error ? sideEffectErr.message : String(sideEffectErr),
+          }),
+          sideEffectErr instanceof Error ? sideEffectErr.stack : undefined,
+        );
       }
 
       return response;
@@ -412,30 +427,43 @@ export class StatdashEventsService {
       return response;
     });
 
-    this.statdashRealtimeService.publish({
-      sessionId: response.sessionId,
-      source: "correction",
-      state: {
-        version: response.version,
-        score: response.score,
-      },
-      deltaEvents: [
-        {
-          eventType: "correction",
+    try {
+      this.statdashRealtimeService.publish({
+        sessionId: response.sessionId,
+        source: "correction",
+        state: {
+          version: response.version,
+          score: response.score,
         },
-      ],
-    });
+        deltaEvents: [
+          {
+            eventType: "correction",
+          },
+        ],
+      });
 
-    await Promise.all([
-      this.redisService.invalidateSessionSnapshotCache(response.sessionId),
-      this.redisService.invalidateProjectionCache(response.sessionId),
-      this.queueService.enqueueCorrectionRecompute(
-        response.sessionId,
-        response.correctedEventId ?? eventId,
-        "correction",
-        `${response.version}`,
-      ),
-    ]);
+      await Promise.all([
+        this.redisService.invalidateSessionSnapshotCache(response.sessionId),
+        this.redisService.invalidateProjectionCache(response.sessionId),
+        this.queueService.enqueueCorrectionRecompute(
+          response.sessionId,
+          response.correctedEventId ?? eventId,
+          "correction",
+          `${response.version}`,
+        ),
+      ]);
+    } catch (sideEffectErr) {
+      this.logger.error(
+        JSON.stringify({
+          event: "statdash.correction.side_effects_failed",
+          sessionId: response.sessionId,
+          eventId,
+          message:
+            sideEffectErr instanceof Error ? sideEffectErr.message : String(sideEffectErr),
+        }),
+        sideEffectErr instanceof Error ? sideEffectErr.stack : undefined,
+      );
+    }
 
     return response;
   }
@@ -506,30 +534,43 @@ export class StatdashEventsService {
       return response;
     });
 
-    this.statdashRealtimeService.publish({
-      sessionId: response.sessionId,
-      source: "reversal",
-      state: {
-        version: response.version,
-        score: response.score,
-      },
-      deltaEvents: [
-        {
-          eventType: "reversal",
+    try {
+      this.statdashRealtimeService.publish({
+        sessionId: response.sessionId,
+        source: "reversal",
+        state: {
+          version: response.version,
+          score: response.score,
         },
-      ],
-    });
+        deltaEvents: [
+          {
+            eventType: "reversal",
+          },
+        ],
+      });
 
-    await Promise.all([
-      this.redisService.invalidateSessionSnapshotCache(response.sessionId),
-      this.redisService.invalidateProjectionCache(response.sessionId),
-      this.queueService.enqueueCorrectionRecompute(
-        response.sessionId,
-        response.reversedEventId ?? eventId,
-        "reversal",
-        `${response.version}`,
-      ),
-    ]);
+      await Promise.all([
+        this.redisService.invalidateSessionSnapshotCache(response.sessionId),
+        this.redisService.invalidateProjectionCache(response.sessionId),
+        this.queueService.enqueueCorrectionRecompute(
+          response.sessionId,
+          response.reversedEventId ?? eventId,
+          "reversal",
+          `${response.version}`,
+        ),
+      ]);
+    } catch (sideEffectErr) {
+      this.logger.error(
+        JSON.stringify({
+          event: "statdash.reversal.side_effects_failed",
+          sessionId: response.sessionId,
+          eventId,
+          message:
+            sideEffectErr instanceof Error ? sideEffectErr.message : String(sideEffectErr),
+        }),
+        sideEffectErr instanceof Error ? sideEffectErr.stack : undefined,
+      );
+    }
 
     return response;
   }

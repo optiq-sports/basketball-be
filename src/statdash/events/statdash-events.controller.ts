@@ -19,7 +19,7 @@ import { StatdashEventsService } from "./statdash-events.service";
 
 @Controller("statdash/events")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.STATISTICIAN)
+@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.STATISTICIAN)
 export class StatdashEventsController {
   constructor(private readonly statdashEventsService: StatdashEventsService) {}
 
