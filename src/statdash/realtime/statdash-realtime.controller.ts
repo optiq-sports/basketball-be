@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { Observable } from "rxjs";
 import { MessageEvent } from "@nestjs/common";
 import { Roles } from "../../auth/decorators/roles.decorator";
+import { SkipResponseTransform } from "../../common/decorators/skip-response-transform.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { StatdashRealtimeService } from "./statdash-realtime.service";
@@ -14,6 +15,7 @@ export class StatdashRealtimeController {
   constructor(private readonly statdashRealtimeService: StatdashRealtimeService) {}
 
   @Sse("sessions/:sessionId/stream")
+  @SkipResponseTransform()
   stream(
     @Param("sessionId") sessionId: string,
     @Query("sinceVersion") sinceVersion?: string,

@@ -5,13 +5,41 @@ import type { Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 
-/** SSE/EventSource cannot send Authorization headers; clients may pass token as query param. */
-function jwtFromBearerOrQuery(req: Request): string | null {
+/**
+ * SSE/EventSource cannot send Authorization headers; clients pass `access_token` as a query param.
+ * Some hosts/proxies omit `req.query` for long URLs — also parse `originalUrl` / `url`.
+ */
+export function jwtFromBearerOrQuery(req: Request): string | null {
   const bearer = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
   if (bearer) return bearer;
+
   const raw = req.query?.access_token;
-  const token = Array.isArray(raw) ? raw[0] : raw;
-  return typeof token === "string" && token.length > 0 ? token : null;
+  const fromQuery = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof fromQuery === "string" && fromQuery.length > 0) {
+    return fromQuery;
+  }
+
+  const search = extractQueryStringFromRequest(req);
+  if (!search) return null;
+  try {
+    const params = new URLSearchParams(search);
+    const token = params.get("access_token");
+    return token && token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractQueryStringFromRequest(req: Request): string | null {
+  const candidates = [req.originalUrl, req.url];
+  for (const path of candidates) {
+    if (!path) continue;
+    const q = path.indexOf("?");
+    if (q !== -1 && q < path.length - 1) {
+      return path.slice(q + 1);
+    }
+  }
+  return null;
 }
 
 export interface JwtPayload {
