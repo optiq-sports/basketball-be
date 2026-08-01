@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
+import type { StringValue } from "ms";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginDto } from "./dto/login.dto";
@@ -53,8 +54,8 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn:
-        this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d",
+      expiresIn: (this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") ||
+        "7d") as StringValue,
     });
 
     // Store session
@@ -107,8 +108,8 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn:
-        this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d",
+      expiresIn: (this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") ||
+        "7d") as StringValue,
     });
 
     await this.prisma.session.create({
