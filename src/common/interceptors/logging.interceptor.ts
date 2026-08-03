@@ -25,7 +25,7 @@ export class LoggingInterceptor implements NestInterceptor {
             `${method} ${url} ${responseTime}ms - ${JSON.stringify({
               query,
               params,
-              bodySize: JSON.stringify(body).length,
+              bodySize: body ? JSON.stringify(body).length : 0,
             })}`,
           );
         },
