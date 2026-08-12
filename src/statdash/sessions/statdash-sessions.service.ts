@@ -45,11 +45,7 @@ export class StatdashSessionsService {
     let match = await this.prisma.match.findUnique({
       where: { id: normalizedMatchKey },
       include: {
-        gameSessions: true
-        // {
-        //   orderBy: { updatedAt: "desc" },
-        //   take: 1,
-        // },
+        gameSessions: true,
       },
     });
 
@@ -59,11 +55,7 @@ export class StatdashSessionsService {
           tournament: { code: normalizedMatchKey },
         },
         include: {
-          gameSessions: true
-          // {
-          //   orderBy: { updatedAt: "desc" },
-          //   take: 1,
-          // },
+          gameSessions: true,
         },
         orderBy: [{ status: "desc" }, { scheduledDate: "desc" }],
       });
@@ -84,7 +76,7 @@ export class StatdashSessionsService {
       });
     }
 
-    const activeSession = match.gameSessions[0] ?? null;
+    const activeSession = match.gameSessions ?? null;
     return {
       matchId: match.id,
       matchStatus: match.status,
