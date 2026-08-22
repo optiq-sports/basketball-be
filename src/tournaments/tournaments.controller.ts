@@ -104,4 +104,5 @@ export class TournamentsController {
   remove(@Param("id") id: string) {
     return this.tournamentsService.remove(id);
   }
+  
 }

@@ -39,4 +39,5 @@ export class StatdashSessionsController {
   getState(@Param("sessionId") sessionId: string) {
     return this.statdashSessionsService.getState(sessionId);
   }
+  
 }

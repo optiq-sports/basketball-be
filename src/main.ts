@@ -31,6 +31,8 @@ function resolveCorsOrigin():
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const helmet = require("helmet")
+  app.use(helmet());
   app.enableCors({
     origin: resolveCorsOrigin(),
     credentials: true,

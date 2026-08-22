@@ -5,5 +5,7 @@ export class AddTeamToTournamentDto {
   @IsString({ each: true })
   @IsNotEmpty()
   teamIds: string[];
+
+  
 }
 

@@ -10,6 +10,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { IUploadProvider } from "./interfaces/upload-provider.interface";
 import { UPLOAD_PROVIDER } from "./upload.constants";
 
+
 @Controller("upload")
 export class UploadController {
   constructor(
