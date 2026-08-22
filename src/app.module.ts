@@ -15,6 +15,7 @@ import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
 import { UploadModule } from "./upload/upload.module";
 import { StatdashModule } from "./statdash/statdash.module";
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { StatdashModule } from "./statdash/statdash.module";
     StatisticianModule,
     UploadModule,
     StatdashModule,
+    HealthModule,
   ],
   providers: [
     {
