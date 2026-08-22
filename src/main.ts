@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import logger from './logger/logger';
 
 function resolveCorsOrigin():
   | boolean
@@ -29,7 +30,9 @@ function resolveCorsOrigin():
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: logger,
+  });
 
   const helmet = require("helmet")
   app.use(helmet());
