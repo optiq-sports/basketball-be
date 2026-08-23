@@ -1,20 +1,29 @@
 // src/health/health.controller.ts
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheckService, HealthCheck, HttpHealthIndicator } from '@nestjs/terminus';
+import { HealthCheckService, HealthCheck, HealthCheckError } from '@nestjs/terminus';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private health: HealthCheckService,
-    private http: HttpHealthIndicator,
+    private prisma: PrismaService,
   ) {}
 
   @Get()
   @HealthCheck()
   check() {
-    // Example: Check if an external API is reachable
     return this.health.check([
-      () => this.http.pingCheck('nestjs-docs', 'https://docs.nestjs.com'),
+      async () => {
+        try {
+          await this.prisma.$queryRaw`SELECT 1`;
+          return { database: { status: 'up' } };
+        } catch (error) {
+          throw new HealthCheckError('Database check failed', {
+            database: { status: 'down' },
+          });
+        }
+      },
     ]);
   }
 }
