@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import logger from './logger/logger';
+import { WinstonModule } from 'nest-winston';
 
 function resolveCorsOrigin():
   | boolean
@@ -31,7 +32,7 @@ function resolveCorsOrigin():
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: logger,
+    logger: WinstonModule.createLogger({ instance: logger }),
   });
 
   const helmet = require("helmet")
@@ -54,6 +55,9 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  // Enable graceful shutdown
+  app.enableShutdownHooks();
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

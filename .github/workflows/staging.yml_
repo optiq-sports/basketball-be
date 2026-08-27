@@ -1,0 +1,48 @@
+# name: Staging Deployment
+
+# on:
+#   push:
+#     branches:
+#       - staging
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
+
+#       - name: Configure AWS Credentials
+#         # uses: aws-actions/configure-aws-credentials@v4
+#         # with:
+#         #   aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#         #   aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         #   aws-region: us-east-1
+#         run: echo "Configure cloud credentials here (e.g., AWS, GCP)"
+
+#       - name: Login to Container Registry
+#         # uses: aws-actions/amazon-ecr-login@v2
+#         run: echo "Login to registry here"
+
+#       - name: Build and Push Docker Image
+#         # run: |
+#         #   docker build -t my-registry.com/basketball-be:${{ github.sha }} .
+#         #   docker push my-registry.com/basketball-be:${{ github.sha }}
+#         run: echo "Build and push Docker image here"
+
+#       - name: Deploy to Staging
+#         run: echo "Update ECS service / Kubernetes / Render deployment here"
+
+#       - name: Run Migrations (migrate deploy)
+#         # Assuming you can run this via a task/container in your infrastructure
+#         run: echo "Run prisma migrate deploy against staging DB"
+
+#       - name: Health Check
+#         run: |
+#           # Wait for deployment to stabilize, then check health
+#           sleep 15
+#           # curl -f https://staging-api.optiq-sports.com/api/health || exit 1
+#           echo "Health check placeholder"
+
+#       - name: Smoke Tests
+#         run: echo "Run basic smoke tests against staging environment"
