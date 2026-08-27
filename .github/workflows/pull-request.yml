@@ -36,6 +36,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Enforce develop to main workflow
+        # When full PL becomes functional; it will be from develop → staging → main.
         if: github.base_ref == 'main' && github.head_ref != 'develop'
         run: |
           echo "❌ Error: Pull requests to 'main' are only allowed from 'develop'."
