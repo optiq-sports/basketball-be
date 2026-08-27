@@ -1,0 +1,47 @@
+# name: Production Deployment
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     environment:
+#       name: production
+#       # Require approval via GitHub environments
+#       url: https://api.optiq-sports.com
+    
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
+
+#       - name: Database Backup
+#         # Crucial step before applying production migrations
+#         # run: aws rds create-db-snapshot --db-instance-identifier optiq-prod --db-snapshot-identifier pre-deploy-${{ github.sha }}
+#         run: echo "Trigger database backup here"
+
+#       - name: Configure AWS Credentials
+#         # uses: aws-actions/configure-aws-credentials@v4
+#         run: echo "Configure cloud credentials here"
+
+#       - name: Deploy Docker Image
+#         run: echo "Update ECS service / Kubernetes deployment with the image built during staging/main merge"
+
+#       - name: Run Migrations (migrate deploy)
+#         # Must use migrate deploy, NEVER migrate dev in production
+#         run: echo "Run prisma migrate deploy against production DB"
+
+#       - name: Health Check
+#         run: |
+#           sleep 15
+#           # curl -f https://api.optiq-sports.com/api/health || exit 1
+#           echo "Health check placeholder"
+
+#       - name: Smoke Tests
+#         run: echo "Run non-destructive smoke tests in production"
+
+#       - name: Application Exception / Monitoring Hooks
+#         # e.g., notify Sentry about a new release
+#         run: echo "Notify Sentry/Datadog of new release version"

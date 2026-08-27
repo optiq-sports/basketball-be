@@ -1,0 +1,84 @@
+name: Pull Request Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    # Ephemeral services for testing
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: optiq_sport
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Enforce develop to main workflow
+        # When full PL becomes functional; it will be from develop → staging → main.
+        if: github.base_ref == 'main' && github.head_ref != 'develop'
+        run: |
+          echo "❌ Error: Pull requests to 'main' are only allowed from 'develop'."
+          echo "Current source branch: ${{ github.head_ref }}"
+          exit 1
+
+      - name: Setup Bun (or Node)
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+        # Alternatively for Node:
+        # uses: actions/setup-node@v4
+        # with:
+        #   node-version: '20'
+        #   cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci # or bun install
+
+      - name: Lint
+        run: npm run lint
+
+      # Generate Prisma Client
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      # Run database migrations on ephemeral DB
+      - name: Run Migrations
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/optiq_sport?schema=public
+        run: npm run prisma:migrate
+
+      # Check typescript types
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Run Tests (Unit & Integration)
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/optiq_sport?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
+        run: npm run test
+
+      - name: Build
+        run: npm run build:app
