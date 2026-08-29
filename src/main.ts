@@ -113,7 +113,7 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
   // SwaggerModule.setup('api-json', app, document);
 
   app.use(
-    '/reference',
+    '/docs',
     apiReference({
       spec: {
         content: document,
