@@ -81,6 +81,7 @@ export class StatisticianService {
 
       return prisma.user.findUnique({
         where: { id: user.id },
+        omit: { password: true },
         include: { profile: true },
       });
     });
@@ -89,6 +90,7 @@ export class StatisticianService {
   findAll() {
     return this.prisma.user.findMany({
       where: { role: Role.STATISTICIAN, status: UserStatus.ACTIVE },
+      omit: { password: true },
       include: { profile: true },
     });
   }
@@ -96,6 +98,7 @@ export class StatisticianService {
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      omit: { password: true },
       include: { profile: true },
     });
     if (!user) throw new NotFoundException("Statistician not found");
@@ -162,6 +165,7 @@ export class StatisticianService {
           update: profileData,
         },
       },
+      omit: { password: true },
       include: { profile: true },
     });
   }
@@ -187,6 +191,7 @@ export class StatisticianService {
           update: { photos: updatedPhotos },
         },
       },
+      omit: { password: true },
       include: { profile: true },
     });
   }
@@ -195,6 +200,7 @@ export class StatisticianService {
     return this.prisma.user.update({
       where: { id },
       data: { status: UserStatus.INACTIVE },
+      omit: { password: true },
     });
   }
 }
