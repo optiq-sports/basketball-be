@@ -67,7 +67,7 @@ jobs:
       - name: Run Migrations
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/optiq_sport?schema=public
-        run: bun run prisma:migrate
+        run: bunx prisma migrate deploy
 
       # Check typescript types
       - name: Typecheck
