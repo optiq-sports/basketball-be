@@ -13,7 +13,7 @@ import logger from '../../logger/logger';
 export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const { method, url, body, query, params, user } = request;
+    const { method, url, body, query, params, user, ip } = request;
     
     // Generate or extract requestId
     const requestId = request.headers['x-request-id'] || crypto.randomUUID();
@@ -30,6 +30,7 @@ export class LoggingInterceptor implements NestInterceptor {
           logger.info(`Request processed: ${method} ${url}`, {
             requestId,
             userId,
+            ip,
             method,
             url,
             responseTimeMs: responseTime,
@@ -45,6 +46,7 @@ export class LoggingInterceptor implements NestInterceptor {
           logger.error(`Request failed: ${method} ${url} - ${error.message}`, {
             requestId,
             userId,
+            ip,
             method,
             url,
             responseTimeMs: responseTime,
