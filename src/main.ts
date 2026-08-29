@@ -7,6 +7,7 @@ import { WinstonModule } from 'nest-winston';
 import helmet from 'helmet';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+
 function resolveCorsOrigin():
   | boolean
   | ((
@@ -109,7 +110,17 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
 
   const document = SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: {
+      withFastify: true,
+      theme: 'nestjs',
+      darkMode: true,
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    }
+  });
+
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
