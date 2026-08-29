@@ -6,7 +6,7 @@ import logger from './logger/logger';
 import { WinstonModule } from 'nest-winston';
 import helmet from 'helmet';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { apiReference } from '@scalar/nestjs-api-reference';
+
 
 function resolveCorsOrigin():
   | boolean
@@ -42,10 +42,10 @@ async function bootstrap() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
         fontSrc: ["'self'", "fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https://cdn.jsdelivr.net"],
+        imgSrc: ["'self'", "data:", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://validator.swagger.io"],
         scriptSrcAttr: ["'unsafe-inline'"],
       },
     },
@@ -110,22 +110,19 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
 
   const document = SwaggerModule.createDocument(app, config);
 
-  // SwaggerModule.setup('api-json', app, document);
-
-  app.use(
-    '/docs',
-    apiReference({
-      spec: {
-        content: document,
-      },
-      withFastify: true,
-      theme: 'nestjs',
-      darkMode: true,
+  SwaggerModule.setup('docs', app, document, {
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js',
+    ],
+    swaggerOptions: {
       persistAuthorization: true,
       tagsSorter: 'alpha',
       operationsSorter: 'alpha',
-    }),
-  );
+    }
+  });
+
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
