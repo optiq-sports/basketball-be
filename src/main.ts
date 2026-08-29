@@ -111,10 +111,12 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
   const document = SwaggerModule.createDocument(app, config);
 
   SwaggerModule.setup('docs', app, document, {
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js',
+    ],
     swaggerOptions: {
-      withFastify: true,
-      theme: 'nestjs',
-      darkMode: true,
       persistAuthorization: true,
       tagsSorter: 'alpha',
       operationsSorter: 'alpha',
