@@ -12,23 +12,71 @@ export function applyCommandRules(
   payload: Record<string, unknown>,
   context: RuleContext,
 ): RuleResult {
+  let result: RuleResult;
+
   switch (commandType) {
     case "shot":
-      return applyShotRules(payload as never, context);
+      result = applyShotRules(payload as never, context);
+      break;
     case "rebound":
-      return applyReboundRules(payload as never, context);
+      result = applyReboundRules(payload as never, context);
+      break;
     case "block":
-      return applyBlockRules(payload as never);
+      result = applyBlockRules(payload as never);
+      break;
     case "foul":
-      return applyFoulFreeThrowRules(payload as never, context);
+      result = applyFoulFreeThrowRules(payload as never, context);
+      break;
     case "turnover":
-      return applyTurnoverStealRules(payload as never);
+      result = applyTurnoverStealRules(payload as never);
+      break;
     default:
-      return {
+      result = {
         emittedEvents: [{ eventType: commandType, payload }],
         scoreDelta: { home: 0, away: 0 },
       };
+      break;
   }
+
+  // Extract clock updates
+  if (typeof payload.quarter === "number") {
+    result.sessionUpdates = { ...result.sessionUpdates, quarter: payload.quarter };
+  }
+  if (typeof payload.clockSecondsRemaining === "number") {
+    result.sessionUpdates = { ...result.sessionUpdates, clockSecondsRemaining: payload.clockSecondsRemaining };
+  }
+  if (typeof payload.possessionTeamId === "string" || payload.possessionTeamId === null) {
+    result.sessionUpdates = { ...result.sessionUpdates, possessionTeamId: payload.possessionTeamId as string | null };
+  }
+  if (typeof payload.jumpBallWinnerTeamId === "string") {
+    result.sessionUpdates = { ...result.sessionUpdates, jumpBallWinnerTeamId: payload.jumpBallWinnerTeamId };
+  }
+
+  // Apply substitution Lineup swapping
+  if (commandType === "substitution" && context.lineupSnapshot) {
+    const { playerOutId, playerInId, teamId } = payload as Record<string, string>;
+    const isHome = teamId === context.session.match.homeTeamId;
+    const isAway = teamId === context.session.match.awayTeamId;
+
+    if (isHome || isAway) {
+      const newLineup = {
+        homeLineup: [...context.lineupSnapshot.homeLineup],
+        awayLineup: [...context.lineupSnapshot.awayLineup],
+      };
+      
+      const targetLineup = isHome ? newLineup.homeLineup : newLineup.awayLineup;
+      const index = targetLineup.indexOf(playerOutId);
+      if (index !== -1) {
+        targetLineup[index] = playerInId;
+      } else {
+        targetLineup.push(playerInId);
+      }
+      
+      result.newLineup = newLineup;
+    }
+  }
+
+  return result;
 }
 
 export function assertExpectedVersion(sessionVersion: number, expectedVersion: number) {

@@ -201,13 +201,124 @@ export class StatdashSessionsService {
       });
     }
 
+    const [updatedSession] = await this.prisma.$transaction([
+      this.prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          status: GameSessionStatus.IN_PROGRESS,
+          startedAt: session.startedAt ?? new Date(),
+        },
+      }),
+      this.prisma.match.update({
+        where: { id: session.matchId },
+        data: {
+          status: "LIVE",
+        },
+      }),
+    ]);
+    return updatedSession;
+  }
+
+  async pauseSession(sessionId: string) {
+    const session = await this.prisma.gameSession.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) {
+      throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+    if (session.status !== GameSessionStatus.IN_PROGRESS) {
+      throw new ConflictException({
+        code: "SD_SESSION_PAUSE_NOT_ALLOWED",
+        message: "Only in-progress sessions can be paused",
+      });
+    }
+
     return this.prisma.gameSession.update({
       where: { id: sessionId },
       data: {
-        status: GameSessionStatus.IN_PROGRESS,
-        startedAt: session.startedAt ?? new Date(),
+        status: GameSessionStatus.PAUSED,
       },
     });
+  }
+
+  async completeSession(sessionId: string) {
+    const session = await this.prisma.gameSession.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) {
+      throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+    if (
+      session.status === GameSessionStatus.COMPLETED ||
+      session.status === GameSessionStatus.CANCELLED
+    ) {
+      throw new ConflictException({
+        code: "SD_SESSION_COMPLETE_NOT_ALLOWED",
+        message: "Session is already completed or cancelled",
+      });
+    }
+
+    // Wrap in transaction to ensure consistency with Match status
+    const [updatedSession] = await this.prisma.$transaction([
+      this.prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          status: GameSessionStatus.COMPLETED,
+          endedAt: session.endedAt ?? new Date(),
+        },
+      }),
+      this.prisma.match.update({
+        where: { id: session.matchId },
+        data: {
+          status: "COMPLETED", // Note: MatchStatus.COMPLETED
+        },
+      }),
+    ]);
+    return updatedSession;
+  }
+
+  async cancelSession(sessionId: string) {
+    const session = await this.prisma.gameSession.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) {
+      throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+    if (
+      session.status === GameSessionStatus.COMPLETED ||
+      session.status === GameSessionStatus.CANCELLED
+    ) {
+      throw new ConflictException({
+        code: "SD_SESSION_CANCEL_NOT_ALLOWED",
+        message: "Session is already completed or cancelled",
+      });
+    }
+
+    const [updatedSession] = await this.prisma.$transaction([
+      this.prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          status: GameSessionStatus.CANCELLED,
+          endedAt: session.endedAt ?? new Date(),
+        },
+      }),
+      this.prisma.match.update({
+        where: { id: session.matchId },
+        data: {
+          status: "CANCELLED", // Note: MatchStatus.CANCELLED
+        },
+      }),
+    ]);
+    return updatedSession;
   }
 
   async getState(sessionId: string) {

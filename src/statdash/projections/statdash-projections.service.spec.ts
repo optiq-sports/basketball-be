@@ -16,6 +16,13 @@ describe("StatdashProjectionsService", () => {
       findMany: jest.fn(),
     },
     projectionState: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
+    matchPlayer: {
+      findMany: jest.fn(),
+    },
+    matchStat: {
       upsert: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -58,7 +65,7 @@ describe("StatdashProjectionsService", () => {
   });
 
   it("replays score deterministically with correction and reversal", () => {
-    const replay = service.replayScoreFromEvents([
+    const events = [
       {
         id: "e1",
         eventType: "shot",
@@ -86,13 +93,33 @@ describe("StatdashProjectionsService", () => {
         sequence: 4,
         payload: { result: "made", teamId: "away_team" },
       },
-    ]);
+    ];
+    const resolvedEvents = service.resolveEvents(events);
+    const replay = service.replayScoreFromEvents(resolvedEvents, events.length);
 
     expect(replay).toEqual({ homeScore: 0, awayScore: 1, version: 4 });
   });
 
   it("builds box score projection from events", async () => {
-    prisma.gameSession.findUnique.mockResolvedValue({ id: "session_1" });
+    prisma.projectionState.findUnique.mockResolvedValue(null);
+    prisma.gameSession.findUnique.mockResolvedValue({
+      id: "session_1",
+      version: 2,
+      homeScore: 0,
+      awayScore: 0,
+      match: {
+        id: "match_1",
+        homeTeamId: "team_a",
+        awayTeamId: "team_b",
+      },
+    });
+    prisma.$transaction.mockResolvedValue([
+      { id: "session_1", version: 2, homeScore: 0, awayScore: 0 },
+      { id: "proj_1" },
+    ]);
+    prisma.matchPlayer.findMany.mockResolvedValue([
+      { playerId: "p1", teamId: "team_a" },
+    ]);
     prisma.gameEvent.findMany.mockResolvedValue([
       {
         id: "e1",

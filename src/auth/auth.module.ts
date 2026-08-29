@@ -13,14 +13,18 @@ import { LocalStrategy } from './strategies/local.strategy';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'your-secret-key',
-        signOptions: {
-          // expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ||
-          //   '24h') as StringValue,
-          expiresIn: (configService.get<string>(process.env.JWT_EXPIRES_IN) || '24h') as StringValue,
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (configService.get<string>('NODE_ENV') === 'production' && !secret) {
+          throw new Error('JWT_SECRET environment variable is missing in production environment');
+        }
+        return {
+          secret: secret || 'your-secret-key',
+          signOptions: {
+            expiresIn: (configService.get<string>('JWT_EXPIRES_IN') || '24h') as StringValue,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],

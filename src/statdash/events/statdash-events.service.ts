@@ -66,6 +66,7 @@ type StatdashTxClient = Prisma.TransactionClient & {
   };
   lineupState: {
     findFirst: (...args: any[]) => any;
+    create: (...args: any[]) => any;
   };
 };
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -220,6 +221,7 @@ export class StatdashEventsService {
             awayTeamId: session.match.awayTeamId,
           },
         },
+        lineupSnapshot,
       });
 
       const currentMax = await tx.gameEvent.aggregate({
@@ -254,8 +256,23 @@ export class StatdashEventsService {
           version: resultingVersion,
           homeScore: session.homeScore + ruleResult.scoreDelta.home,
           awayScore: session.awayScore + ruleResult.scoreDelta.away,
+          quarter: ruleResult.sessionUpdates?.quarter ?? undefined,
+          clockSecondsRemaining: ruleResult.sessionUpdates?.clockSecondsRemaining ?? undefined,
+          possessionTeamId: ruleResult.sessionUpdates?.possessionTeamId ?? undefined,
+          jumpBallWinnerTeamId: ruleResult.sessionUpdates?.jumpBallWinnerTeamId ?? undefined,
         },
       });
+
+      if (ruleResult.newLineup) {
+        await tx.lineupState.create({
+          data: {
+            sessionId: session.id,
+            quarter: ruleResult.sessionUpdates?.quarter ?? session.quarter,
+            homeLineup: ruleResult.newLineup.homeLineup,
+            awayLineup: ruleResult.newLineup.awayLineup,
+          }
+        });
+      }
 
       const response: CommandResult = {
         sessionId: updatedSession.id,
@@ -412,7 +429,8 @@ export class StatdashEventsService {
         where: { sessionId: targetEvent.sessionId },
         orderBy: { sequence: "asc" },
       });
-      const replay = this.statdashProjectionsService.replayScoreFromEvents(events);
+      const resolvedEvents = this.statdashProjectionsService.resolveEvents(events);
+      const replay = this.statdashProjectionsService.replayScoreFromEvents(resolvedEvents, events.length);
       const updatedSession = await tx.gameSession.update({
         where: { id: targetEvent.sessionId },
         data: {
@@ -522,7 +540,8 @@ export class StatdashEventsService {
         where: { sessionId: targetEvent.sessionId },
         orderBy: { sequence: "asc" },
       });
-      const replay = this.statdashProjectionsService.replayScoreFromEvents(events);
+      const resolvedEvents = this.statdashProjectionsService.resolveEvents(events);
+      const replay = this.statdashProjectionsService.replayScoreFromEvents(resolvedEvents, events.length);
       const updatedSession = await tx.gameSession.update({
         where: { id: targetEvent.sessionId },
         data: {

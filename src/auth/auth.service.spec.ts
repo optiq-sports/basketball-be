@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Role } from '@prisma/client';
 import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
@@ -20,11 +21,15 @@ describe('AuthService', () => {
     },
     session: {
       create: jest.fn(),
+      findFirst: jest.fn(),
+      delete: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
 
   const mockJwtService = {
     sign: jest.fn(),
+    verify: jest.fn(),
   };
 
   const mockConfigService = {
@@ -135,5 +140,72 @@ describe('AuthService', () => {
       await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
     });
   });
-});
 
+  describe('refresh', () => {
+    it('should throw an error if session is not found', async () => {
+      (mockPrismaService.session.findFirst as jest.Mock).mockResolvedValue(null);
+      await expect(service.refresh('invalid_token')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw an error if jwt verification fails', async () => {
+      const session = {
+        id: 'session-id',
+        user: { id: 'user-id', email: 'test@example.com', role: Role.ADMIN, status: 'ACTIVE' },
+      };
+      (mockPrismaService.session.findFirst as jest.Mock).mockResolvedValue(session);
+      (mockJwtService.verify as jest.Mock).mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      await expect(service.refresh('expired_token')).rejects.toThrow(UnauthorizedException);
+      expect(mockPrismaService.session.delete).toHaveBeenCalledWith({ where: { id: session.id } });
+    });
+
+    it('should successfully refresh the token', async () => {
+      const session = {
+        id: 'session-id',
+        user: { id: 'user-id', email: 'test@example.com', role: Role.ADMIN, status: 'ACTIVE' },
+      };
+      (mockPrismaService.session.findFirst as jest.Mock).mockResolvedValue(session);
+      (mockJwtService.verify as jest.Mock).mockReturnValue({ sub: 'user-id' });
+      (mockJwtService.sign as jest.Mock)
+        .mockReturnValueOnce('new-access-token')
+        .mockReturnValueOnce('new-refresh-token');
+      (mockConfigService.get as jest.Mock).mockReturnValue('24h');
+
+      const result = await service.refresh('valid-refresh-token');
+
+      expect(result).toEqual({
+        access_token: 'new-access-token',
+        refresh_token: 'new-refresh-token',
+        expires_in: expect.any(Number),
+        refresh_token_expires_in: expect.any(Number),
+        token_type: 'Bearer',
+        user: {
+          id: 'user-id',
+          email: 'test@example.com',
+          name: null,
+          role: Role.ADMIN,
+        },
+      });
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('logout', () => {
+    it('should delete session if found', async () => {
+      (mockPrismaService.session.findFirst as jest.Mock).mockResolvedValue({ id: 'session-id' });
+      const result = await service.logout('valid-token');
+
+      expect(mockPrismaService.session.delete).toHaveBeenCalledWith({ where: { id: 'session-id' } });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should not throw if session is not found', async () => {
+      (mockPrismaService.session.findFirst as jest.Mock).mockResolvedValue(null);
+      const result = await service.logout('invalid-token');
+
+      expect(result).toEqual({ success: true });
+    });
+  });
+});

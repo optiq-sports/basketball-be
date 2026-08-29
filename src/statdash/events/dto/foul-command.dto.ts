@@ -21,6 +21,20 @@ export class FreeThrowAttemptPartDto {
   result!: "made" | "missed";
 }
 
+export class LastMissedFreeThrowReboundDto {
+  @IsString()
+  @IsIn(["offensive", "defensive", "dead_ball"])
+  reboundType!: "offensive" | "defensive" | "dead_ball";
+
+  @IsOptional()
+  @IsString()
+  playerId?: string;
+
+  @IsOptional()
+  @IsString()
+  deadBallReason?: string;
+}
+
 export class FoulCommandDto extends BaseCommandDto {
   @IsString()
   @IsNotEmpty()
@@ -46,4 +60,9 @@ export class FoulCommandDto extends BaseCommandDto {
   @ValidateNested({ each: true })
   @Type(() => FreeThrowAttemptPartDto)
   freeThrows?: FreeThrowAttemptPartDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LastMissedFreeThrowReboundDto)
+  lastMissedFreeThrowRebound?: LastMissedFreeThrowReboundDto;
 }

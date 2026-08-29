@@ -4,61 +4,61 @@
 
 ## Documentation vs code contradictions
 
-| Topic | Stale doc | Actual code | Priority |
-|-------|-----------|-------------|----------|
-| Real-time stats | `README.md` lists as future | StatDash SSE implemented | Update README |
-| File upload | `README.md` lists as future | Cloudinary upload implemented | Update README |
+| Topic                   | Stale doc                                            | Actual code                            | Priority                  |
+| ----------------------- | ---------------------------------------------------- | -------------------------------------- | ------------------------- |
+| Real-time stats         | `README.md` lists as future                          | StatDash SSE implemented               | Update README             |
+| File upload             | `README.md` lists as future                          | Cloudinary upload implemented          | Update README             |
 | Deduplication threshold | `SYSTEM_DESIGN.md`, `IMPLEMENTATION_SUMMARY.md`: 98% | `player-deduplication.service.ts`: 75% | Update docs or align code |
-| Env file name | `README.md`: `.env-sample` | `.env.example` | Update README |
-| Docker Compose | `README.md`: active services | `docker-compose.yaml` fully commented | Restore or update README |
-| Roles | `README.md`: ADMIN, STATISTICIAN | `SUPER_ADMIN` added in schema | Update README |
-| RBAC matrix | `SYSTEM_DESIGN.md` omits SUPER_ADMIN | Full 3-role model | Update SYSTEM_DESIGN |
+| Env file name           | `README.md`: `.env-sample`                           | `.env.example`                         | Update README             |
+| Docker Compose          | `README.md`: active services                         | `docker-compose.yaml` fully commented  | Restore or update README  |
+| Roles                   | `README.md`: ADMIN, STATISTICIAN                     | `SUPER_ADMIN` added in schema          | Update README             |
+| RBAC matrix             | `SYSTEM_DESIGN.md` omits SUPER_ADMIN                 | Full 3-role model                      | Update SYSTEM_DESIGN      |
 
 ## Open bugs and workarounds
 
-| Issue | Workaround | Files |
-|-------|------------|-------|
+| Issue                                 | Workaround                                            | Files                             |
+| ------------------------------------- | ----------------------------------------------------- | --------------------------------- |
 | Box score ignores correction/reversal | Use `replayScoreFromEvents` path via rebuild endpoint | `statdash-projections.service.ts` |
-| Session COMPLETED never set | Manually PATCH match status | `statdash-sessions.service.ts` |
-| Match stat sync worker no-ops | Call `POST .../rebuild` for DB sync | `queue-worker.service.ts` |
-| Refresh token unusable | Re-login | `auth.service.ts` |
-| No `/api/health` | Use login smoke test or add endpoint | — |
+| Session COMPLETED never set           | Manually PATCH match status                           | `statdash-sessions.service.ts`    |
+| Match stat sync worker no-ops         | Call `POST .../rebuild` for DB sync                   | `queue-worker.service.ts`         |
+| Refresh token unusable                | Re-login                                              | `auth.service.ts`                 |
+| No `/api/health`                      | Use login smoke test or add endpoint                  | —                                 |
 
 No `TODO`/`FIXME` comments found in `src/` via grep.
 
 ## Incomplete features / WIP
 
-| Feature | State | Evidence |
-|---------|-------|----------|
-| Game session PAUSED/COMPLETED/CANCELLED | Schema only | No service transitions |
-| Clock/possession from commands | Events logged only | `statdash-events.service.ts` |
-| S3 upload provider | Commented env vars | `.env.example` |
-| Winston structured logging | File exists, unwired | `src/logger/logger.ts` |
-| Refresh token endpoint | Not implemented | — |
-| Logout / session revocation | Not implemented | — |
-| API rate limiting | Not implemented | — |
-| Swagger/OpenAPI | Not implemented | README future list |
-| Tournament standings | Not implemented | README future list |
-| Email notifications | Not implemented | README future list |
-| Advanced jersey validation | PARTIAL per verification doc | `docs/statdash-be-verification-results.md` |
+| Feature                                 | State                        | Evidence                                   |
+| --------------------------------------- | ---------------------------- | ------------------------------------------ |
+| Game session PAUSED/COMPLETED/CANCELLED | Schema only                  | No service transitions                     |
+| Clock/possession from commands          | Events logged only           | `statdash-events.service.ts`               |
+| S3 upload provider                      | Commented env vars           | `.env.example`                             |
+| Winston structured logging              | File exists, unwired         | `src/logger/logger.ts`                     |
+| Refresh token endpoint                  | Not implemented              | —                                          |
+| Logout / session revocation             | Not implemented              | —                                          |
+| API rate limiting                       | Not implemented              | —                                          |
+| Swagger/OpenAPI                         | Not implemented              | README future list                         |
+| Tournament standings                    | Not implemented              | README future list                         |
+| Email notifications                     | Not implemented              | README future list                         |
+| Advanced jersey validation              | PARTIAL per verification doc | `docs/statdash-be-verification-results.md` |
 
 ## Technical debt register
 
-| Area | Issue | Suggested fix | Priority |
-|------|-------|---------------|----------|
-| `upload.controller.ts` | No auth | Add JwtAuthGuard + RolesGuard | P0 |
-| `auth.controller.ts` | Open register with role | Disable or restrict to SUPER_ADMIN | P0 |
-| CI/CD | None | Add GitHub Actions pipeline | P0 |
-| `auth.module.ts` | Default JWT secret | Fail fast if missing in production | P1 |
-| `auth.service.ts` | Session expires hardcoded 24h | Use JWT_EXPIRES_IN | P2 |
-| `docker-compose.yaml` | Commented out | Restore or remove | P2 |
-| `README.md` | Stale feature list | Sync with implementation | P2 |
-| StatDash projections | Box score vs replay inconsistency | Unify on replay logic | P1 |
-| Queue workers | Cache-only, no rebuild | Call rebuildAndPersist or document | P2 |
-| `execution_log.txt` | In repo root | Review contents; add to .gitignore if log | P3 |
-| Test coverage | Teams/tournaments/matches untested | Add service specs | P2 |
-| Health endpoint | Missing | Add Terminus health module | P2 |
-| Helmet | Not configured | Add to main.ts | P3 |
+| Area                   | Issue                              | Suggested fix                             | Priority |
+| ---------------------- | ---------------------------------- | ----------------------------------------- | -------- |
+| `upload.controller.ts` | No auth                            | Add JwtAuthGuard + RolesGuard             | P0       |
+| `auth.controller.ts`   | Open register with role            | Disable or restrict to SUPER_ADMIN        | P0       |
+| CI/CD                  | None                               | Add GitHub Actions pipeline               | P0       |
+| `auth.module.ts`       | Default JWT secret                 | Fail fast if missing in production        | P1       |
+| `auth.service.ts`      | Session expires hardcoded 24h      | Use JWT_EXPIRES_IN                        | P2       |
+| `docker-compose.yaml`  | Commented out                      | Restore or remove                         | P2       |
+| `README.md`            | Stale feature list                 | Sync with implementation                  | P2       |
+| StatDash projections   | Box score vs replay inconsistency  | Unify on replay logic                     | P1       |
+| Queue workers          | Cache-only, no rebuild             | Call rebuildAndPersist or document        | P2       |
+| `execution_log.txt`    | In repo root                       | Review contents; add to .gitignore if log | P3       |
+| Test coverage          | Teams/tournaments/matches untested | Add service specs                         | P2       |
+| Health endpoint        | Missing                            | Add Terminus health module                | P2       |
+| Helmet                 | Not configured                     | Add to main.ts                            | P3       |
 
 ## Planned features (from existing docs)
 
@@ -75,6 +75,7 @@ From `README.md` future enhancements (some already done):
 - [ ] Swagger/OpenAPI documentation
 
 From `SYSTEM_DESIGN.md`:
+
 - Caching strategy for deduplication (future)
 - WebSocket alternative (SSE chosen instead)
 
@@ -82,20 +83,21 @@ From `SYSTEM_DESIGN.md`:
 
 Current versions from `package.json` (as of repo state):
 
-| Package | Version | Notes |
-|---------|---------|-------|
-| @nestjs/* | ^10.4.0 | NestJS 11 available — evaluate upgrade |
-| @prisma/client | ^6.17.1 | Keep aligned with `prisma` CLI |
-| bullmq | ^5.76.2 | Monitor breaking changes |
-| bcrypt | ^6.0.0 | Major version — verify compatibility |
-| cloudinary | ^2.9.0 | — |
-| typescript | ^5.9.3 | — |
+| Package        | Version | Notes                                  |
+| -------------- | ------- | -------------------------------------- |
+| @nestjs/\*     | ^10.4.0 | NestJS 11 available — evaluate upgrade |
+| @prisma/client | ^6.17.1 | Keep aligned with `prisma` CLI         |
+| bullmq         | ^5.76.2 | Monitor breaking changes               |
+| bcrypt         | ^6.0.0  | Major version — verify compatibility   |
+| cloudinary     | ^2.9.0  | —                                      |
+| typescript     | ^5.9.3  | —                                      |
 
 No `npm audit` output captured in handover. Run `npm audit` on takeover.
 
 ## Verification status
 
 `docs/statdash-be-verification-results.md` (2026-04-27):
+
 - E2E-01 through E2E-05: **PASS**
 - Session boot matrix: **PARTIAL** (DB connectivity noted)
 - Lineup validation: **PARTIAL**
