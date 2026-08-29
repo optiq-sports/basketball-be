@@ -34,6 +34,7 @@ describe("StatdashEventsService", () => {
     $transaction: jest.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx)),
   };
   const projectionsService = {
+    resolveEvents: jest.fn().mockImplementation((events) => events),
     replayScoreFromEvents: jest.fn().mockReturnValue({
       homeScore: 12,
       awayScore: 9,

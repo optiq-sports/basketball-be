@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import logger from './logger/logger';
 import { WinstonModule } from 'nest-winston';
+import helmet from 'helmet';
 
 function resolveCorsOrigin():
   | boolean
@@ -35,7 +36,6 @@ async function bootstrap() {
     logger: WinstonModule.createLogger({ instance: logger }),
   });
 
-  const helmet = require("helmet")
   app.use(helmet());
   app.enableCors({
     origin: resolveCorsOrigin(),

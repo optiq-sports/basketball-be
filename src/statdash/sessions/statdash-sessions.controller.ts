@@ -40,4 +40,18 @@ export class StatdashSessionsController {
     return this.statdashSessionsService.getState(sessionId);
   }
   
+  @Post(":sessionId/pause")
+  pauseSession(@Param("sessionId") sessionId: string) {
+    return this.statdashSessionsService.pauseSession(sessionId);
+  }
+
+  @Post(":sessionId/complete")
+  completeSession(@Param("sessionId") sessionId: string) {
+    return this.statdashSessionsService.completeSession(sessionId);
+  }
+
+  @Post(":sessionId/cancel")
+  cancelSession(@Param("sessionId") sessionId: string) {
+    return this.statdashSessionsService.cancelSession(sessionId);
+  }
 }

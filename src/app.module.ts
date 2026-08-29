@@ -1,6 +1,9 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+import { WinstonModule } from "nest-winston";
+import logger from "./logger/logger";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
 import { CommonModule } from "./common/common.module";
 import { AuthModule } from "./auth/auth.module";
@@ -19,9 +22,19 @@ import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
+    WinstonModule.forRoot({
+      instance: logger,
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ".env",
+    }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => [{
+        ttl: parseInt(configService.get<string>('THROTTLE_TTL') || '60000', 10),
+        limit: parseInt(configService.get<string>('THROTTLE_LIMIT') || '100', 10),
+      }],
     }),
     PrismaModule,
     CommonModule,
@@ -48,6 +61,10 @@ import { HealthModule } from './health/health.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: TransformInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

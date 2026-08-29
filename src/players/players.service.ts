@@ -834,12 +834,12 @@ export class PlayersService {
               ? new Date(row["Date of Birth"] || row["DOB"])
               : undefined,
           nationality:
-            row["Nationality"] || row["Country"]
-              ? String(row["Nationality"] || row["Country"]).trim()
+            row["Nationality"] || row["nationality"] || row["Country"] || row["country"]
+              ? String(row["Nationality"] || row["nationality"] || row["Country"] || row["country"]).trim()
               : undefined,
           jerseyNumber:
-            row["Jersey Number"] || row["Jersey"]
-              ? parseInt(row["Jersey Number"] || row["Jersey"])
+            row["Jersey Number"] || row["jersey number"] || row["Jersey"] || row["jersey"] || row["jerseyNumber"] || row["jerseynumber"]
+              ? parseInt(row["Jersey Number"] || row["jersey number"] || row["Jersey"] || row["jersey"] || row["jerseyNumber"] || row["jerseynumber"])
               : undefined,
           position: row["Position"]
             ? (row["Position"] as PlayerPosition)

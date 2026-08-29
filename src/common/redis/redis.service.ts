@@ -276,4 +276,19 @@ export class RedisService implements OnModuleDestroy {
   private realtimeUpdatesChannel() {
     return "statdash:realtime:updates";
   }
+
+  async checkHealth(): Promise<boolean> {
+    if (!process.env.REDIS_URL) {
+      return true; // Running in memory fallback mode, technically healthy
+    }
+    if (this.redisClient?.status === "ready") {
+      try {
+        await this.redisClient.ping();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
 }

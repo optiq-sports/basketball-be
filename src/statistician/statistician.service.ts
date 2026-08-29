@@ -88,7 +88,7 @@ export class StatisticianService {
 
   findAll() {
     return this.prisma.user.findMany({
-      where: { role: Role.STATISTICIAN },
+      where: { role: Role.STATISTICIAN, status: UserStatus.ACTIVE },
       include: { profile: true },
     });
   }

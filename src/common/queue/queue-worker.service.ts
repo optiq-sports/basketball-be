@@ -1,9 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import { Job, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../redis/redis.service";
 import { QueueService } from "./queue.service";
+import { StatdashProjectionsService } from "../../statdash/projections/statdash-projections.service";
 
 @Injectable()
 export class QueueWorkerService implements OnModuleDestroy {
@@ -15,6 +17,7 @@ export class QueueWorkerService implements OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly queueService: QueueService,
+    private readonly moduleRef: ModuleRef,
   ) {
     const redisUrl = process.env.REDIS_URL;
     if (!redisUrl) {
@@ -73,6 +76,14 @@ export class QueueWorkerService implements OnModuleDestroy {
     if (!sessionId) return;
     await this.redisService.invalidateProjectionCache(sessionId);
     await this.redisService.invalidateSessionSnapshotCache(sessionId);
+    try {
+      const projectionsService = this.moduleRef.get(StatdashProjectionsService, { strict: false });
+      await projectionsService.rebuildAndPersist(sessionId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to rebuild projections for session ${sessionId}: ${error}`,
+      );
+    }
   }
 
   private async handleRecomputeJob(job: Job) {
@@ -80,6 +91,14 @@ export class QueueWorkerService implements OnModuleDestroy {
     if (!sessionId) return;
     await this.redisService.invalidateProjectionCache(sessionId);
     await this.redisService.invalidateSessionSnapshotCache(sessionId);
+    try {
+      const projectionsService = this.moduleRef.get(StatdashProjectionsService, { strict: false });
+      await projectionsService.rebuildAndPersist(sessionId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to rebuild projections for session ${sessionId}: ${error}`,
+      );
+    }
   }
 
   private async handleMatchStatSyncJob(job: Job) {
@@ -90,12 +109,20 @@ export class QueueWorkerService implements OnModuleDestroy {
       select: { matchId: true },
     });
     if (!session) return;
-    this.logger.log(
-      JSON.stringify({
-        event: "queue.matchstat.sync.completed",
-        sessionId,
-        matchId: session.matchId,
-      }),
-    );
+    try {
+      const projectionsService = this.moduleRef.get(StatdashProjectionsService, { strict: false });
+      await projectionsService.rebuildAndPersist(sessionId);
+      this.logger.log(
+        JSON.stringify({
+          event: "queue.matchstat.sync.completed",
+          sessionId,
+          matchId: session.matchId,
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to sync match stats for session ${sessionId}: ${error}`,
+      );
+    }
   }
 }

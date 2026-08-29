@@ -24,17 +24,31 @@ export class StatdashProjectionsService {
   async getBoxScore(sessionId: string) {
     const cached = await this.redisService.getProjectionCached(sessionId, "box_score");
     if (cached) return cached;
-    const events = await this.getSessionEvents(sessionId);
-    const boxScore = this.buildBoxScoreFromEvents(events);
-    await this.redisService.setProjectionCached(sessionId, "box_score", boxScore, 60);
-    return boxScore;
+
+    const state = await this.prisma.projectionState.findUnique({
+      where: {
+        sessionId_projectionType: {
+          sessionId,
+          projectionType: "box_score",
+        },
+      },
+    });
+
+    if (state && state.payload) {
+      await this.redisService.setProjectionCached(sessionId, "box_score", state.payload, 60);
+      return state.payload;
+    }
+
+    const rebuilt = await this.rebuildAndPersist(sessionId);
+    return rebuilt.boxScore;
   }
 
   async getShotChart(sessionId: string) {
     const cached = await this.redisService.getProjectionCached(sessionId, "shot_chart");
     if (cached) return cached;
     const events = await this.getSessionEvents(sessionId);
-    const shotChart = events
+    const resolvedEvents = this.resolveEvents(events);
+    const shotChart = resolvedEvents
       .filter((event) => event.eventType === "shot")
       .map((event) => {
         const payload = event.payload as Record<string, unknown>;
@@ -108,11 +122,13 @@ export class StatdashProjectionsService {
       });
     }
 
-    const replay = this.replayScoreFromEvents(events, {
+    const resolvedEvents = this.resolveEvents(events);
+
+    const replay = this.replayScoreFromEvents(resolvedEvents, events.length, {
       homeTeamId: sessionForTeamContext.match.homeTeamId,
       awayTeamId: sessionForTeamContext.match.awayTeamId,
     });
-    const boxScorePayload = this.buildBoxScoreFromEvents(events);
+    const boxScorePayload = this.buildBoxScoreFromEvents(resolvedEvents, events.length);
 
     const [updatedSession, storedProjection] = await this.prisma.$transaction([
       this.prisma.gameSession.update({
@@ -120,6 +136,10 @@ export class StatdashProjectionsService {
         data: {
           homeScore: replay.homeScore,
           awayScore: replay.awayScore,
+          quarter: replay.quarter,
+          clockSecondsRemaining: replay.clockSecondsRemaining,
+          possessionTeamId: replay.possessionTeamId,
+          jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
           version: replay.version,
         },
       }),
@@ -161,17 +181,17 @@ export class StatdashProjectionsService {
       version: updatedSession.version,
       score: { home: updatedSession.homeScore, away: updatedSession.awayScore },
       projectionId: storedProjection.id,
+      boxScore: boxScorePayload,
     };
   }
 
-  replayScoreFromEvents(
+  resolveEvents(
     events: Array<{
       id: string;
       eventType: string;
       payload: unknown;
       sequence: number;
     }>,
-    teamContext?: { homeTeamId: string; awayTeamId: string },
   ) {
     const reversedIds = new Set<string>();
     const corrections = new Map<string, Record<string, unknown>>();
@@ -194,15 +214,43 @@ export class StatdashProjectionsService {
       }
     }
 
+    return events
+      .filter(
+        (e) =>
+          !reversedIds.has(e.id) &&
+          e.eventType !== "reversal" &&
+          e.eventType !== "correction",
+      )
+      .map((e) => ({
+        ...e,
+        payload: corrections.has(e.id)
+          ? {
+              ...(e.payload as Record<string, unknown>),
+              ...(corrections.get(e.id) as Record<string, unknown>),
+            }
+          : (e.payload as Record<string, unknown>),
+      }));
+  }
+
+  replayScoreFromEvents(
+    resolvedEvents: Array<{
+      id: string;
+      eventType: string;
+      payload: unknown;
+      sequence: number;
+    }>,
+    version: number,
+    teamContext?: { homeTeamId: string; awayTeamId: string },
+  ) {
     let homeScore = 0;
     let awayScore = 0;
+    let quarter = 1;
+    let clockSecondsRemaining = 600;
+    let possessionTeamId: string | null = null;
+    let jumpBallWinnerTeamId: string | null = null;
 
-    for (const event of events) {
-      if (reversedIds.has(event.id)) continue;
-      if (event.eventType === "correction" || event.eventType === "reversal") continue;
-
-      const payload =
-        corrections.get(event.id) ?? (event.payload as Record<string, unknown>);
+    for (const event of resolvedEvents) {
+      const payload = event.payload as Record<string, unknown>;
       if (event.eventType === "shot" && payload.result === "made") {
         const value = Number(payload.shotValue ?? 0);
         const isHome = this.isHomeTeamPayload(payload, teamContext);
@@ -214,12 +262,29 @@ export class StatdashProjectionsService {
         if (isHome) homeScore += 1;
         else awayScore += 1;
       }
+
+      if (typeof payload.quarter === "number") {
+        quarter = payload.quarter;
+      }
+      if (typeof payload.clockSecondsRemaining === "number") {
+        clockSecondsRemaining = payload.clockSecondsRemaining;
+      }
+      if (typeof payload.possessionTeamId === "string" || payload.possessionTeamId === null) {
+        possessionTeamId = payload.possessionTeamId as string | null;
+      }
+      if (typeof payload.jumpBallWinnerTeamId === "string") {
+        jumpBallWinnerTeamId = payload.jumpBallWinnerTeamId;
+      }
     }
 
     return {
       homeScore,
       awayScore,
-      version: events.length,
+      quarter,
+      clockSecondsRemaining,
+      possessionTeamId,
+      jumpBallWinnerTeamId,
+      version,
     };
   }
 
@@ -242,7 +307,8 @@ export class StatdashProjectionsService {
   }
 
   private buildBoxScoreFromEvents(
-    events: Array<{ eventType: string; payload: unknown; id: string }>,
+    resolvedEvents: Array<{ eventType: string; payload: unknown; id: string }>,
+    rawEventCount: number,
   ) {
     const players: Record<string, ProjectionTotals & { playerId: string }> = {};
     const totals: ProjectionTotals = {
@@ -255,7 +321,7 @@ export class StatdashProjectionsService {
       turnovers: 0,
     };
 
-    for (const event of events) {
+    for (const event of resolvedEvents) {
       const payload = event.payload as Record<string, unknown>;
       const playerId = (payload.playerId as string | undefined) ??
         (payload.shooterPlayerId as string | undefined) ??
@@ -309,7 +375,7 @@ export class StatdashProjectionsService {
     return {
       players,
       totals,
-      totalEvents: events.length,
+      totalEvents: rawEventCount,
     };
   }
 

@@ -16,6 +16,7 @@ describe("StatdashSessionsService", () => {
     match: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
     },
     gameSession: {
       findUnique: jest.fn(),
@@ -28,6 +29,7 @@ describe("StatdashSessionsService", () => {
     lineupState: {
       findFirst: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
   const redisService = {
     getSessionSnapshotCached: jest.fn(),
@@ -99,7 +101,7 @@ describe("StatdashSessionsService", () => {
     prismaService.match.findUnique.mockResolvedValue({
       id: "match_1",
       status: MatchStatus.LIVE,
-      gameSessions: [{ id: "session_1", status: GameSessionStatus.IN_PROGRESS }],
+      gameSessions: { id: "session_1", status: GameSessionStatus.IN_PROGRESS },
     });
 
     const result = await service.resolveMatchKey("match_1");
@@ -114,8 +116,8 @@ describe("StatdashSessionsService", () => {
   it("fails resolve when tournament key maps to multiple matches", async () => {
     prismaService.match.findUnique.mockResolvedValue(null);
     prismaService.match.findMany.mockResolvedValue([
-      { id: "m1", status: MatchStatus.SCHEDULED, gameSessions: [] },
-      { id: "m2", status: MatchStatus.SCHEDULED, gameSessions: [] },
+      { id: "m1", status: MatchStatus.SCHEDULED, gameSessions: null },
+      { id: "m2", status: MatchStatus.SCHEDULED, gameSessions: null },
     ]);
 
     await expect(service.resolveMatchKey("TOURNAMENT_KEY")).rejects.toThrow(
@@ -133,13 +135,14 @@ describe("StatdashSessionsService", () => {
       status: GameSessionStatus.PENDING,
       startedAt: null,
     });
-    prismaService.gameSession.update.mockResolvedValue({
+    prismaService.$transaction = jest.fn().mockResolvedValue([{
       id: "session_1",
       status: GameSessionStatus.IN_PROGRESS,
-    });
+    }]);
 
     const result = await service.startSession("session_1");
     expect(result).toEqual({ id: "session_1", status: GameSessionStatus.IN_PROGRESS });
+    expect(prismaService.$transaction).toHaveBeenCalled();
   });
 
   it("rejects start for completed sessions", async () => {
@@ -155,5 +158,43 @@ describe("StatdashSessionsService", () => {
   it("fails with not found for unknown session start", async () => {
     prismaService.gameSession.findUnique.mockResolvedValue(null);
     await expect(service.startSession("missing_session")).rejects.toThrow(NotFoundException);
+  });
+
+  describe("state transitions", () => {
+    it("pauses an in-progress session", async () => {
+      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.IN_PROGRESS });
+      prismaService.gameSession.update.mockResolvedValue({ id: "session_1", status: GameSessionStatus.PAUSED });
+
+      const result = await service.pauseSession("session_1");
+      expect(result.status).toBe(GameSessionStatus.PAUSED);
+    });
+
+    it("rejects pause for non-in-progress session", async () => {
+      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.PENDING });
+      await expect(service.pauseSession("session_1")).rejects.toThrow(ConflictException);
+    });
+
+    it("completes a session and its match", async () => {
+      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.IN_PROGRESS, matchId: "match_1" });
+      prismaService.$transaction = jest.fn().mockResolvedValue([{ id: "session_1", status: GameSessionStatus.COMPLETED }]);
+
+      const result = await service.completeSession("session_1");
+      expect(result.status).toBe(GameSessionStatus.COMPLETED);
+      expect(prismaService.$transaction).toHaveBeenCalled();
+    });
+
+    it("rejects complete for already completed session", async () => {
+      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.COMPLETED });
+      await expect(service.completeSession("session_1")).rejects.toThrow(ConflictException);
+    });
+
+    it("cancels a session and its match", async () => {
+      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.IN_PROGRESS, matchId: "match_1" });
+      prismaService.$transaction = jest.fn().mockResolvedValue([{ id: "session_1", status: GameSessionStatus.CANCELLED }]);
+
+      const result = await service.cancelSession("session_1");
+      expect(result.status).toBe(GameSessionStatus.CANCELLED);
+      expect(prismaService.$transaction).toHaveBeenCalled();
+    });
   });
 });

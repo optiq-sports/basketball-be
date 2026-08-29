@@ -120,6 +120,7 @@ model PlayerTeam {
 
   @@index([teamId, isActive])
   @@index([playerId, teamId])
+  @@unique([teamId, jerseyNumber])
   @@map("player_team")
 }
 
