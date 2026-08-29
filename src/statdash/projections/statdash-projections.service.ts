@@ -136,6 +136,10 @@ export class StatdashProjectionsService {
         data: {
           homeScore: replay.homeScore,
           awayScore: replay.awayScore,
+          quarter: replay.quarter,
+          clockSecondsRemaining: replay.clockSecondsRemaining,
+          possessionTeamId: replay.possessionTeamId,
+          jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
           version: replay.version,
         },
       }),
@@ -240,6 +244,10 @@ export class StatdashProjectionsService {
   ) {
     let homeScore = 0;
     let awayScore = 0;
+    let quarter = 1;
+    let clockSecondsRemaining = 600;
+    let possessionTeamId: string | null = null;
+    let jumpBallWinnerTeamId: string | null = null;
 
     for (const event of resolvedEvents) {
       const payload = event.payload as Record<string, unknown>;
@@ -254,11 +262,28 @@ export class StatdashProjectionsService {
         if (isHome) homeScore += 1;
         else awayScore += 1;
       }
+
+      if (typeof payload.quarter === "number") {
+        quarter = payload.quarter;
+      }
+      if (typeof payload.clockSecondsRemaining === "number") {
+        clockSecondsRemaining = payload.clockSecondsRemaining;
+      }
+      if (typeof payload.possessionTeamId === "string" || payload.possessionTeamId === null) {
+        possessionTeamId = payload.possessionTeamId as string | null;
+      }
+      if (typeof payload.jumpBallWinnerTeamId === "string") {
+        jumpBallWinnerTeamId = payload.jumpBallWinnerTeamId;
+      }
     }
 
     return {
       homeScore,
       awayScore,
+      quarter,
+      clockSecondsRemaining,
+      possessionTeamId,
+      jumpBallWinnerTeamId,
       version,
     };
   }

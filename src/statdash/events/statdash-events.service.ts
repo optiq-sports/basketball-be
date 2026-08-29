@@ -256,10 +256,10 @@ export class StatdashEventsService {
           version: resultingVersion,
           homeScore: session.homeScore + ruleResult.scoreDelta.home,
           awayScore: session.awayScore + ruleResult.scoreDelta.away,
-          quarter: ruleResult.sessionUpdates?.quarter ?? undefined,
-          clockSecondsRemaining: ruleResult.sessionUpdates?.clockSecondsRemaining ?? undefined,
-          possessionTeamId: ruleResult.sessionUpdates?.possessionTeamId ?? undefined,
-          jumpBallWinnerTeamId: ruleResult.sessionUpdates?.jumpBallWinnerTeamId ?? undefined,
+          quarter: ruleResult.sessionUpdates?.quarter !== undefined ? ruleResult.sessionUpdates.quarter : undefined,
+          clockSecondsRemaining: ruleResult.sessionUpdates?.clockSecondsRemaining !== undefined ? ruleResult.sessionUpdates.clockSecondsRemaining : undefined,
+          possessionTeamId: ruleResult.sessionUpdates?.possessionTeamId !== undefined ? ruleResult.sessionUpdates.possessionTeamId : undefined,
+          jumpBallWinnerTeamId: ruleResult.sessionUpdates?.jumpBallWinnerTeamId !== undefined ? ruleResult.sessionUpdates.jumpBallWinnerTeamId : undefined,
         },
       });
 
@@ -436,6 +436,10 @@ export class StatdashEventsService {
         data: {
           homeScore: replay.homeScore,
           awayScore: replay.awayScore,
+          quarter: replay.quarter,
+          clockSecondsRemaining: replay.clockSecondsRemaining,
+          possessionTeamId: replay.possessionTeamId,
+          jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
           version: replay.version,
         },
       });
@@ -547,6 +551,10 @@ export class StatdashEventsService {
         data: {
           homeScore: replay.homeScore,
           awayScore: replay.awayScore,
+          quarter: replay.quarter,
+          clockSecondsRemaining: replay.clockSecondsRemaining,
+          possessionTeamId: replay.possessionTeamId,
+          jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
           version: replay.version,
         },
       });

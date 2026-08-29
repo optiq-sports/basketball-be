@@ -64,7 +64,7 @@ export class AuthService {
       userId: user.id,
       access_token: accessToken,
       refreshToken: refreshToken,
-      expires: new Date(Date.now() + ms(expiresInStr as StringValue)),
+      expires: new Date(Date.now() + ms(refreshExpiresIn as StringValue)),
     };
 
     if (oldSessionId) {

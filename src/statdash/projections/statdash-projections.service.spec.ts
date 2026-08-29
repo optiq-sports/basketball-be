@@ -97,7 +97,15 @@ describe("StatdashProjectionsService", () => {
     const resolvedEvents = service.resolveEvents(events);
     const replay = service.replayScoreFromEvents(resolvedEvents, events.length);
 
-    expect(replay).toEqual({ homeScore: 0, awayScore: 1, version: 4 });
+    expect(replay).toEqual({
+      homeScore: 0,
+      awayScore: 1,
+      quarter: 1,
+      clockSecondsRemaining: 600,
+      possessionTeamId: null,
+      jumpBallWinnerTeamId: null,
+      version: 4,
+    });
   });
 
   it("builds box score projection from events", async () => {
