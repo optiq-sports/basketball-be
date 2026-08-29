@@ -3,7 +3,11 @@ import { Controller, Get } from '@nestjs/common';
 import { HealthCheckService, HealthCheck, HealthCheckError, MemoryHealthIndicator } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../common/redis/redis.service';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AppErrorResponse } from '../common/decorators/api-errors.decorator';
+import { HealthResponseDto } from './dto/health-response.dto';
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -15,6 +19,9 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({ summary: 'Check the health of the application and its dependencies' })
+  @ApiResponse({ status: 200, description: 'The application is healthy', type: HealthResponseDto })
+  @AppErrorResponse(503, "Service Unavailable", "GET", "/api/health", "One or more health checks failed (e.g., database, redis, memory)")
   check() {
     return this.health.check([
       // Database health check

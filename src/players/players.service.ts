@@ -30,7 +30,7 @@ export class PlayersService {
   /**
    * Create a standalone player (not assigned to any team)
    */
-  async create(createPlayerDto: CreatePlayerDto): Promise<Player> {
+  async create(createPlayerDto: CreatePlayerDto): Promise<PlayerResponseDto> {
     this.logger.log(
       `Creating player: ${createPlayerDto.firstName} ${createPlayerDto.lastName}`,
     );
@@ -84,7 +84,7 @@ export class PlayersService {
       }
     }
 
-    return this.prisma.player.create({
+    const player = await this.prisma.player.create({
       data: {
         firstName: createPlayerDto.firstName,
         lastName: createPlayerDto.lastName,
@@ -99,7 +99,9 @@ export class PlayersService {
         nationality: createPlayerDto.nationality,
       } as any,
     });
-  }
+
+    return this.formatPlayerResponse(player);
+  }  
 
   /**
    * Create a player and assign to a team (with jersey number)

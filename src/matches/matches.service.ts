@@ -6,13 +6,14 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateMatchDto } from "./dto/create-match.dto";
 import { UpdateMatchDto } from "./dto/update-match.dto";
-import { Match, MatchStatus } from "@prisma/client";
+import { MatchResponseDto } from "./dto/match-response.dto";
+import { MatchStatus } from "@prisma/client";
 
 @Injectable()
 export class MatchesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createMatchDto: CreateMatchDto): Promise<Match> {
+  async create(createMatchDto: CreateMatchDto): Promise<MatchResponseDto> {
     // Verify tournament exists
     const tournament = await this.prisma.tournament.findUnique({
       where: { id: createMatchDto.tournamentId },
@@ -96,7 +97,7 @@ export class MatchesService {
     });
   }
 
-  async findAll(tournamentId?: string, status?: MatchStatus): Promise<Match[]> {
+  async findAll(tournamentId?: string, status?: MatchStatus): Promise<MatchResponseDto[]> {
     const where: any = {};
     if (tournamentId) {
       where.tournamentId = tournamentId;
@@ -129,7 +130,7 @@ export class MatchesService {
     });
   }
 
-  async findOne(id: string): Promise<Match> {
+  async findOne(id: string): Promise<MatchResponseDto> {
     const match = await this.prisma.match.findUnique({
       where: { id },
       include: {
@@ -175,7 +176,7 @@ export class MatchesService {
     return match;
   }
 
-  async update(id: string, updateMatchDto: UpdateMatchDto): Promise<Match> {
+  async update(id: string, updateMatchDto: UpdateMatchDto): Promise<MatchResponseDto> {
     const match = await this.findOne(id);
 
     const updateData: any = { ...updateMatchDto };

@@ -10,6 +10,7 @@ import { UpdateTournamentDto } from "./dto/update-tournament.dto";
 import { AddTeamToTournamentDto } from "./dto/add-team-to-tournament.dto";
 import { Tournament } from "@prisma/client";
 import * as crypto from "crypto";
+import { TournamentResponseDto } from "./dto/tournament-response.dto";
 
 @Injectable()
 export class TournamentsService {
@@ -19,7 +20,7 @@ export class TournamentsService {
     return crypto.randomBytes(6).toString("hex").toUpperCase();
   }
 
-  async create(createTournamentDto: CreateTournamentDto): Promise<Tournament> {
+  async create(createTournamentDto: CreateTournamentDto): Promise<TournamentResponseDto> {
     // Check for idempotency: Prevent duplicates with same name and division
     const duplicate = await this.prisma.tournament.findFirst({
       where: {
@@ -67,7 +68,7 @@ export class TournamentsService {
     });
   }
 
-  async findAll(): Promise<Tournament[]> {
+  async findAll(): Promise<TournamentResponseDto[]> {
     return this.prisma.tournament.findMany({
       include: {
         teams: {
@@ -92,7 +93,7 @@ export class TournamentsService {
     });
   }
 
-  async findOne(id: string): Promise<Tournament> {
+  async findOne(id: string): Promise<TournamentResponseDto> {
     const tournament = await this.prisma.tournament.findUnique({
       where: { id },
       include: {
@@ -132,7 +133,7 @@ export class TournamentsService {
     return tournament;
   }
 
-  async findByCode(code: string): Promise<Tournament> {
+  async findByCode(code: string): Promise<TournamentResponseDto> {
     const tournament = await this.prisma.tournament.findUnique({
       where: { code },
       include: {
@@ -170,7 +171,7 @@ export class TournamentsService {
   async update(
     id: string,
     updateTournamentDto: UpdateTournamentDto,
-  ): Promise<Tournament> {
+  ): Promise<TournamentResponseDto> {
     await this.findOne(id);
 
     const updateData: any = { ...updateTournamentDto };
@@ -199,7 +200,7 @@ export class TournamentsService {
   async addTeams(
     id: string,
     addTeamDto: AddTeamToTournamentDto,
-  ): Promise<Tournament> {
+  ): Promise<TournamentResponseDto> {
     const tournament = await this.findOne(id);
 
     // Verify all teams exist
@@ -250,7 +251,7 @@ export class TournamentsService {
     });
   }
 
-  async updateFlyer(id: string, flyerUrl: string): Promise<Tournament> {
+  async updateFlyer(id: string, flyerUrl: string): Promise<TournamentResponseDto> {
     await this.findOne(id);
     return this.prisma.tournament.update({
       where: { id },
