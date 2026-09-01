@@ -94,6 +94,12 @@ class EventDto {
 
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   createdAt: Date;
+
+  @ApiProperty({ example: 1, nullable: true })
+  period: number | null;
+
+  @ApiProperty({ example: 600, nullable: true })
+  clockSecondsRemaining: number | null;
 }
 
 export class StatdashSessionSnapshotDto {

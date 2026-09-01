@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from "@nestjs/common";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 
 function prismaExceptionInfo(exception: unknown): {

@@ -252,14 +252,21 @@ export class PlayersService {
         }
 
         // Assign player to team
-        await tx.playerTeam.create({
-          data: {
-            playerId: player.id,
-            teamId: createPlayerDto.teamId,
-            jerseyNumber: createPlayerDto.jerseyNumber,
-            isActive: true,
-          },
-        });
+        try {
+          await tx.playerTeam.create({
+            data: {
+              playerId: player.id,
+              teamId: createPlayerDto.teamId,
+              jerseyNumber: createPlayerDto.jerseyNumber,
+              isActive: true,
+            },
+          });
+        } catch (error: any) {
+          if (error.code === 'P2002') {
+            throw new ConflictException(`Jersey number ${createPlayerDto.jerseyNumber} is already taken in this team`);
+          }
+          throw error;
+        }
 
         // Return player with team info
         return this.formatPlayerResponse(player, createPlayerDto.teamId);
@@ -425,14 +432,21 @@ export class PlayersService {
         }
 
         // Assign player to team
-        await tx.playerTeam.create({
-          data: {
-            playerId: player.id,
-            teamId: bulkDto.teamId,
-            jerseyNumber: playerData.jerseyNumber,
-            isActive: true,
-          },
-        });
+        try {
+          await tx.playerTeam.create({
+            data: {
+              playerId: player.id,
+              teamId: bulkDto.teamId,
+              jerseyNumber: playerData.jerseyNumber,
+              isActive: true,
+            },
+          });
+        } catch (error: any) {
+          if (error.code === 'P2002') {
+            throw new ConflictException(`Jersey number ${playerData.jerseyNumber} is already taken in this team`);
+          }
+          throw error;
+        }
 
         // Add to result
         result.players.push(
@@ -588,10 +602,17 @@ export class PlayersService {
 
     // If a specific team jersey update is requested, apply it to the PlayerTeam record
     if (teamId && jerseyNumber !== undefined) {
-      await this.prisma.playerTeam.updateMany({
-        where: { playerId: id, teamId, isActive: true },
-        data: { jerseyNumber },
-      });
+      try {
+        await this.prisma.playerTeam.updateMany({
+          where: { playerId: id, teamId, isActive: true },
+          data: { jerseyNumber },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(`Jersey number ${jerseyNumber} is already taken in this team`);
+        }
+        throw error;
+      }
     }
 
     return this.formatPlayerResponse(updatedPlayer);
@@ -671,23 +692,37 @@ export class PlayersService {
 
     if (existing) {
       // Reactivate if inactive
-      await this.prisma.playerTeam.update({
-        where: { id: existing.id },
-        data: {
-          isActive: true,
-          leftAt: null,
-        },
-      });
+      try {
+        await this.prisma.playerTeam.update({
+          where: { id: existing.id },
+          data: {
+            isActive: true,
+            leftAt: null,
+          },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(`Jersey number ${jerseyNumber} is already taken in this team`);
+        }
+        throw error;
+      }
     } else {
       // Create new association
-      await this.prisma.playerTeam.create({
-        data: {
-          playerId,
-          teamId,
-          jerseyNumber,
-          isActive: true,
-        },
-      });
+      try {
+        await this.prisma.playerTeam.create({
+          data: {
+            playerId,
+            teamId,
+            jerseyNumber,
+            isActive: true,
+          },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(`Jersey number ${jerseyNumber} is already taken in this team`);
+        }
+        throw error;
+      }
     }
 
     return this.formatPlayerResponse(player, teamId);
@@ -714,7 +749,7 @@ export class PlayersService {
    * Format player response with team information
    */
   private async formatPlayerResponse(
-    player: Player & { playerTeams?: any[] },
+    player: Player & { playerTeams?: any[]; matchStats?: any[] },
     teamId?: string,
   ): Promise<PlayerResponseDto> {
     let playerTeams = player.playerTeams;
@@ -771,6 +806,22 @@ export class PlayersService {
         leftAt: pt.leftAt,
         team: pt.team,
       })),
+      recentMatches: player.matchStats?.map((stat) => {
+        const isHome = stat.match.homeTeamId === (primaryTeam?.teamId ?? stat.teamId);
+        const opponentTeam = isHome ? stat.match.awayTeam : stat.match.homeTeam;
+        return {
+          matchId: stat.match.id,
+          opponent: opponentTeam?.name ?? null,
+          scheduledDate: stat.match.scheduledDate,
+          points: stat.points,
+          rebounds: stat.rebounds,
+          assists: stat.assists,
+          blocks: stat.blocks,
+          steals: stat.steals,
+          fouls: stat.fouls,
+          turnovers: stat.turnovers,
+        };
+      }),
     };
   }
 
@@ -813,10 +864,20 @@ export class PlayersService {
     for (const [index, row] of (rawData as any[]).entries()) {
       const rowNumber = index + 2; // Excel row number (1-header, 0-indexed)
       try {
+        // Normalize row keys to lowercase and trim whitespace
+        const normalizedRow: Record<string, any> = {};
+        for (const key in row) {
+          if (Object.prototype.hasOwnProperty.call(row, key)) {
+            normalizedRow[key.trim().toLowerCase()] = row[key];
+          }
+        }
+
         // Basic Mapping & Validation
         const firstName =
-          row["First Name"] || row["firstname"] || row["FirstName"];
-        const lastName = row["Last Name"] || row["lastname"] || row["LastName"];
+          normalizedRow["first name"] || normalizedRow["firstname"];
+        const lastName = 
+          normalizedRow["last name"] || normalizedRow["lastname"];
+          
         if (!firstName || !lastName) {
           result.errors.push({
             row: rowNumber,
@@ -825,51 +886,27 @@ export class PlayersService {
           continue;
         }
 
+        const nationalityVal = normalizedRow["country"] || normalizedRow["nationality"];
+        const jerseyVal = normalizedRow["jersey number"] || normalizedRow["jersey"] || normalizedRow["jerseynumber"];
+
         const candidate = {
           firstName: String(firstName).trim(),
           lastName: String(lastName).trim(),
-          email: row["Email"] ? String(row["Email"]).trim() : undefined,
-          height: row["Height"] ? String(row["Height"]) : undefined,
-          phone: row["Phone"] ? String(row["Phone"]) : undefined,
+          email: normalizedRow["email"] ? String(normalizedRow["email"]).trim() : undefined,
+          height: normalizedRow["height"] ? String(normalizedRow["height"]) : undefined,
+          phone: normalizedRow["phone"] ? String(normalizedRow["phone"]) : undefined,
           dateOfBirth:
-            row["Date of Birth"] || row["DOB"]
-              ? new Date(row["Date of Birth"] || row["DOB"])
+            normalizedRow["date of birth"] || normalizedRow["dob"]
+              ? new Date(normalizedRow["date of birth"] || normalizedRow["dob"])
               : undefined,
-          nationality:
-            row["Nationality"] ||
-            row["nationality"] ||
-            row["Country"] ||
-            row["country"]
-              ? String(
-                  row["Nationality"] ||
-                    row["nationality"] ||
-                    row["Country"] ||
-                    row["country"],
-                ).trim()
+          nationality: nationalityVal ? String(nationalityVal).trim() : undefined,
+          jerseyNumber: jerseyVal !== undefined && jerseyVal !== null && jerseyVal !== ""
+              ? parseInt(String(jerseyVal))
               : undefined,
-          jerseyNumber:
-            row["Jersey Number"] ||
-            row["jersey number"] ||
-            row["Jersey"] ||
-            row["jersey"] ||
-            row["jerseyNumber"] ||
-            row["jerseynumber"]
-              ? parseInt(
-                  row["Jersey Number"] ||
-                    row["jersey number"] ||
-                    row["Jersey"] ||
-                    row["jersey"] ||
-                    row["jerseyNumber"] ||
-                    row["jerseynumber"],
-                )
-              : undefined,
-          position: row["Position"]
-            ? (row["Position"] as PlayerPosition)
+          position: normalizedRow["position"]
+            ? (normalizedRow["position"] as PlayerPosition)
             : undefined,
-          gender:
-            row["Gender"] || row["gender"]
-              ? String(row["Gender"] || row["gender"]).trim()
-              : undefined,
+          gender: normalizedRow["gender"] ? String(normalizedRow["gender"]).trim() : undefined,
         };
 
         // 1. Deduplication Check
@@ -923,6 +960,7 @@ export class PlayersService {
               });
 
               if (!alreadyInTeam) {
+              try {
                 await this.prisma.playerTeam.create({
                   data: {
                     playerId: duplicateCheck.existingPlayer.id,
@@ -931,6 +969,12 @@ export class PlayersService {
                     isActive: true,
                   },
                 });
+              } catch (error: any) {
+                if (error.code === 'P2002') {
+                  throw new ConflictException(`Jersey number ${candidate.jerseyNumber} is already taken in this team`);
+                }
+                throw error;
+              }
                 result.details[result.details.length - 1].action = "LINKED";
               } else {
                 result.details[result.details.length - 1].action =
@@ -973,14 +1017,21 @@ export class PlayersService {
           });
 
           if (teamId) {
-            await this.prisma.playerTeam.create({
-              data: {
-                playerId: newPlayer.id,
-                teamId,
-                jerseyNumber: candidate.jerseyNumber || 0,
-                isActive: true,
-              },
-            });
+            try {
+              await this.prisma.playerTeam.create({
+                data: {
+                  playerId: newPlayer.id,
+                  teamId,
+                  jerseyNumber: candidate.jerseyNumber || 0,
+                  isActive: true,
+                },
+              });
+            } catch (error: any) {
+              if (error.code === 'P2002') {
+                throw new ConflictException(`Jersey number ${candidate.jerseyNumber} is already taken in this team`);
+              }
+              throw error;
+            }
           }
           result.created++;
         }

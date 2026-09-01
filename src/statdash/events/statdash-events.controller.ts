@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { Role } from "@prisma/client";
-import { Request } from "express";
+import type { Request } from "express";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
@@ -125,7 +125,12 @@ export class StatdashEventsController {
   }
 
   @Post(":eventId/reverse")
-  @ApiOperation({ summary: "Reverse an existing game event" })
+  @ApiOperation({
+    summary: "Reverse an existing game event",
+    description: `Reverses the specified game event and recalculates the session state. 
+    
+**Cascading Reversals:** If the frontend supplies a \`parentEventId\` when recording child events (e.g., Free Throws spawned from a Foul), reversing the parent event will automatically cascade and reverse all child events, including derived assists.`,
+  })
   @ApiBody({ type: ReverseEventDto })
   @ApiResponse({
     status: 201,

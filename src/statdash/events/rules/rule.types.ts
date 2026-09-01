@@ -1,5 +1,5 @@
 import { GameSession } from "@prisma/client";
-import { StatdashCommandType } from "../../contracts/event-types";
+import type { StatdashCommandType } from "../../contracts/event-types";
 
 export type RuleEventDraft = {
   eventType: StatdashCommandType;
@@ -29,4 +29,5 @@ export type RuleContext = {
     match: { homeTeamId: string; awayTeamId: string };
   };
   lineupSnapshot?: { homeLineup: string[]; awayLineup: string[] } | null;
+  recentEvents?: Array<{ eventType: string; payload: Record<string, unknown> }>;
 };

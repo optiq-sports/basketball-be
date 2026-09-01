@@ -6,7 +6,7 @@ export class ClockCommandDto {
   @IsInt()
   @Min(1)
   @Max(10)
-  quarter!: number;
+  period!: number;
 
   @ApiProperty({ example: 720 })
   @IsInt()

@@ -151,6 +151,8 @@ export class StatdashSessionsService {
               eventType: string;
               payload: unknown;
               createdAt: Date;
+              period: number | null;
+              clockSecondsRemaining: number | null;
             }>,
           )
         : this.prisma.gameEvent.findMany({
@@ -171,6 +173,8 @@ export class StatdashSessionsService {
           eventType: string;
           payload: unknown;
           createdAt: Date;
+          period: number | null;
+          clockSecondsRemaining: number | null;
         }>)
       : recentEvents.reverse();
 
@@ -341,6 +345,8 @@ export class StatdashSessionsService {
       eventType: string;
       payload: unknown;
       createdAt: Date;
+      period: number | null;
+      clockSecondsRemaining: number | null;
     }>,
     latestLineup: { homeLineup: unknown; awayLineup: unknown } | null,
   ) {
@@ -367,6 +373,8 @@ export class StatdashSessionsService {
         eventType: event.eventType,
         payload: event.payload,
         createdAt: event.createdAt,
+        period: event.period,
+        clockSecondsRemaining: event.clockSecondsRemaining,
       })),
       version: session.version,
       startedAt: session.startedAt,

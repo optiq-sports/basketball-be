@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsArray } from "class-validator";
+import { IsString, IsNotEmpty, IsArray, IsOptional } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class AddTeamToTournamentDto {
@@ -10,4 +10,13 @@ export class AddTeamToTournamentDto {
   @IsString({ each: true })
   @IsNotEmpty()
   teamIds: string[];
+
+  @ApiProperty({
+    example: "A",
+    description: "Group the team(s) should be assigned to",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  group?: string;
 }

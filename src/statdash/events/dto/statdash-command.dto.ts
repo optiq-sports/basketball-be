@@ -1,8 +1,8 @@
-import { IsIn, IsInt, IsNotEmpty, IsObject, IsString } from "class-validator";
+import { IsIn, IsInt, IsNotEmpty, IsObject, IsString, IsOptional } from "class-validator";
 import { ApiProperty, ApiExtraModels, getSchemaPath } from "@nestjs/swagger";
 import {
   STATDASH_COMMAND_TYPES,
-  StatdashCommandType,
+  type StatdashCommandType,
 } from "../../contracts/event-types";
 import { ClockCommandDto } from "./clock-command.dto";
 import { DeadBallCommandDto } from "./dead-ball-command.dto";
@@ -74,4 +74,13 @@ export class StatdashCommandDto {
   @IsString()
   @IsNotEmpty()
   idempotencyKey!: string;
+
+  @ApiProperty({
+    example: "cuid-of-parent-event",
+    description: "Optional ID of a parent event (e.g. Foul that generated this Free Throw) to enable cascading reversal",
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  parentEventId?: string;
 }

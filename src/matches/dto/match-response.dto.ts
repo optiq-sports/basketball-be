@@ -64,4 +64,18 @@ export class MatchResponseDto {
 
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   updatedAt: Date;
+
+  @ApiProperty({
+    example: [{ id: "session_1", status: "LIVE" }],
+    required: false,
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        status: { type: "string" },
+      },
+    },
+  })
+  gameSessions?: any;
 }

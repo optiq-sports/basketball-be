@@ -93,6 +93,7 @@ export class MatchesService {
         tournament: true,
         homeTeam: true,
         awayTeam: true,
+        statistician: true,
       },
     });
   }
@@ -115,6 +116,7 @@ export class MatchesService {
         tournament: true,
         homeTeam: true,
         awayTeam: true,
+        statistician: true,
         stats: {
           include: {
             player: {
@@ -138,9 +140,14 @@ export class MatchesService {
       where: { id },
       include: {
         tournament: true,
+        statistician: true,
+        gameSessions: {
+          select: { id: true, status: true },
+        },
         homeTeam: {
           include: {
             playerTeams: {
+              where: { isActive: true },
               include: {
                 player: true,
               },
@@ -151,6 +158,7 @@ export class MatchesService {
         awayTeam: {
           include: {
             playerTeams: {
+              where: { isActive: true },
               include: {
                 player: true,
               },
@@ -176,7 +184,10 @@ export class MatchesService {
       throw new NotFoundException(`Match with ID ${id} not found`);
     }
 
-    return match;
+    return {
+      ...match,
+      gameSessions: match.gameSessions ? [match.gameSessions] : [],
+    } as any;
   }
 
   async update(
@@ -236,6 +247,7 @@ export class MatchesService {
         tournament: true,
         homeTeam: true,
         awayTeam: true,
+        statistician: true,
         stats: {
           include: {
             player: true,

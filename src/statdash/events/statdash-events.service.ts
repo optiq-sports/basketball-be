@@ -216,6 +216,12 @@ export class StatdashEventsService {
             }
           }
 
+          const recentEventsRecords = await tx.gameEvent.findMany({
+            where: { sessionId: session.id },
+            orderBy: { sequence: "desc" },
+            take: 5,
+          });
+
           const ruleResult = applyCommandRules(
             command.commandType,
             command.payload,
@@ -231,6 +237,10 @@ export class StatdashEventsService {
                 },
               },
               lineupSnapshot,
+              recentEvents: recentEventsRecords.map((e) => ({
+                eventType: e.eventType,
+                payload: e.payload as Record<string, unknown>,
+              })),
             },
           );
 
@@ -251,8 +261,11 @@ export class StatdashEventsService {
                 eventType: draft.eventType,
                 payload: draft.payload as Prisma.InputJsonValue,
                 actorUserId,
+                period: typeof command.payload.period === 'number' ? command.payload.period : null,
+                clockSecondsRemaining: typeof command.payload.clockSecondsRemaining === 'number' ? command.payload.clockSecondsRemaining : null,
                 expectedVersion: command.expectedVersion,
                 resultingVersion: command.expectedVersion + i + 1,
+                parentEventId: command.parentEventId,
               },
             });
             emittedEvents.push(event);
@@ -561,15 +574,42 @@ export class StatdashEventsService {
           _max: { sequence: true },
         });
         const nextSequence = (maxSequence._max.sequence ?? 0) + 1;
+        let currentSequence = nextSequence;
+        const eventsToCreate = [];
 
-        await tx.gameEvent.create({
-          data: {
-            sessionId: targetEvent.sessionId,
-            sequence: nextSequence,
+        eventsToCreate.push({
+          sessionId: targetEvent.sessionId,
+          sequence: currentSequence++,
+          eventType: "reversal",
+          payload: {
+            reversedEventId: targetEvent.id,
+            originalEventType: targetEvent.eventType,
+            reason: dto.reason,
+            audit: {
+              createdBy: actorUserId,
+              updatedBy: actorUserId,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          } as Prisma.InputJsonValue,
+          actorUserId,
+          expectedVersion: targetEvent.resultingVersion,
+          resultingVersion: targetEvent.resultingVersion + 1,
+        });
+
+        const childEvents = await tx.gameEvent.findMany({
+          where: { parentEventId: targetEvent.id },
+          orderBy: { sequence: "asc" },
+        });
+
+        for (const child of childEvents) {
+          eventsToCreate.push({
+            sessionId: child.sessionId,
+            sequence: currentSequence++,
             eventType: "reversal",
             payload: {
-              reversedEventId: targetEvent.id,
-              originalEventType: targetEvent.eventType,
+              reversedEventId: child.id,
+              originalEventType: child.eventType,
               reason: dto.reason,
               audit: {
                 createdBy: actorUserId,
@@ -579,9 +619,13 @@ export class StatdashEventsService {
               },
             } as Prisma.InputJsonValue,
             actorUserId,
-            expectedVersion: targetEvent.resultingVersion,
-            resultingVersion: targetEvent.resultingVersion + 1,
-          },
+            expectedVersion: child.resultingVersion,
+            resultingVersion: child.resultingVersion + 1,
+          });
+        }
+
+        await tx.gameEvent.createMany({
+          data: eventsToCreate,
         });
 
         const events = await tx.gameEvent.findMany({

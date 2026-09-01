@@ -31,7 +31,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "@prisma/client";
-import { IUploadProvider } from "../upload/interfaces/upload-provider.interface";
+import type { IUploadProvider } from "../upload/interfaces/upload-provider.interface";
 import { UPLOAD_PROVIDER } from "../upload/upload.constants";
 
 @ApiTags("Tournaments")

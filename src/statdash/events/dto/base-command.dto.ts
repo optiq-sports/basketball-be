@@ -11,7 +11,7 @@ export class BaseCommandDto {
   @ApiProperty({ example: 1, required: false })
   @IsOptional()
   @IsInt()
-  quarter?: number;
+  period?: number;
 
   @ApiProperty({ example: 720, required: false })
   @IsOptional()

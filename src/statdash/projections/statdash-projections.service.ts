@@ -72,6 +72,7 @@ export class StatdashProjectionsService {
           x: payload.x ?? null,
           y: payload.y ?? null,
           sequence: event.sequence,
+          period: event.period ?? null,
         };
       });
     await this.redisService.setProjectionCached(
@@ -223,6 +224,7 @@ export class StatdashProjectionsService {
       eventType: string;
       payload: unknown;
       sequence: number;
+      period?: number | null;
     }>,
   ) {
     const reversedIds = new Set<string>();

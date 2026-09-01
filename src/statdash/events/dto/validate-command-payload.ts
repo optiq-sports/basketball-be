@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { ClassConstructor } from "class-transformer/types/interfaces";
-import { StatdashCommandType } from "../../contracts/event-types";
+import type { StatdashCommandType } from "../../contracts/event-types";
 import { ClockCommandDto } from "./clock-command.dto";
 import { DeadBallCommandDto } from "./dead-ball-command.dto";
 import { FoulCommandDto } from "./foul-command.dto";

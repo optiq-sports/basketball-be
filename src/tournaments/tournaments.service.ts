@@ -228,10 +228,13 @@ export class TournamentsService {
               teamId,
             },
           },
-          update: {},
+          update: {
+            group: addTeamDto.group,
+          },
           create: {
             tournamentId: id,
             teamId,
+            group: addTeamDto.group,
           },
         }),
       ),

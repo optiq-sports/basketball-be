@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { IUploadProvider } from "./interfaces/upload-provider.interface";
+import type { IUploadProvider } from "./interfaces/upload-provider.interface";
 import { UPLOAD_PROVIDER } from "./upload.constants";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";

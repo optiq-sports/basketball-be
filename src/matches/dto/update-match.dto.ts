@@ -1,6 +1,6 @@
 import { PartialType, ApiProperty } from "@nestjs/swagger";
 import { CreateMatchDto } from "./create-match.dto";
-import { IsOptional, IsInt, IsEnum, Min } from "class-validator";
+import { IsOptional, IsInt, IsEnum, Min, IsString } from "class-validator";
 import { MatchStatus } from "@prisma/client";
 
 export class UpdateMatchDto extends PartialType(CreateMatchDto) {
@@ -92,4 +92,13 @@ export class UpdateMatchDto extends PartialType(CreateMatchDto) {
   @IsOptional()
   @IsEnum(MatchStatus)
   status?: MatchStatus;
+
+  @ApiProperty({
+    example: "cuid-statistician-id",
+    description: "ID of the statistician assigned to the match",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  statisticianId?: string;
 }

@@ -20,6 +20,7 @@ model User {
   gameEvents    GameEvent[]
   sessions      Session[]
   profile       UserProfile?
+  matches       Match[]
 
   @@map("user")
 }
@@ -118,9 +119,9 @@ model PlayerTeam {
   player       Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
   team         Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
+  @@unique([teamId, jerseyNumber])
   @@index([teamId, isActive])
   @@index([playerId, teamId])
-  @@unique([teamId, jerseyNumber])
   @@map("player_team")
 }
 
@@ -153,6 +154,7 @@ model TournamentTeam {
   id           String     @id @default(cuid()) @map("id")
   tournamentId String     @map("tournament_id")
   teamId       String     @map("team_id")
+  group        String?    @map("group")
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
   team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -163,33 +165,35 @@ model TournamentTeam {
 }
 
 model Match {
-  id            String        @id @default(cuid()) @map("id")
-  tournamentId  String        @map("tournament_id")
-  homeTeamId    String        @map("home_team_id")
-  awayTeamId    String        @map("away_team_id")
-  scheduledDate DateTime      @map("scheduled_date")
-  status        MatchStatus   @default(SCHEDULED) @map("status")
-  homeScore     Int           @default(0) @map("home_score")
-  awayScore     Int           @default(0) @map("away_score")
-  quarter1Home  Int?          @map("quarter_1_home")
-  quarter1Away  Int?          @map("quarter_1_away")
-  quarter2Home  Int?          @map("quarter_2_home")
-  quarter2Away  Int?          @map("quarter_2_away")
-  quarter3Home  Int?          @map("quarter_3_home")
-  quarter3Away  Int?          @map("quarter_3_away")
-  quarter4Home  Int?          @map("quarter_4_home")
-  quarter4Away  Int?          @map("quarter_4_away")
-  overtimeHome  Int?          @map("overtime_home")
-  overtimeAway  Int?          @map("overtime_away")
-  venue         String?       @map("venue")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  gameSessions  GameSession?
-  awayTeam      Team          @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
-  homeTeam      Team          @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
-  tournament    Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  matchPlayers  MatchPlayer[]
-  stats         MatchStat[]
+  id             String        @id @default(cuid()) @map("id")
+  tournamentId   String        @map("tournament_id")
+  homeTeamId     String        @map("home_team_id")
+  awayTeamId     String        @map("away_team_id")
+  scheduledDate  DateTime      @map("scheduled_date")
+  status         MatchStatus   @default(SCHEDULED) @map("status")
+  homeScore      Int           @default(0) @map("home_score")
+  awayScore      Int           @default(0) @map("away_score")
+  quarter1Home   Int?          @map("quarter_1_home")
+  quarter1Away   Int?          @map("quarter_1_away")
+  quarter2Home   Int?          @map("quarter_2_home")
+  quarter2Away   Int?          @map("quarter_2_away")
+  quarter3Home   Int?          @map("quarter_3_home")
+  quarter3Away   Int?          @map("quarter_3_away")
+  quarter4Home   Int?          @map("quarter_4_home")
+  quarter4Away   Int?          @map("quarter_4_away")
+  overtimeHome   Int?          @map("overtime_home")
+  overtimeAway   Int?          @map("overtime_away")
+  venue          String?       @map("venue")
+  statisticianId String?       @map("statistician_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  gameSessions   GameSession?
+  statistician   User?         @relation(fields: [statisticianId], references: [id])
+  awayTeam       Team          @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
+  homeTeam       Team          @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
+  tournament     Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matchPlayers   MatchPlayer[]
+  stats          MatchStat[]
 
   @@map("match")
 }
@@ -262,19 +266,24 @@ model GameSession {
 }
 
 model GameEvent {
-  id               String             @id @default(cuid()) @map("id")
-  sessionId        String             @map("session_id")
-  sequence         Int                @map("sequence")
-  eventType        String             @map("event_type")
-  payload          Json               @map("payload")
-  actorUserId      String             @map("actor_user_id")
-  expectedVersion  Int                @map("expected_version")
-  resultingVersion Int                @map("resulting_version")
-  idempotencyKeyId String?            @map("idempotency_key_id")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  actor            User               @relation(fields: [actorUserId], references: [id])
-  idempotencyKey   IdempotencyRecord? @relation(fields: [idempotencyKeyId], references: [id])
-  session          GameSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id                    String             @id @default(cuid()) @map("id")
+  sessionId             String             @map("session_id")
+  sequence              Int                @map("sequence")
+  eventType             String             @map("event_type")
+  payload               Json               @map("payload")
+  actorUserId           String             @map("actor_user_id")
+  expectedVersion       Int                @map("expected_version")
+  resultingVersion      Int                @map("resulting_version")
+  idempotencyKeyId      String?            @map("idempotency_key_id")
+  parentEventId         String?            @map("parent_event_id")
+  period                Int?               @map("period")
+  clockSecondsRemaining Int?               @map("clock_seconds_remaining")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  actor                 User               @relation(fields: [actorUserId], references: [id])
+  idempotencyKey        IdempotencyRecord? @relation(fields: [idempotencyKeyId], references: [id])
+  session               GameSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  parentEvent           GameEvent?         @relation("EventHierarchy", fields: [parentEventId], references: [id])
+  childEvents           GameEvent[]        @relation("EventHierarchy")
 
   @@unique([sessionId, sequence])
   @@index([sessionId, createdAt])

@@ -31,6 +31,38 @@ export class PlayerTeamResponseDto {
   };
 }
 
+export class MatchStatSummary {
+  @ApiProperty({ example: "match_123" })
+  matchId: string;
+
+  @ApiProperty({ example: "Lakers", required: false })
+  opponent?: string;
+
+  @ApiProperty({ example: "2024-06-01T18:00:00Z" })
+  scheduledDate: Date;
+
+  @ApiProperty({ example: 25 })
+  points: number;
+
+  @ApiProperty({ example: 10 })
+  rebounds: number;
+
+  @ApiProperty({ example: 5 })
+  assists: number;
+
+  @ApiProperty({ example: 2 })
+  blocks: number;
+
+  @ApiProperty({ example: 1 })
+  steals: number;
+
+  @ApiProperty({ example: 3 })
+  fouls: number;
+
+  @ApiProperty({ example: 2 })
+  turnovers: number;
+}
+
 export class PlayerResponseDto {
   @ApiProperty({ example: "p_123" })
   id: string;
@@ -87,6 +119,9 @@ export class PlayerResponseDto {
 
   @ApiProperty({ type: [PlayerTeamResponseDto], required: false })
   playerTeams?: PlayerTeamResponseDto[];
+
+  @ApiProperty({ type: [MatchStatSummary], required: false })
+  recentMatches?: MatchStatSummary[];
 }
 
 export class BulkCreatePlayersResponseDto {

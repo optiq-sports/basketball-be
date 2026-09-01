@@ -9,6 +9,8 @@ export const STATDASH_EVENT_TYPES = [
   "jump_ball",
   "timeout",
   "clock",
+  "assist",
+  "reversal",
 ] as const;
 
 export type StatdashEventType = (typeof STATDASH_EVENT_TYPES)[number];
@@ -39,5 +41,7 @@ export const STATDASH_COMMAND_TYPES = [
   "jump_ball",
   "timeout",
   "clock",
+  "assist",
+  "reversal",
 ] as const;
 export type StatdashCommandType = (typeof STATDASH_COMMAND_TYPES)[number];
