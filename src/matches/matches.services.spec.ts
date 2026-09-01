@@ -131,7 +131,7 @@ describe("MatchesService", () => {
     it("should return match if found", async () => {
       mockPrismaService.match.findUnique.mockResolvedValue({ id: "m1" });
       const result = await service.findOne("m1");
-      expect(result).toEqual({ id: "m1" });
+      expect(result).toEqual({ id: "m1", gameSessions: [] });
     });
   });
 

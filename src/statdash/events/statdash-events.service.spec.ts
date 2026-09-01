@@ -27,6 +27,7 @@ describe("StatdashEventsService", () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      createMany: jest.fn(),
     },
   };
 
@@ -114,8 +115,11 @@ describe("StatdashEventsService", () => {
         payload: {
           teamId: "home",
           shooterPlayerId: "p1",
-          shotValue: 2,
-          result: "made",
+          shot: {
+            value: 2,
+            result: "made",
+            type: "jumpshot",
+          },
         },
         expectedVersion: 2,
         idempotencyKey: "idem_1",
@@ -148,8 +152,11 @@ describe("StatdashEventsService", () => {
           payload: {
             teamId: "home",
             shooterPlayerId: "p1",
-            shotValue: 2,
-            result: "made",
+            shot: {
+              value: 2,
+              result: "made",
+              type: "jumpshot",
+            },
           },
           expectedVersion: 2,
           idempotencyKey: "idem_1",
@@ -173,8 +180,11 @@ describe("StatdashEventsService", () => {
           payload: {
             teamId: "home",
             shooterPlayerId: "p1",
-            shotValue: 2,
-            result: "made",
+            shot: {
+              value: 2,
+              result: "made",
+              type: "jumpshot",
+            },
           },
           expectedVersion: 2,
           idempotencyKey: "idem_1",
@@ -203,6 +213,15 @@ describe("StatdashEventsService", () => {
       eventType: "shot",
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
     });
+    tx.gameEvent.findMany.mockResolvedValue([
+      {
+        id: "ge1",
+        sequence: 11,
+        eventType: "shot",
+        payload: { shotValue: 2, result: "made" },
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      }
+    ]);
     tx.gameSession.update.mockResolvedValue({
       id: "session_1",
       version: 3,
@@ -218,8 +237,11 @@ describe("StatdashEventsService", () => {
         payload: {
           teamId: "home",
           shooterPlayerId: "p1",
-          shotValue: 2,
-          result: "made",
+          shot: {
+            value: 2,
+            result: "made",
+            type: "jumpshot",
+          },
         },
         expectedVersion: 2,
         idempotencyKey: "idem_ok",
