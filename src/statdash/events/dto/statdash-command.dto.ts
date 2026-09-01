@@ -1,33 +1,76 @@
+import { IsIn, IsInt, IsNotEmpty, IsObject, IsString } from "class-validator";
+import { ApiProperty, ApiExtraModels, getSchemaPath } from "@nestjs/swagger";
 import {
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsObject,
-  IsString,
-} from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
-import { STATDASH_COMMAND_TYPES, StatdashCommandType } from "../../contracts/event-types";
+  STATDASH_COMMAND_TYPES,
+  StatdashCommandType,
+} from "../../contracts/event-types";
+import { ClockCommandDto } from "./clock-command.dto";
+import { DeadBallCommandDto } from "./dead-ball-command.dto";
+import { FoulCommandDto } from "./foul-command.dto";
+import { FreeThrowCommandDto } from "./free-throw-command.dto";
+import { JumpBallCommandDto } from "./jump-ball-command.dto";
+import { ReboundCommandDto } from "./rebound-command.dto";
+import { ShotCommandDto } from "./shot-command.dto";
+import { SubstitutionCommandDto } from "./substitution-command.dto";
+import { TimeoutCommandDto } from "./timeout-command.dto";
+import { TurnoverCommandDto } from "./turnover-command.dto";
 
+@ApiExtraModels(
+  ShotCommandDto,
+  ReboundCommandDto,
+  TurnoverCommandDto,
+  FoulCommandDto,
+  FreeThrowCommandDto,
+  DeadBallCommandDto,
+  SubstitutionCommandDto,
+  JumpBallCommandDto,
+  TimeoutCommandDto,
+  ClockCommandDto,
+)
 export class StatdashCommandDto {
   @ApiProperty({ example: "session_123", description: "The ID of the session" })
   @IsString()
   @IsNotEmpty()
   sessionId!: string;
 
-  @ApiProperty({ enum: STATDASH_COMMAND_TYPES, example: "SHOT", description: "The type of the command" })
+  @ApiProperty({
+    enum: STATDASH_COMMAND_TYPES,
+    example: "shot",
+    description: "The type of the command",
+  })
   @IsString()
   @IsIn(STATDASH_COMMAND_TYPES)
   commandType!: StatdashCommandType;
 
-  @ApiProperty({ example: { points: 2, player: "player_1" }, description: "Command-specific payload" })
+  @ApiProperty({
+    description: "Command-specific payload. Structure depends on commandType.",
+    oneOf: [
+      { $ref: getSchemaPath(ShotCommandDto) },
+      { $ref: getSchemaPath(ReboundCommandDto) },
+      { $ref: getSchemaPath(TurnoverCommandDto) },
+      { $ref: getSchemaPath(FoulCommandDto) },
+      { $ref: getSchemaPath(FreeThrowCommandDto) },
+      { $ref: getSchemaPath(DeadBallCommandDto) },
+      { $ref: getSchemaPath(SubstitutionCommandDto) },
+      { $ref: getSchemaPath(JumpBallCommandDto) },
+      { $ref: getSchemaPath(TimeoutCommandDto) },
+      { $ref: getSchemaPath(ClockCommandDto) },
+    ],
+  })
   @IsObject()
   payload!: Record<string, unknown>;
 
-  @ApiProperty({ example: 1, description: "Expected version of the session for optimistic locking" })
+  @ApiProperty({
+    example: 1,
+    description: "Expected version of the session for optimistic locking",
+  })
   @IsInt()
   expectedVersion!: number;
 
-  @ApiProperty({ example: "unique-key-123", description: "Idempotency key to prevent duplicate commands" })
+  @ApiProperty({
+    example: "unique-key-123",
+    description: "Idempotency key to prevent duplicate commands",
+  })
   @IsString()
   @IsNotEmpty()
   idempotencyKey!: string;

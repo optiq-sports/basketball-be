@@ -44,7 +44,11 @@ export class PlayerResponseDto {
   @ApiProperty({ example: "mj@bulls.com", required: false })
   email?: string;
 
-  @ApiProperty({ example: PlayerPosition.CENTER, enum: PlayerPosition, required: false })
+  @ApiProperty({
+    example: PlayerPosition.CENTER,
+    enum: PlayerPosition,
+    required: false,
+  })
   position?: PlayerPosition;
 
   @ApiProperty({ example: "198cm", required: false })

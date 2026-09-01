@@ -1,12 +1,9 @@
 export const STATDASH_EVENT_TYPES = [
   "shot",
-  "assist",
   "rebound",
-  "block",
   "foul",
   "free_throw",
   "turnover",
-  "steal",
   "dead_ball",
   "substitution",
   "jump_ball",
@@ -28,17 +25,15 @@ export const STATDASH_DEAD_BALL_REASONS = [
   "held_ball",
   "lane_violation",
 ] as const;
-export type StatdashDeadBallReason = (typeof STATDASH_DEAD_BALL_REASONS)[number];
+export type StatdashDeadBallReason =
+  (typeof STATDASH_DEAD_BALL_REASONS)[number];
 
 export const STATDASH_COMMAND_TYPES = [
   "shot",
-  "assist",
   "rebound",
-  "block",
   "foul",
   "free_throw",
   "turnover",
-  "steal",
   "dead_ball",
   "substitution",
   "jump_ball",

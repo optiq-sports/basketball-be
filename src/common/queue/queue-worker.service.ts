@@ -77,7 +77,10 @@ export class QueueWorkerService implements OnModuleDestroy {
     await this.redisService.invalidateProjectionCache(sessionId);
     await this.redisService.invalidateSessionSnapshotCache(sessionId);
     try {
-      const projectionsService = this.moduleRef.get(StatdashProjectionsService, { strict: false });
+      const projectionsService = this.moduleRef.get(
+        StatdashProjectionsService,
+        { strict: false },
+      );
       await projectionsService.rebuildAndPersist(sessionId);
     } catch (error) {
       this.logger.error(
@@ -92,7 +95,10 @@ export class QueueWorkerService implements OnModuleDestroy {
     await this.redisService.invalidateProjectionCache(sessionId);
     await this.redisService.invalidateSessionSnapshotCache(sessionId);
     try {
-      const projectionsService = this.moduleRef.get(StatdashProjectionsService, { strict: false });
+      const projectionsService = this.moduleRef.get(
+        StatdashProjectionsService,
+        { strict: false },
+      );
       await projectionsService.rebuildAndPersist(sessionId);
     } catch (error) {
       this.logger.error(
@@ -110,7 +116,10 @@ export class QueueWorkerService implements OnModuleDestroy {
     });
     if (!session) return;
     try {
-      const projectionsService = this.moduleRef.get(StatdashProjectionsService, { strict: false });
+      const projectionsService = this.moduleRef.get(
+        StatdashProjectionsService,
+        { strict: false },
+      );
       await projectionsService.rebuildAndPersist(sessionId);
       this.logger.log(
         JSON.stringify({

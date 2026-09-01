@@ -1,5 +1,8 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { PlayerResponseDto, PlayerTeamResponseDto } from "../../players/dto/player-response.dto";
+import {
+  PlayerResponseDto,
+  PlayerTeamResponseDto,
+} from "../../players/dto/player-response.dto";
 
 export class TeamResponseDto {
   @ApiProperty({ example: "team_123" })

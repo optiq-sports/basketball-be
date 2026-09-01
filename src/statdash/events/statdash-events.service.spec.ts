@@ -31,7 +31,9 @@ describe("StatdashEventsService", () => {
   };
 
   const prisma = {
-    $transaction: jest.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx)),
+    $transaction: jest.fn(async (cb: (trx: typeof tx) => Promise<unknown>) =>
+      cb(tx),
+    ),
   };
   const projectionsService = {
     resolveEvents: jest.fn().mockImplementation((events) => events),
@@ -264,7 +266,11 @@ describe("StatdashEventsService", () => {
     tx.gameEvent.aggregate.mockResolvedValue({ _max: { sequence: 2 } });
     tx.gameEvent.create.mockResolvedValue({});
     tx.gameEvent.findMany.mockResolvedValue([
-      { id: "e1", eventType: "shot", payload: { result: "made", shotValue: 2 } },
+      {
+        id: "e1",
+        eventType: "shot",
+        payload: { result: "made", shotValue: 2 },
+      },
       { id: "e2", eventType: "correction", payload: { targetEventId: "e1" } },
     ]);
     tx.gameSession.update.mockResolvedValue({
@@ -276,7 +282,10 @@ describe("StatdashEventsService", () => {
 
     const result = await service.correctEvent(
       "e1",
-      { reason: "fix shooter", correctedPayload: { shotValue: 3, result: "made" } },
+      {
+        reason: "fix shooter",
+        correctedPayload: { shotValue: 3, result: "made" },
+      },
       "actor_1",
     );
 

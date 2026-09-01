@@ -1,28 +1,33 @@
-import { IsNotEmpty, IsOptional, IsString, ValidateNested } from "class-validator";
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { BaseCommandDto } from "./base-command.dto";
 
-export class TurnoverStealDto {
+export class TurnoverDataDto {
+  @ApiProperty({ example: "bad_pass" })
   @IsString()
   @IsNotEmpty()
-  playerId!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  teamId!: string;
+  type!: string;
 }
 
 export class TurnoverCommandDto extends BaseCommandDto {
+  @ApiProperty({ example: "player_1" })
   @IsString()
   @IsNotEmpty()
-  playerId!: string;
+  turnoverPlayerId!: string;
 
-  @IsString()
-  @IsNotEmpty()
-  turnoverType!: string;
-
+  @ApiProperty({ example: "player_X", required: false })
   @IsOptional()
+  @IsString()
+  stealPlayerId?: string;
+
+  @ApiProperty({ type: () => TurnoverDataDto })
   @ValidateNested()
-  @Type(() => TurnoverStealDto)
-  steal?: TurnoverStealDto;
+  @Type(() => TurnoverDataDto)
+  turnover!: TurnoverDataDto;
 }

@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { HealthController } from './health.controller';
-import { HealthCheckService, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../common/redis/redis.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { HealthController } from "./health.controller";
+import { HealthCheckService, MemoryHealthIndicator } from "@nestjs/terminus";
+import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../common/redis/redis.service";
 
-describe('HealthController', () => {
+describe("HealthController", () => {
   let controller: HealthController;
   let health: HealthCheckService;
   let prisma: PrismaService;
@@ -19,7 +19,9 @@ describe('HealthController', () => {
           provide: HealthCheckService,
           useValue: {
             check: jest.fn().mockImplementation((indicators) => {
-              return Promise.all(indicators.map((indicator: any) => indicator()));
+              return Promise.all(
+                indicators.map((indicator: any) => indicator()),
+              );
             }),
           },
         },
@@ -51,36 +53,44 @@ describe('HealthController', () => {
     memory = module.get<MemoryHealthIndicator>(MemoryHealthIndicator);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(controller).toBeDefined();
   });
 
-  it('should return up status when all checks pass', async () => {
+  it("should return up status when all checks pass", async () => {
     (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([1]);
     (redis.checkHealth as jest.Mock).mockResolvedValueOnce(true);
-    (memory.checkRSS as jest.Mock).mockResolvedValueOnce({ memory_rss: { status: 'up' } });
-    
+    (memory.checkRSS as jest.Mock).mockResolvedValueOnce({
+      memory_rss: { status: "up" },
+    });
+
     const result = await controller.check();
     expect(result).toEqual([
-      { database: { status: 'up' } },
-      { redis: { status: 'up' } },
-      { memory_rss: { status: 'up' } },
+      { database: { status: "up" } },
+      { redis: { status: "up" } },
+      { memory_rss: { status: "up" } },
     ]);
   });
 
-  it('should throw HealthCheckError when DB is down', async () => {
-    (prisma.$queryRaw as jest.Mock).mockRejectedValueOnce(new Error('Connection failed'));
+  it("should throw HealthCheckError when DB is down", async () => {
+    (prisma.$queryRaw as jest.Mock).mockRejectedValueOnce(
+      new Error("Connection failed"),
+    );
     (redis.checkHealth as jest.Mock).mockResolvedValueOnce(true);
-    (memory.checkRSS as jest.Mock).mockResolvedValueOnce({ memory_rss: { status: 'up' } });
-    
-    await expect(controller.check()).rejects.toThrow('Database check failed');
+    (memory.checkRSS as jest.Mock).mockResolvedValueOnce({
+      memory_rss: { status: "up" },
+    });
+
+    await expect(controller.check()).rejects.toThrow("Database check failed");
   });
 
-  it('should throw HealthCheckError when Redis is down', async () => {
+  it("should throw HealthCheckError when Redis is down", async () => {
     (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([1]);
     (redis.checkHealth as jest.Mock).mockResolvedValueOnce(false);
-    (memory.checkRSS as jest.Mock).mockResolvedValueOnce({ memory_rss: { status: 'up' } });
-    
-    await expect(controller.check()).rejects.toThrow('Redis check failed');
+    (memory.checkRSS as jest.Mock).mockResolvedValueOnce({
+      memory_rss: { status: "up" },
+    });
+
+    await expect(controller.check()).rejects.toThrow("Redis check failed");
   });
 });

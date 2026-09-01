@@ -76,7 +76,7 @@ export class StringSimilarity {
       }
     }
 
-    return (jaro + (0.1 * prefix * (1 - jaro))) * 100;
+    return (jaro + 0.1 * prefix * (1 - jaro)) * 100;
   }
 
   private static jaro(str1: string, str2: string): number {
@@ -127,8 +127,8 @@ export class StringSimilarity {
     return str
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/[^\w\s]/g, '');
+      .replace(/\s+/g, " ")
+      .replace(/[^\w\s]/g, "");
   }
 
   /**
@@ -145,4 +145,3 @@ export class StringSimilarity {
     return Math.max(levenshtein, jaroWinkler);
   }
 }
-

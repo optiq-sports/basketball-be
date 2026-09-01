@@ -1,12 +1,11 @@
-import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { AppModule } from './app.module';
-import logger from './logger/logger';
-import { WinstonModule } from 'nest-winston';
-import helmet from 'helmet';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-
+import "reflect-metadata";
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { AppModule } from "./app.module";
+import logger from "./logger/logger";
+import { WinstonModule } from "nest-winston";
+import helmet from "helmet";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 function resolveCorsOrigin():
   | boolean
@@ -20,7 +19,7 @@ function resolveCorsOrigin():
   }
   const allowed = new Set(
     raw
-      .split(',')
+      .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
   );
@@ -38,23 +37,46 @@ async function bootstrap() {
     logger: WinstonModule.createLogger({ instance: logger }),
   });
 
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-        fontSrc: ["'self'", "fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://validator.swagger.io"],
-        scriptSrcAttr: ["'unsafe-inline'"],
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "https://cdn.jsdelivr.net",
+            "https://cdnjs.cloudflare.com",
+          ],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "https://fonts.googleapis.com",
+            "https://cdnjs.cloudflare.com",
+          ],
+          fontSrc: ["'self'", "fonts.gstatic.com"],
+          imgSrc: [
+            "'self'",
+            "data:",
+            "https://cdn.jsdelivr.net",
+            "https://cdnjs.cloudflare.com",
+            "https://validator.swagger.io",
+          ],
+          scriptSrcAttr: ["'unsafe-inline'"],
+        },
       },
-    },
-  }));
+    }),
+  );
   app.enableCors({
     origin: resolveCorsOrigin(),
     credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "X-Requested-With",
+    ],
   });
 
   // Global validation pipe
@@ -67,11 +89,12 @@ async function bootstrap() {
   );
 
   // Global prefix
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
 
   const config = new DocumentBuilder()
-    .setTitle('Optiq Sports Basketball API')
-    .setDescription(`
+    .setTitle("Optiq Sports Basketball API")
+    .setDescription(
+      `
 # 🏀 Optiq Sports Basketball API
 
 Welcome to the official backend API for Optiq Sports. This API powers the entire basketball management ecosystem, from tournament organization down to real-time play-by-play stat tracking.
@@ -95,34 +118,37 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
 - **Soft Deletes**: The API heavily utilizes soft deletes to maintain historical integrity.
 
 *For support or integration questions, please contact the Optiq engineering team.*
-    `)
-    .setVersion('1.0')
-    .addBearerAuth({
-      type: 'http',
-      scheme: 'bearer',
-      bearerFormat: 'JWT',
-      description: 'Enter JWT token',
-      in: 'header',
-      name: 'Authorization',
-    },
-      'bearer')
+    `,
+    )
+    .setVersion("1.0")
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Enter JWT token",
+        in: "header",
+        name: "Authorization",
+      },
+      "bearer",
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
 
-  SwaggerModule.setup('docs', app, document, {
-    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+  SwaggerModule.setup("docs", app, document, {
+    customCssUrl:
+      "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css",
     customJs: [
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js',
+      "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.js",
     ],
     swaggerOptions: {
       persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-    }
+      tagsSorter: "alpha",
+      operationsSorter: "alpha",
+    },
   });
-
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
@@ -134,4 +160,3 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
 }
 
 bootstrap();
-

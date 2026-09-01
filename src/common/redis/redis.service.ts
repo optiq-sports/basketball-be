@@ -9,7 +9,10 @@ type IdempotencyCacheValue = {
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
-  private readonly inMemory = new Map<string, { value: string; expiresAt?: number }>();
+  private readonly inMemory = new Map<
+    string,
+    { value: string; expiresAt?: number }
+  >();
   private readonly redisClient?: Redis;
   private readonly redisSubscriber?: Redis;
   private readonly updateHandlers = new Set<(payload: unknown) => void>();
@@ -30,7 +33,9 @@ export class RedisService implements OnModuleDestroy {
       lazyConnect: true,
     });
     this.redisClient.on("error", (error) => {
-      this.logger.warn(`Redis unavailable, falling back to memory cache: ${error.message}`);
+      this.logger.warn(
+        `Redis unavailable, falling back to memory cache: ${error.message}`,
+      );
     });
     this.redisSubscriber.on("error", (error) => {
       this.logger.warn(
@@ -38,7 +43,9 @@ export class RedisService implements OnModuleDestroy {
       );
     });
     this.redisClient.connect().catch((error: Error) => {
-      this.logger.warn(`Redis connect failed, using in-memory fallback: ${error.message}`);
+      this.logger.warn(
+        `Redis connect failed, using in-memory fallback: ${error.message}`,
+      );
     });
     this.redisSubscriber
       .connect()
@@ -131,7 +138,9 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async getProjectionCached(sessionId: string, projectionType: string) {
-    const raw = await this.getJson(this.projectionKey(sessionId, projectionType));
+    const raw = await this.getJson(
+      this.projectionKey(sessionId, projectionType),
+    );
     return raw ?? null;
   }
 
@@ -141,7 +150,11 @@ export class RedisService implements OnModuleDestroy {
     payload: unknown,
     ttlSec = 60,
   ) {
-    await this.setJson(this.projectionKey(sessionId, projectionType), payload, ttlSec);
+    await this.setJson(
+      this.projectionKey(sessionId, projectionType),
+      payload,
+      ttlSec,
+    );
   }
 
   async invalidateProjectionCache(sessionId: string, projectionType?: string) {
@@ -178,7 +191,13 @@ export class RedisService implements OnModuleDestroy {
   async acquireSessionLock(sessionId: string, owner: string, ttlMs = 3000) {
     const lockKey = this.sessionLockKey(sessionId);
     if (this.redisClient?.status === "ready") {
-      const result = await this.redisClient.set(lockKey, owner, "PX", ttlMs, "NX");
+      const result = await this.redisClient.set(
+        lockKey,
+        owner,
+        "PX",
+        ttlMs,
+        "NX",
+      );
       return result === "OK";
     }
 

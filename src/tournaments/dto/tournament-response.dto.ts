@@ -11,7 +11,10 @@ export class TournamentResponseDto {
   @ApiProperty({ example: "SPL2024" })
   code: string;
 
-  @ApiProperty({ enum: TournamentDivision, example: TournamentDivision.DIVISION_1 })
+  @ApiProperty({
+    enum: TournamentDivision,
+    example: TournamentDivision.DIVISION_1,
+  })
   division: TournamentDivision;
 
   @ApiProperty({ example: 82 })

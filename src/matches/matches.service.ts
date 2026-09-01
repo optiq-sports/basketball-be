@@ -97,7 +97,10 @@ export class MatchesService {
     });
   }
 
-  async findAll(tournamentId?: string, status?: MatchStatus): Promise<MatchResponseDto[]> {
+  async findAll(
+    tournamentId?: string,
+    status?: MatchStatus,
+  ): Promise<MatchResponseDto[]> {
     const where: any = {};
     if (tournamentId) {
       where.tournamentId = tournamentId;
@@ -176,7 +179,10 @@ export class MatchesService {
     return match;
   }
 
-  async update(id: string, updateMatchDto: UpdateMatchDto): Promise<MatchResponseDto> {
+  async update(
+    id: string,
+    updateMatchDto: UpdateMatchDto,
+  ): Promise<MatchResponseDto> {
     const match = await this.findOne(id);
 
     const updateData: any = { ...updateMatchDto };

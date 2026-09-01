@@ -60,7 +60,9 @@ describe("StatdashProjectionsService", () => {
       ],
     }).compile();
 
-    service = module.get<StatdashProjectionsService>(StatdashProjectionsService);
+    service = module.get<StatdashProjectionsService>(
+      StatdashProjectionsService,
+    );
     jest.clearAllMocks();
   });
 
@@ -78,7 +80,11 @@ describe("StatdashProjectionsService", () => {
         sequence: 2,
         payload: {
           targetEventId: "e1",
-          correctedPayload: { result: "made", shotValue: 3, teamId: "home_team" },
+          correctedPayload: {
+            result: "made",
+            shotValue: 3,
+            teamId: "home_team",
+          },
         },
       },
       {
@@ -140,7 +146,12 @@ describe("StatdashProjectionsService", () => {
           shotValue: 2,
         },
       },
-      { id: "e2", eventType: "rebound", sequence: 2, payload: { playerId: "p1" } },
+      {
+        id: "e2",
+        eventType: "rebound",
+        sequence: 2,
+        payload: { playerId: "p1" },
+      },
     ]);
 
     const result = await service.getBoxScore("session_1");

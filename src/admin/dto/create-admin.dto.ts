@@ -10,12 +10,18 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Role, UserStatus } from "@prisma/client";
 
 export class CreateAdminDto {
-  @ApiProperty({ example: "admin@example.com", description: "Email address of the admin" })
+  @ApiProperty({
+    example: "admin@example.com",
+    description: "Email address of the admin",
+  })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: "Password123!", description: "Strong password, at least 6 characters" })
+  @ApiProperty({
+    example: "Password123!",
+    description: "Strong password, at least 6 characters",
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(6)
@@ -31,7 +37,11 @@ export class CreateAdminDto {
   @IsEnum(Role)
   role?: Role;
 
-  @ApiProperty({ enum: UserStatus, example: UserStatus.ACTIVE, required: false })
+  @ApiProperty({
+    enum: UserStatus,
+    example: UserStatus.ACTIVE,
+    required: false,
+  })
   @IsOptional()
   @IsEnum(UserStatus)
   status?: UserStatus;

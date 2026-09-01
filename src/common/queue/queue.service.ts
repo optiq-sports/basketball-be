@@ -3,7 +3,8 @@ import { JobsOptions, Queue } from "bullmq";
 import IORedis from "ioredis";
 
 type QueuePayload = Record<string, unknown>;
-type QueueName = "statdash-projections" | "statdash-recompute" | "statdash-matchstat-sync";
+type QueueName =
+  "statdash-projections" | "statdash-recompute" | "statdash-matchstat-sync";
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {
@@ -59,7 +60,9 @@ export class QueueService implements OnModuleDestroy {
     await this.projectionQueue.add(
       "projection.rebuild",
       { sessionId, reason },
-      this.withJobPolicy({ jobId: `projection:${sessionId}:${dedupKey ?? "latest"}` }),
+      this.withJobPolicy({
+        jobId: `projection:${sessionId}:${dedupKey ?? "latest"}`,
+      }),
     );
   }
 
@@ -68,7 +71,9 @@ export class QueueService implements OnModuleDestroy {
     await this.matchStatSyncQueue.add(
       "matchstat.sync",
       { sessionId },
-      this.withJobPolicy({ jobId: `matchstat:${sessionId}:${dedupKey ?? "latest"}` }),
+      this.withJobPolicy({
+        jobId: `matchstat:${sessionId}:${dedupKey ?? "latest"}`,
+      }),
     );
   }
 
@@ -97,13 +102,19 @@ export class QueueService implements OnModuleDestroy {
     await this.recomputeQueue.add(
       "session.replay.backfill",
       { sessionId, fromSequence: fromSequence ?? null },
-      this.withJobPolicy({ jobId: `replay:${sessionId}:${dedupKey ?? "latest"}` }),
+      this.withJobPolicy({
+        jobId: `replay:${sessionId}:${dedupKey ?? "latest"}`,
+      }),
     );
   }
 
   async enqueueDeadLetterRecovery(payload: QueuePayload) {
     if (!this.deadLetterQueue) return;
-    await this.deadLetterQueue.add("dlq.recovery", payload, this.withJobPolicy({}));
+    await this.deadLetterQueue.add(
+      "dlq.recovery",
+      payload,
+      this.withJobPolicy({}),
+    );
   }
 
   async pushToDeadLetter(payload: {
@@ -164,7 +175,11 @@ export class QueueService implements OnModuleDestroy {
 
   async requeueDeadLetterJobs(limit = 25) {
     if (!this.deadLetterQueue) return { requeued: 0 };
-    const jobs = await this.deadLetterQueue.getJobs(["waiting", "failed"], 0, limit - 1);
+    const jobs = await this.deadLetterQueue.getJobs(
+      ["waiting", "failed"],
+      0,
+      limit - 1,
+    );
     let requeued = 0;
     for (const job of jobs) {
       const payload = (job.data ?? {}) as {

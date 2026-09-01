@@ -1,23 +1,24 @@
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsIn, IsNotEmpty, IsString, ValidateNested } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import { STATDASH_REBOUND_TYPES } from "../../contracts/event-types";
 import { BaseCommandDto } from "./base-command.dto";
 
-export class ReboundCommandDto extends BaseCommandDto {
-  @IsString()
-  @IsNotEmpty()
-  playerId!: string;
-
+export class ReboundDataDto {
+  @ApiProperty({ example: "offensive", enum: STATDASH_REBOUND_TYPES })
   @IsString()
   @IsIn(STATDASH_REBOUND_TYPES)
-  reboundType!: "offensive" | "defensive";
+  type!: "offensive" | "defensive";
+}
 
-  @IsOptional()
+export class ReboundCommandDto extends BaseCommandDto {
+  @ApiProperty({ example: "player_3" })
   @IsString()
-  @IsIn(["made", "missed"])
-  followUpShotResult?: "made" | "missed";
+  @IsNotEmpty()
+  reboundPlayerId!: string;
 
-  @IsOptional()
-  @IsInt()
-  @IsIn([2, 3])
-  shotValue?: 2 | 3;
+  @ApiProperty({ type: () => ReboundDataDto })
+  @ValidateNested()
+  @Type(() => ReboundDataDto)
+  rebound!: ReboundDataDto;
 }

@@ -6,15 +6,21 @@ describe("validateCommandPayload", () => {
     const result = validateCommandPayload("shot", {
       teamId: "team_1",
       shooterPlayerId: "player_1",
-      shotValue: 2,
-      result: "made",
+      shot: {
+        value: 2,
+        result: "made",
+        type: "jumpshot",
+      },
     });
 
     expect(result).toEqual({
       teamId: "team_1",
       shooterPlayerId: "player_1",
-      shotValue: 2,
-      result: "made",
+      shot: {
+        value: 2,
+        result: "made",
+        type: "jumpshot",
+      },
     });
   });
 
@@ -22,8 +28,12 @@ describe("validateCommandPayload", () => {
     expect(() =>
       validateCommandPayload("shot", {
         teamId: "team_1",
-        shotValue: 9,
-        result: "invalid",
+        shooterPlayerId: "player_1",
+        shot: {
+          value: 9,
+          result: "invalid",
+          type: "jumpshot",
+        },
       }),
     ).toThrow(BadRequestException);
   });
@@ -31,7 +41,10 @@ describe("validateCommandPayload", () => {
   it("rejects unknown dead ball reason", () => {
     expect(() =>
       validateCommandPayload("dead_ball", {
-        reason: "random_reason",
+        teamId: "team_1",
+        deadBall: {
+          reason: "random_reason",
+        },
       }),
     ).toThrow(BadRequestException);
   });

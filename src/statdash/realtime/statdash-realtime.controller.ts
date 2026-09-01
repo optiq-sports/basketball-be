@@ -7,7 +7,13 @@ import { SkipResponseTransform } from "../../common/decorators/skip-response-tra
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { StatdashRealtimeService } from "./statdash-realtime.service";
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import { AppErrorResponse } from "../../common/decorators/api-errors.decorator";
 import { StreamQueryDto } from "./dto/stream-query.dto";
 
@@ -17,13 +23,27 @@ import { StreamQueryDto } from "./dto/stream-query.dto";
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.STATISTICIAN)
 export class StatdashRealtimeController {
-  constructor(private readonly statdashRealtimeService: StatdashRealtimeService) {}
+  constructor(
+    private readonly statdashRealtimeService: StatdashRealtimeService,
+  ) {}
 
   @Sse("sessions/:sessionId/stream")
   @SkipResponseTransform()
-  @ApiOperation({ summary: "Connect to Server-Sent Events (SSE) stream for a session" })
-  @ApiResponse({ status: 200, description: "SSE Stream successfully connected (produces text/event-stream)" })
-  @AppErrorResponse(401, "Unauthorized", "GET", "/api/statdash/realtime/sessions/:sessionId/stream", "Invalid or missing access token")
+  @ApiOperation({
+    summary: "Connect to Server-Sent Events (SSE) stream for a session",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "SSE Stream successfully connected (produces text/event-stream)",
+  })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/statdash/realtime/sessions/:sessionId/stream",
+    "Invalid or missing access token",
+  )
   stream(
     @Param("sessionId") sessionId: string,
     @Query() query: StreamQueryDto,

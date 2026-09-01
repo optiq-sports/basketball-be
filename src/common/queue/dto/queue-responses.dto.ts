@@ -25,9 +25,27 @@ export class QueueHealthResponseDto {
     type: "object",
     additionalProperties: { $ref: "#/components/schemas/JobCountsDto" },
     example: {
-      "statdash-projections": { waiting: 0, active: 0, completed: 50, failed: 2, delayed: 0 },
-      "statdash-recompute": { waiting: 0, active: 0, completed: 10, failed: 0, delayed: 0 },
-      "statdash-matchstat-sync": { waiting: 0, active: 0, completed: 10, failed: 0, delayed: 0 },
+      "statdash-projections": {
+        waiting: 0,
+        active: 0,
+        completed: 50,
+        failed: 2,
+        delayed: 0,
+      },
+      "statdash-recompute": {
+        waiting: 0,
+        active: 0,
+        completed: 10,
+        failed: 0,
+        delayed: 0,
+      },
+      "statdash-matchstat-sync": {
+        waiting: 0,
+        active: 0,
+        completed: 10,
+        failed: 0,
+        delayed: 0,
+      },
     },
   })
   queues: Record<string, JobCountsDto>;
@@ -37,7 +55,10 @@ class QueueLagDto {
   @ApiProperty({ example: 5 })
   waiting: number;
 
-  @ApiProperty({ example: 1250, description: "Milliseconds since the oldest job was added" })
+  @ApiProperty({
+    example: 1250,
+    description: "Milliseconds since the oldest job was added",
+  })
   oldestWaitingMs: number;
 }
 

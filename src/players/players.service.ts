@@ -101,7 +101,7 @@ export class PlayersService {
     });
 
     return this.formatPlayerResponse(player);
-  }  
+  }
 
   /**
    * Create a player and assign to a team (with jersey number)
@@ -836,12 +836,32 @@ export class PlayersService {
               ? new Date(row["Date of Birth"] || row["DOB"])
               : undefined,
           nationality:
-            row["Nationality"] || row["nationality"] || row["Country"] || row["country"]
-              ? String(row["Nationality"] || row["nationality"] || row["Country"] || row["country"]).trim()
+            row["Nationality"] ||
+            row["nationality"] ||
+            row["Country"] ||
+            row["country"]
+              ? String(
+                  row["Nationality"] ||
+                    row["nationality"] ||
+                    row["Country"] ||
+                    row["country"],
+                ).trim()
               : undefined,
           jerseyNumber:
-            row["Jersey Number"] || row["jersey number"] || row["Jersey"] || row["jersey"] || row["jerseyNumber"] || row["jerseynumber"]
-              ? parseInt(row["Jersey Number"] || row["jersey number"] || row["Jersey"] || row["jersey"] || row["jerseyNumber"] || row["jerseynumber"])
+            row["Jersey Number"] ||
+            row["jersey number"] ||
+            row["Jersey"] ||
+            row["jersey"] ||
+            row["jerseyNumber"] ||
+            row["jerseynumber"]
+              ? parseInt(
+                  row["Jersey Number"] ||
+                    row["jersey number"] ||
+                    row["Jersey"] ||
+                    row["jersey"] ||
+                    row["jerseyNumber"] ||
+                    row["jerseynumber"],
+                )
               : undefined,
           position: row["Position"]
             ? (row["Position"] as PlayerPosition)

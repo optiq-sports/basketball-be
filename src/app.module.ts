@@ -18,7 +18,7 @@ import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
 import { UploadModule } from "./upload/upload.module";
 import { StatdashModule } from "./statdash/statdash.module";
-import { HealthModule } from './health/health.module';
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
@@ -31,10 +31,18 @@ import { HealthModule } from './health/health.module';
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => [{
-        ttl: parseInt(configService.get<string>('THROTTLE_TTL') || '60000', 10),
-        limit: parseInt(configService.get<string>('THROTTLE_LIMIT') || '100', 10),
-      }],
+      useFactory: (configService: ConfigService) => [
+        {
+          ttl: parseInt(
+            configService.get<string>("THROTTLE_TTL") || "60000",
+            10,
+          ),
+          limit: parseInt(
+            configService.get<string>("THROTTLE_LIMIT") || "100",
+            10,
+          ),
+        },
+      ],
     }),
     PrismaModule,
     CommonModule,

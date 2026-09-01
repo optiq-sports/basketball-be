@@ -18,18 +18,26 @@ describe("QueueService", () => {
     await expect(
       service.enqueueProjectionRebuild("session_1", "test"),
     ).resolves.toBeUndefined();
-    await expect(service.enqueueMatchStatSync("session_1")).resolves.toBeUndefined();
+    await expect(
+      service.enqueueMatchStatSync("session_1"),
+    ).resolves.toBeUndefined();
     await expect(
       service.enqueueCorrectionRecompute("session_1", "event_1", "correction"),
     ).resolves.toBeUndefined();
-    await expect(service.enqueueReplayBackfill("session_1")).resolves.toBeUndefined();
-    await expect(service.enqueueDeadLetterRecovery({ foo: "bar" })).resolves.toBeUndefined();
-    await expect(service.pushToDeadLetter({
-      queueName: "statdash-projections",
-      jobName: "projection.rebuild",
-      data: { sessionId: "session_1" },
-      failedReason: "x",
-    })).resolves.toBeUndefined();
+    await expect(
+      service.enqueueReplayBackfill("session_1"),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.enqueueDeadLetterRecovery({ foo: "bar" }),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.pushToDeadLetter({
+        queueName: "statdash-projections",
+        jobName: "projection.rebuild",
+        data: { sessionId: "session_1" },
+        failedReason: "x",
+      }),
+    ).resolves.toBeUndefined();
     await expect(service.getQueueHealth()).resolves.toEqual({
       enabled: false,
       queues: {},
@@ -38,7 +46,9 @@ describe("QueueService", () => {
       enabled: false,
       lag: {},
     });
-    await expect(service.requeueDeadLetterJobs()).resolves.toEqual({ requeued: 0 });
+    await expect(service.requeueDeadLetterJobs()).resolves.toEqual({
+      requeued: 0,
+    });
     await expect(service.warmSessionCaches("session_1")).resolves.toEqual({
       warmed: true,
       sessionId: "session_1",

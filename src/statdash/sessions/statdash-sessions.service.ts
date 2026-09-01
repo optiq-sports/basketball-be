@@ -144,13 +144,15 @@ export class StatdashSessionsService {
     );
     const [recentEvents, latestLineup] = await Promise.all([
       cachedRecentEvents
-        ? Promise.resolve(cachedRecentEvents as Array<{
-            id: string;
-            sequence: number;
-            eventType: string;
-            payload: unknown;
-            createdAt: Date;
-          }>)
+        ? Promise.resolve(
+            cachedRecentEvents as Array<{
+              id: string;
+              sequence: number;
+              eventType: string;
+              payload: unknown;
+              createdAt: Date;
+            }>,
+          )
         : this.prisma.gameEvent.findMany({
             where: { sessionId: session.id },
             orderBy: { sequence: "desc" },
@@ -175,7 +177,11 @@ export class StatdashSessionsService {
     const snapshot = this.buildSnapshot(session, orderedEvents, latestLineup);
     await this.redisService.setSessionSnapshotCached(session.id, snapshot, 30);
     if (!cachedRecentEvents) {
-      await this.redisService.setRecentEventsCached(session.id, orderedEvents, 30);
+      await this.redisService.setRecentEventsCached(
+        session.id,
+        orderedEvents,
+        30,
+      );
     }
 
     return snapshot;
@@ -326,8 +332,16 @@ export class StatdashSessionsService {
   }
 
   private buildSnapshot(
-    session: GameSession & { match?: { homeTeamId: string; awayTeamId: string } },
-    recentEvents: Array<{ id: string; sequence: number; eventType: string; payload: unknown; createdAt: Date }>,
+    session: GameSession & {
+      match?: { homeTeamId: string; awayTeamId: string };
+    },
+    recentEvents: Array<{
+      id: string;
+      sequence: number;
+      eventType: string;
+      payload: unknown;
+      createdAt: Date;
+    }>,
     latestLineup: { homeLineup: unknown; awayLineup: unknown } | null,
   ) {
     return {

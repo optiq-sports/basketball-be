@@ -29,12 +29,21 @@ export class PlayerProjectionDto extends ProjectionTotalsDto {
 }
 
 export class BoxScoreResponseDto {
-  @ApiProperty({ 
-    type: "object", 
+  @ApiProperty({
+    type: "object",
     additionalProperties: { $ref: "#/components/schemas/PlayerProjectionDto" },
-    example: { 
-      "player_123": { playerId: "player_123", points: 25, rebounds: 10, assists: 5, blocks: 2, steals: 1, fouls: 3, turnovers: 4 } 
-    } 
+    example: {
+      player_123: {
+        playerId: "player_123",
+        points: 25,
+        rebounds: 10,
+        assists: 5,
+        blocks: 2,
+        steals: 1,
+        fouls: 3,
+        turnovers: 4,
+      },
+    },
   })
   players: Record<string, PlayerProjectionDto>;
 

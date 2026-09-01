@@ -2,16 +2,27 @@ import { ApiProperty } from "@nestjs/swagger";
 import { GameSessionStatus, MatchStatus } from "@prisma/client";
 
 export class ResolveMatchKeyResponseDto {
-  @ApiProperty({ example: "cmtdrhinr0000sb9ld34vjt4w", description: "The ID of the match" })
+  @ApiProperty({
+    example: "cmtdrhinr0000sb9ld34vjt4w",
+    description: "The ID of the match",
+  })
   matchId: string;
 
   @ApiProperty({ enum: MatchStatus, example: MatchStatus.SCHEDULED })
   matchStatus: MatchStatus;
 
-  @ApiProperty({ example: "session_123", description: "The ID of the active session, if any", nullable: true })
+  @ApiProperty({
+    example: "session_123",
+    description: "The ID of the active session, if any",
+    nullable: true,
+  })
   sessionId: string | null;
 
-  @ApiProperty({ enum: GameSessionStatus, example: GameSessionStatus.IN_PROGRESS, nullable: true })
+  @ApiProperty({
+    enum: GameSessionStatus,
+    example: GameSessionStatus.IN_PROGRESS,
+    nullable: true,
+  })
   sessionStatus: GameSessionStatus | null;
 }
 
@@ -22,7 +33,10 @@ export class StatdashSessionDto {
   @ApiProperty({ example: "match_123" })
   matchId: string;
 
-  @ApiProperty({ enum: GameSessionStatus, example: GameSessionStatus.IN_PROGRESS })
+  @ApiProperty({
+    enum: GameSessionStatus,
+    example: GameSessionStatus.IN_PROGRESS,
+  })
   status: GameSessionStatus;
 
   @ApiProperty({ example: 1 })
@@ -89,7 +103,10 @@ export class StatdashSessionSnapshotDto {
   @ApiProperty({ example: "match_123" })
   matchId: string;
 
-  @ApiProperty({ enum: GameSessionStatus, example: GameSessionStatus.IN_PROGRESS })
+  @ApiProperty({
+    enum: GameSessionStatus,
+    example: GameSessionStatus.IN_PROGRESS,
+  })
   status: GameSessionStatus;
 
   @ApiProperty({ example: 1 })
@@ -116,7 +133,9 @@ export class StatdashSessionSnapshotDto {
   @ApiProperty({ example: "team_1", nullable: true })
   possessionTeamId: string | null;
 
-  @ApiProperty({ example: { homeLineup: ["player_1"], awayLineup: ["player_2"] } })
+  @ApiProperty({
+    example: { homeLineup: ["player_1"], awayLineup: ["player_2"] },
+  })
   activeLineups: any;
 
   @ApiProperty({ type: [EventDto] })
