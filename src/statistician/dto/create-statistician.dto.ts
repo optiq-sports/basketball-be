@@ -16,17 +16,29 @@ export class CreateStatisticianDto {
   email: string;
 
   // Password is optional because we set a default if not provided
-  @ApiProperty({ example: "Password123!", required: false, description: "Optional custom password" })
+  @ApiProperty({
+    example: "Password123!",
+    required: false,
+    description: "Optional custom password",
+  })
   @IsString()
   @IsOptional()
   password?: string;
 
-  @ApiProperty({ example: "John Doe", required: false, description: "Full name" })
+  @ApiProperty({
+    example: "John Doe",
+    required: false,
+    description: "Full name",
+  })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ enum: UserStatus, example: UserStatus.ACTIVE, required: false })
+  @ApiProperty({
+    enum: UserStatus,
+    example: UserStatus.ACTIVE,
+    required: false,
+  })
   @IsOptional()
   @IsEnum(UserStatus)
   status?: UserStatus;
@@ -74,7 +86,11 @@ export class CreateStatisticianDto {
   @IsOptional()
   homeAddress?: string;
 
-  @ApiProperty({ type: [String], example: ["https://example.com/photo.jpg"], required: false })
+  @ApiProperty({
+    type: [String],
+    example: ["https://example.com/photo.jpg"],
+    required: false,
+  })
   @IsArray()
   @IsOptional()
   photos?: string[];

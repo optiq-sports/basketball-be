@@ -27,11 +27,14 @@ describe("StatdashEventsService", () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      createMany: jest.fn(),
     },
   };
 
   const prisma = {
-    $transaction: jest.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx)),
+    $transaction: jest.fn(async (cb: (trx: typeof tx) => Promise<unknown>) =>
+      cb(tx),
+    ),
   };
   const projectionsService = {
     resolveEvents: jest.fn().mockImplementation((events) => events),
@@ -112,8 +115,11 @@ describe("StatdashEventsService", () => {
         payload: {
           teamId: "home",
           shooterPlayerId: "p1",
-          shotValue: 2,
-          result: "made",
+          shot: {
+            value: 2,
+            result: "made",
+            type: "jumpshot",
+          },
         },
         expectedVersion: 2,
         idempotencyKey: "idem_1",
@@ -146,8 +152,11 @@ describe("StatdashEventsService", () => {
           payload: {
             teamId: "home",
             shooterPlayerId: "p1",
-            shotValue: 2,
-            result: "made",
+            shot: {
+              value: 2,
+              result: "made",
+              type: "jumpshot",
+            },
           },
           expectedVersion: 2,
           idempotencyKey: "idem_1",
@@ -171,8 +180,11 @@ describe("StatdashEventsService", () => {
           payload: {
             teamId: "home",
             shooterPlayerId: "p1",
-            shotValue: 2,
-            result: "made",
+            shot: {
+              value: 2,
+              result: "made",
+              type: "jumpshot",
+            },
           },
           expectedVersion: 2,
           idempotencyKey: "idem_1",
@@ -201,6 +213,15 @@ describe("StatdashEventsService", () => {
       eventType: "shot",
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
     });
+    tx.gameEvent.findMany.mockResolvedValue([
+      {
+        id: "ge1",
+        sequence: 11,
+        eventType: "shot",
+        payload: { shotValue: 2, result: "made" },
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      }
+    ]);
     tx.gameSession.update.mockResolvedValue({
       id: "session_1",
       version: 3,
@@ -216,8 +237,11 @@ describe("StatdashEventsService", () => {
         payload: {
           teamId: "home",
           shooterPlayerId: "p1",
-          shotValue: 2,
-          result: "made",
+          shot: {
+            value: 2,
+            result: "made",
+            type: "jumpshot",
+          },
         },
         expectedVersion: 2,
         idempotencyKey: "idem_ok",
@@ -264,7 +288,11 @@ describe("StatdashEventsService", () => {
     tx.gameEvent.aggregate.mockResolvedValue({ _max: { sequence: 2 } });
     tx.gameEvent.create.mockResolvedValue({});
     tx.gameEvent.findMany.mockResolvedValue([
-      { id: "e1", eventType: "shot", payload: { result: "made", shotValue: 2 } },
+      {
+        id: "e1",
+        eventType: "shot",
+        payload: { result: "made", shotValue: 2 },
+      },
       { id: "e2", eventType: "correction", payload: { targetEventId: "e1" } },
     ]);
     tx.gameSession.update.mockResolvedValue({
@@ -276,7 +304,10 @@ describe("StatdashEventsService", () => {
 
     const result = await service.correctEvent(
       "e1",
-      { reason: "fix shooter", correctedPayload: { shotValue: 3, result: "made" } },
+      {
+        reason: "fix shooter",
+        correctedPayload: { shotValue: 3, result: "made" },
+      },
       "actor_1",
     );
 

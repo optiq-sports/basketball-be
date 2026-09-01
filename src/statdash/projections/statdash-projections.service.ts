@@ -22,7 +22,10 @@ export class StatdashProjectionsService {
   ) {}
 
   async getBoxScore(sessionId: string) {
-    const cached = await this.redisService.getProjectionCached(sessionId, "box_score");
+    const cached = await this.redisService.getProjectionCached(
+      sessionId,
+      "box_score",
+    );
     if (cached) return cached;
 
     const state = await this.prisma.projectionState.findUnique({
@@ -35,7 +38,12 @@ export class StatdashProjectionsService {
     });
 
     if (state && state.payload) {
-      await this.redisService.setProjectionCached(sessionId, "box_score", state.payload, 60);
+      await this.redisService.setProjectionCached(
+        sessionId,
+        "box_score",
+        state.payload,
+        60,
+      );
       return state.payload;
     }
 
@@ -44,7 +52,10 @@ export class StatdashProjectionsService {
   }
 
   async getShotChart(sessionId: string) {
-    const cached = await this.redisService.getProjectionCached(sessionId, "shot_chart");
+    const cached = await this.redisService.getProjectionCached(
+      sessionId,
+      "shot_chart",
+    );
     if (cached) return cached;
     const events = await this.getSessionEvents(sessionId);
     const resolvedEvents = this.resolveEvents(events);
@@ -61,9 +72,15 @@ export class StatdashProjectionsService {
           x: payload.x ?? null,
           y: payload.y ?? null,
           sequence: event.sequence,
+          period: event.period ?? null,
         };
       });
-    await this.redisService.setProjectionCached(sessionId, "shot_chart", shotChart, 60);
+    await this.redisService.setProjectionCached(
+      sessionId,
+      "shot_chart",
+      shotChart,
+      60,
+    );
     return shotChart;
   }
 
@@ -95,7 +112,12 @@ export class StatdashProjectionsService {
       totalEvents: box.totalEvents,
       generatedAt: new Date().toISOString(),
     };
-    await this.redisService.setProjectionCached(sessionId, "summary", summary, 30);
+    await this.redisService.setProjectionCached(
+      sessionId,
+      "summary",
+      summary,
+      30,
+    );
     return summary;
   }
 
@@ -128,7 +150,10 @@ export class StatdashProjectionsService {
       homeTeamId: sessionForTeamContext.match.homeTeamId,
       awayTeamId: sessionForTeamContext.match.awayTeamId,
     });
-    const boxScorePayload = this.buildBoxScoreFromEvents(resolvedEvents, events.length);
+    const boxScorePayload = this.buildBoxScoreFromEvents(
+      resolvedEvents,
+      events.length,
+    );
 
     const [updatedSession, storedProjection] = await this.prisma.$transaction([
       this.prisma.gameSession.update({
@@ -169,11 +194,19 @@ export class StatdashProjectionsService {
     );
 
     await Promise.all([
-      this.redisService.setProjectionCached(sessionId, "box_score", boxScorePayload, 60),
+      this.redisService.setProjectionCached(
+        sessionId,
+        "box_score",
+        boxScorePayload,
+        60,
+      ),
       this.redisService.invalidateProjectionCache(sessionId, "shot_chart"),
       this.redisService.invalidateProjectionCache(sessionId, "summary"),
       this.redisService.invalidateSessionSnapshotCache(sessionId),
-      this.queueService.enqueueMatchStatSync(sessionId, `${updatedSession.version}`),
+      this.queueService.enqueueMatchStatSync(
+        sessionId,
+        `${updatedSession.version}`,
+      ),
     ]);
 
     return {
@@ -191,6 +224,7 @@ export class StatdashProjectionsService {
       eventType: string;
       payload: unknown;
       sequence: number;
+      period?: number | null;
     }>,
   ) {
     const reversedIds = new Set<string>();
@@ -206,8 +240,7 @@ export class StatdashProjectionsService {
         const payload = event.payload as Record<string, unknown>;
         const targetEventId = payload.targetEventId as string | undefined;
         const correctedPayload = payload.correctedPayload as
-          | Record<string, unknown>
-          | undefined;
+          Record<string, unknown> | undefined;
         if (targetEventId && correctedPayload) {
           corrections.set(targetEventId, correctedPayload);
         }
@@ -269,7 +302,10 @@ export class StatdashProjectionsService {
       if (typeof payload.clockSecondsRemaining === "number") {
         clockSecondsRemaining = payload.clockSecondsRemaining;
       }
-      if (typeof payload.possessionTeamId === "string" || payload.possessionTeamId === null) {
+      if (
+        typeof payload.possessionTeamId === "string" ||
+        payload.possessionTeamId === null
+      ) {
         possessionTeamId = payload.possessionTeamId as string | null;
       }
       if (typeof payload.jumpBallWinnerTeamId === "string") {
@@ -323,11 +359,13 @@ export class StatdashProjectionsService {
 
     for (const event of resolvedEvents) {
       const payload = event.payload as Record<string, unknown>;
-      const playerId = (payload.playerId as string | undefined) ??
+      const playerId =
+        (payload.playerId as string | undefined) ??
         (payload.shooterPlayerId as string | undefined) ??
         (payload.foulerPlayerId as string | undefined);
       if (!playerId) continue;
-      if (!players[playerId]) players[playerId] = this.emptyPlayerProjection(playerId);
+      if (!players[playerId])
+        players[playerId] = this.emptyPlayerProjection(playerId);
 
       switch (event.eventType) {
         case "shot":

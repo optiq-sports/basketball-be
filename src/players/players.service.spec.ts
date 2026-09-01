@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { PlayersService } from './players.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { PlayerDeduplicationService } from '../common/services/player-deduplication.service';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { PlayersService } from "./players.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { PlayerDeduplicationService } from "../common/services/player-deduplication.service";
+import { NotFoundException, ConflictException } from "@nestjs/common";
 
-describe('PlayersService', () => {
+describe("PlayersService", () => {
   let service: PlayersService;
   let prisma: PrismaService;
   let deduplicationService: PlayerDeduplicationService;
@@ -51,30 +51,32 @@ describe('PlayersService', () => {
 
     service = module.get<PlayersService>(PlayersService);
     prisma = module.get<PrismaService>(PrismaService);
-    deduplicationService = module.get<PlayerDeduplicationService>(PlayerDeduplicationService);
+    deduplicationService = module.get<PlayerDeduplicationService>(
+      PlayerDeduplicationService,
+    );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
-    it('should create a new player successfully', async () => {
+  describe("create", () => {
+    it("should create a new player successfully", async () => {
       const createPlayerDto = {
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
+        firstName: "John",
+        lastName: "Doe",
+        email: "john@example.com",
       };
 
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        matchType: 'NO_MATCH',
+        matchType: "NO_MATCH",
         existingPlayer: undefined,
         similarityScore: 0,
       });
 
       mockPrismaService.player.findUnique.mockResolvedValue(null);
       mockPrismaService.player.create.mockResolvedValue({
-        id: 'player1',
+        id: "player1",
         ...createPlayerDto,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -86,44 +88,49 @@ describe('PlayersService', () => {
       expect(mockPrismaService.player.create).toHaveBeenCalled();
     });
 
-    it('should throw ConflictException if duplicate player found', async () => {
+    it("should throw ConflictException if duplicate player found", async () => {
       const createPlayerDto = {
-        firstName: 'John',
-        lastName: 'Doe',
+        firstName: "John",
+        lastName: "Doe",
       };
 
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        matchType: 'EXACT_MATCH',
-        existingPlayer: { id: 'existing1', firstName: 'John', lastName: 'Doe' },
+        matchType: "EXACT_MATCH",
+        existingPlayer: { id: "existing1", firstName: "John", lastName: "Doe" },
         similarityScore: 98.5,
       });
 
-      await expect(service.create(createPlayerDto)).rejects.toThrow(ConflictException);
+      await expect(service.create(createPlayerDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
-  describe('createForTeam', () => {
-    it('should create player and assign to team', async () => {
+  describe("createForTeam", () => {
+    it("should create player and assign to team", async () => {
       const createDto = {
-        teamId: 'team1',
-        firstName: 'John',
-        lastName: 'Doe',
+        teamId: "team1",
+        firstName: "John",
+        lastName: "Doe",
         jerseyNumber: 23,
       };
 
-      mockPrismaService.team.findUnique.mockResolvedValue({ id: 'team1', name: 'Lakers' });
+      mockPrismaService.team.findUnique.mockResolvedValue({
+        id: "team1",
+        name: "Lakers",
+      });
       mockPrismaService.playerTeam.findFirst.mockResolvedValue(null);
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        matchType: 'NO_MATCH',
+        matchType: "NO_MATCH",
       });
 
       mockPrismaService.$transaction.mockImplementation(async (callback) => {
         return callback({
           player: {
             create: jest.fn().mockResolvedValue({
-              id: 'player1',
-              firstName: 'John',
-              lastName: 'Doe',
+              id: "player1",
+              firstName: "John",
+              lastName: "Doe",
             }),
             findUnique: jest.fn().mockResolvedValue(null),
           },
@@ -139,40 +146,46 @@ describe('PlayersService', () => {
       expect(mockPrismaService.$transaction).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if team does not exist', async () => {
+    it("should throw NotFoundException if team does not exist", async () => {
       const createDto = {
-        teamId: 'invalid',
-        firstName: 'John',
-        lastName: 'Doe',
+        teamId: "invalid",
+        firstName: "John",
+        lastName: "Doe",
         jerseyNumber: 23,
       };
 
       mockPrismaService.team.findUnique.mockResolvedValue(null);
 
-      await expect(service.createForTeam(createDto)).rejects.toThrow(NotFoundException);
+      await expect(service.createForTeam(createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
-  describe('bulkCreateForTeam', () => {
-    it('should create multiple players with deduplication', async () => {
+  describe("bulkCreateForTeam", () => {
+    it("should create multiple players with deduplication", async () => {
       const bulkDto = {
-        teamId: 'team1',
+        teamId: "team1",
         players: [
-          { firstName: 'John', lastName: 'Doe', jerseyNumber: 23 },
-          { firstName: 'Jane', lastName: 'Smith', jerseyNumber: 24 },
+          { firstName: "John", lastName: "Doe", jerseyNumber: 23 },
+          { firstName: "Jane", lastName: "Smith", jerseyNumber: 24 },
         ],
       };
 
-      mockPrismaService.team.findUnique.mockResolvedValue({ id: 'team1' });
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team1" });
       mockPrismaService.playerTeam.findMany.mockResolvedValue([]);
       mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
-        matchType: 'NO_MATCH',
+        matchType: "NO_MATCH",
       });
 
       mockPrismaService.$transaction.mockImplementation(async (callback) => {
         return callback({
           player: {
-            create: jest.fn().mockResolvedValue({ id: 'player1', firstName: 'John', lastName: 'Doe' }),
+            create: jest.fn().mockResolvedValue({
+              id: "player1",
+              firstName: "John",
+              lastName: "Doe",
+            }),
             findUnique: jest.fn().mockResolvedValue(null),
           },
           playerTeam: {
@@ -188,13 +201,13 @@ describe('PlayersService', () => {
     });
   });
 
-  describe('findOne', () => {
-    it('should return player if found', async () => {
-      const playerId = 'player1';
+  describe("findOne", () => {
+    it("should return player if found", async () => {
+      const playerId = "player1";
       const mockPlayer = {
         id: playerId,
-        firstName: 'John',
-        lastName: 'Doe',
+        firstName: "John",
+        lastName: "Doe",
         playerTeams: [],
         matchStats: [],
       };
@@ -207,11 +220,12 @@ describe('PlayersService', () => {
       expect(result.id).toBe(playerId);
     });
 
-    it('should throw NotFoundException if player not found', async () => {
+    it("should throw NotFoundException if player not found", async () => {
       mockPrismaService.player.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne("invalid")).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });
-

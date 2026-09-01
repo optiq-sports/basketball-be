@@ -1,11 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
-import { StatdashCommandType } from "../../contracts/event-types";
-import { applyBlockRules } from "./block.rules";
-import { applyFoulFreeThrowRules } from "./foul-ft.rules";
+import type { StatdashCommandType } from "../../contracts/event-types";
+import { applyFoulRules } from "./foul.rules";
+import { applyFreeThrowRules } from "./free-throw.rules";
 import { applyReboundRules } from "./rebound.rules";
 import { RuleContext, RuleResult } from "./rule.types";
 import { applyShotRules } from "./shot.rules";
-import { applyTurnoverStealRules } from "./turnover-steal.rules";
+import { applyTurnoverRules } from "./turnover.rules";
+import { applyTimeoutRules } from "./timeout.rules";
 
 export function applyCommandRules(
   commandType: StatdashCommandType,
@@ -19,16 +20,19 @@ export function applyCommandRules(
       result = applyShotRules(payload as never, context);
       break;
     case "rebound":
-      result = applyReboundRules(payload as never, context);
-      break;
-    case "block":
-      result = applyBlockRules(payload as never);
+      result = applyReboundRules(payload as never);
       break;
     case "foul":
-      result = applyFoulFreeThrowRules(payload as never, context);
+      result = applyFoulRules(payload as never);
+      break;
+    case "free_throw":
+      result = applyFreeThrowRules(payload as never, context);
       break;
     case "turnover":
-      result = applyTurnoverStealRules(payload as never);
+      result = applyTurnoverRules(payload as never);
+      break;
+    case "timeout":
+      result = applyTimeoutRules(payload as never);
       break;
     default:
       result = {
@@ -39,47 +43,77 @@ export function applyCommandRules(
   }
 
   // Extract clock updates
-  if (typeof payload.quarter === "number") {
-    result.sessionUpdates = { ...result.sessionUpdates, quarter: payload.quarter };
+  if (typeof payload.period === "number") {
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      quarter: payload.period,
+    };
   }
   if (typeof payload.clockSecondsRemaining === "number") {
-    result.sessionUpdates = { ...result.sessionUpdates, clockSecondsRemaining: payload.clockSecondsRemaining };
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      clockSecondsRemaining: payload.clockSecondsRemaining,
+    };
   }
-  if (typeof payload.possessionTeamId === "string" || payload.possessionTeamId === null) {
-    result.sessionUpdates = { ...result.sessionUpdates, possessionTeamId: payload.possessionTeamId as string | null };
+  if (
+    typeof payload.possessionTeamId === "string" ||
+    payload.possessionTeamId === null
+  ) {
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      possessionTeamId: payload.possessionTeamId as string | null,
+    };
   }
   if (typeof payload.jumpBallWinnerTeamId === "string") {
-    result.sessionUpdates = { ...result.sessionUpdates, jumpBallWinnerTeamId: payload.jumpBallWinnerTeamId };
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      jumpBallWinnerTeamId: payload.jumpBallWinnerTeamId,
+    };
   }
 
   // Apply substitution Lineup swapping
-  if (commandType === "substitution" && context.lineupSnapshot) {
-    const { playerOutId, playerInId, teamId } = payload as Record<string, string>;
-    const isHome = teamId === context.session.match.homeTeamId;
-    const isAway = teamId === context.session.match.awayTeamId;
+  if (commandType === "substitution") {
+    const p = payload as Record<string, unknown>;
+    const homeLineup = p.homeLineup as string[] | undefined;
+    const awayLineup = p.awayLineup as string[] | undefined;
+    const hasFullLineup = homeLineup || awayLineup;
 
-    if (isHome || isAway) {
-      const newLineup = {
-        homeLineup: [...context.lineupSnapshot.homeLineup],
-        awayLineup: [...context.lineupSnapshot.awayLineup],
+    if (hasFullLineup) {
+      result.newLineup = {
+        homeLineup: homeLineup ?? (context.lineupSnapshot?.homeLineup ?? []),
+        awayLineup: awayLineup ?? (context.lineupSnapshot?.awayLineup ?? []),
       };
-      
-      const targetLineup = isHome ? newLineup.homeLineup : newLineup.awayLineup;
-      const index = targetLineup.indexOf(playerOutId);
-      if (index !== -1) {
-        targetLineup[index] = playerInId;
-      } else {
-        targetLineup.push(playerInId);
+    } else if (context.lineupSnapshot) {
+      const { playerOutId, playerInId, teamId } = payload as Record<string, string>;
+      const isHome = teamId === context.session.match.homeTeamId;
+      const isAway = teamId === context.session.match.awayTeamId;
+
+      if (isHome || isAway) {
+        const newLineup = {
+          homeLineup: [...context.lineupSnapshot.homeLineup],
+          awayLineup: [...context.lineupSnapshot.awayLineup],
+        };
+
+        const targetLineup = isHome ? newLineup.homeLineup : newLineup.awayLineup;
+        const index = targetLineup.indexOf(playerOutId);
+        if (index !== -1) {
+          targetLineup[index] = playerInId;
+        } else {
+          targetLineup.push(playerInId);
+        }
+
+        result.newLineup = newLineup;
       }
-      
-      result.newLineup = newLineup;
     }
   }
 
   return result;
 }
 
-export function assertExpectedVersion(sessionVersion: number, expectedVersion: number) {
+export function assertExpectedVersion(
+  sessionVersion: number,
+  expectedVersion: number,
+) {
   if (sessionVersion !== expectedVersion) {
     throw new BadRequestException({
       code: "SD_VERSION_MISMATCH",

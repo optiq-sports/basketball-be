@@ -26,7 +26,10 @@ type StatdashRealtimeUpdate = {
 @Injectable()
 export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
   private readonly updates$ = new Subject<StatdashRealtimeUpdate>();
-  private readonly historyBySession = new Map<string, StatdashRealtimeUpdate[]>();
+  private readonly historyBySession = new Map<
+    string,
+    StatdashRealtimeUpdate[]
+  >();
   private static readonly MAX_HISTORY_PER_SESSION = 200;
   private readonly nodeId = `node_${Math.random().toString(36).slice(2)}`;
   private unsubscribe?: () => void;
@@ -36,8 +39,7 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.unsubscribe = this.redisService.subscribeSessionUpdates((payload) => {
       const envelope = payload as
-        | { originNodeId?: string; update?: StatdashRealtimeUpdate }
-        | undefined;
+        { originNodeId?: string; update?: StatdashRealtimeUpdate } | undefined;
       if (!envelope?.update) return;
       if (envelope.originNodeId === this.nodeId) return;
       this.emitUpdate(envelope.update);
@@ -48,9 +50,15 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
     this.unsubscribe?.();
   }
 
-  streamBySession(sessionId: string, sinceVersion?: number): Observable<MessageEvent> {
-    const replay = (this.historyBySession.get(sessionId) ?? []).filter((update) =>
-      typeof sinceVersion === "number" ? update.state.version > sinceVersion : true,
+  streamBySession(
+    sessionId: string,
+    sinceVersion?: number,
+  ): Observable<MessageEvent> {
+    const replay = (this.historyBySession.get(sessionId) ?? []).filter(
+      (update) =>
+        typeof sinceVersion === "number"
+          ? update.state.version > sinceVersion
+          : true,
     );
     const live = this.updates$.pipe(
       filter((update) => update.sessionId === sessionId),

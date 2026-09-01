@@ -15,5 +15,4 @@ import { UPLOAD_PROVIDER } from "./upload.constants";
   controllers: [UploadController],
   exports: [UPLOAD_PROVIDER],
 })
-
 export class UploadModule {}

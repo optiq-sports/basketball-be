@@ -1,5 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { GameSessionStatus, MatchStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../common/redis/redis.service";
@@ -135,13 +139,18 @@ describe("StatdashSessionsService", () => {
       status: GameSessionStatus.PENDING,
       startedAt: null,
     });
-    prismaService.$transaction = jest.fn().mockResolvedValue([{
-      id: "session_1",
-      status: GameSessionStatus.IN_PROGRESS,
-    }]);
+    prismaService.$transaction = jest.fn().mockResolvedValue([
+      {
+        id: "session_1",
+        status: GameSessionStatus.IN_PROGRESS,
+      },
+    ]);
 
     const result = await service.startSession("session_1");
-    expect(result).toEqual({ id: "session_1", status: GameSessionStatus.IN_PROGRESS });
+    expect(result).toEqual({
+      id: "session_1",
+      status: GameSessionStatus.IN_PROGRESS,
+    });
     expect(prismaService.$transaction).toHaveBeenCalled();
   });
 
@@ -152,31 +161,54 @@ describe("StatdashSessionsService", () => {
       startedAt: new Date(),
     });
 
-    await expect(service.startSession("session_1")).rejects.toThrow(ConflictException);
+    await expect(service.startSession("session_1")).rejects.toThrow(
+      ConflictException,
+    );
   });
 
   it("fails with not found for unknown session start", async () => {
     prismaService.gameSession.findUnique.mockResolvedValue(null);
-    await expect(service.startSession("missing_session")).rejects.toThrow(NotFoundException);
+    await expect(service.startSession("missing_session")).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   describe("state transitions", () => {
     it("pauses an in-progress session", async () => {
-      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.IN_PROGRESS });
-      prismaService.gameSession.update.mockResolvedValue({ id: "session_1", status: GameSessionStatus.PAUSED });
+      prismaService.gameSession.findUnique.mockResolvedValue({
+        id: "session_1",
+        status: GameSessionStatus.IN_PROGRESS,
+      });
+      prismaService.gameSession.update.mockResolvedValue({
+        id: "session_1",
+        status: GameSessionStatus.PAUSED,
+      });
 
       const result = await service.pauseSession("session_1");
       expect(result.status).toBe(GameSessionStatus.PAUSED);
     });
 
     it("rejects pause for non-in-progress session", async () => {
-      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.PENDING });
-      await expect(service.pauseSession("session_1")).rejects.toThrow(ConflictException);
+      prismaService.gameSession.findUnique.mockResolvedValue({
+        id: "session_1",
+        status: GameSessionStatus.PENDING,
+      });
+      await expect(service.pauseSession("session_1")).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it("completes a session and its match", async () => {
-      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.IN_PROGRESS, matchId: "match_1" });
-      prismaService.$transaction = jest.fn().mockResolvedValue([{ id: "session_1", status: GameSessionStatus.COMPLETED }]);
+      prismaService.gameSession.findUnique.mockResolvedValue({
+        id: "session_1",
+        status: GameSessionStatus.IN_PROGRESS,
+        matchId: "match_1",
+      });
+      prismaService.$transaction = jest
+        .fn()
+        .mockResolvedValue([
+          { id: "session_1", status: GameSessionStatus.COMPLETED },
+        ]);
 
       const result = await service.completeSession("session_1");
       expect(result.status).toBe(GameSessionStatus.COMPLETED);
@@ -184,13 +216,26 @@ describe("StatdashSessionsService", () => {
     });
 
     it("rejects complete for already completed session", async () => {
-      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.COMPLETED });
-      await expect(service.completeSession("session_1")).rejects.toThrow(ConflictException);
+      prismaService.gameSession.findUnique.mockResolvedValue({
+        id: "session_1",
+        status: GameSessionStatus.COMPLETED,
+      });
+      await expect(service.completeSession("session_1")).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it("cancels a session and its match", async () => {
-      prismaService.gameSession.findUnique.mockResolvedValue({ id: "session_1", status: GameSessionStatus.IN_PROGRESS, matchId: "match_1" });
-      prismaService.$transaction = jest.fn().mockResolvedValue([{ id: "session_1", status: GameSessionStatus.CANCELLED }]);
+      prismaService.gameSession.findUnique.mockResolvedValue({
+        id: "session_1",
+        status: GameSessionStatus.IN_PROGRESS,
+        matchId: "match_1",
+      });
+      prismaService.$transaction = jest
+        .fn()
+        .mockResolvedValue([
+          { id: "session_1", status: GameSessionStatus.CANCELLED },
+        ]);
 
       const result = await service.cancelSession("session_1");
       expect(result.status).toBe(GameSessionStatus.CANCELLED);

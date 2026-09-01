@@ -99,10 +99,48 @@ export class StatisticianService {
     const user = await this.prisma.user.findUnique({
       where: { id },
       omit: { password: true },
-      include: { profile: true },
+      include: {
+        profile: true,
+        gameEvents: {
+          include: {
+            session: {
+              include: {
+                match: {
+                  include: { homeTeam: true, awayTeam: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!user) throw new NotFoundException("Statistician not found");
-    return user;
+
+    const uniqueSessions = new Map();
+    if (user.gameEvents) {
+      for (const event of user.gameEvents) {
+        if (event.session && !uniqueSessions.has(event.sessionId)) {
+          uniqueSessions.set(event.sessionId, event.session);
+        }
+      }
+    }
+
+    const gamesOfficiated = Array.from(uniqueSessions.values()).map(
+      (session: any) => ({
+        matchId: session.match.id,
+        homeTeam: session.match.homeTeam,
+        awayTeam: session.match.awayTeam,
+        scheduledDate: session.match.scheduledDate,
+        venue: session.match.venue,
+      })
+    );
+
+    const { gameEvents, ...userWithoutEvents } = user as any;
+
+    return {
+      ...userWithoutEvents,
+      gamesOfficiated,
+    };
   }
 
   async update(id: string, updateStatisticianDto: UpdateStatisticianDto) {

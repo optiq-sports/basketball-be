@@ -5,14 +5,21 @@ import {
   UseInterceptors,
   Inject,
   BadRequestException,
-  UseGuards
+  UseGuards,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { IUploadProvider } from "./interfaces/upload-provider.interface";
+import type { IUploadProvider } from "./interfaces/upload-provider.interface";
 import { UPLOAD_PROVIDER } from "./upload.constants";
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
 import { UploadResponseDto } from "./dto/upload-response.dto";
 
@@ -41,9 +48,25 @@ export class UploadController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: "File successfully uploaded", type: UploadResponseDto })
-  @AppErrorResponse(400, "Bad Request", "POST", "/api/upload", "No file uploaded")
-  @AppErrorResponse(401, "Unauthorized", "POST", "/api/upload", "Invalid or missing access token")
+  @ApiResponse({
+    status: 201,
+    description: "File successfully uploaded",
+    type: UploadResponseDto,
+  })
+  @AppErrorResponse(
+    400,
+    "Bad Request",
+    "POST",
+    "/api/upload",
+    "No file uploaded",
+  )
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "POST",
+    "/api/upload",
+    "Invalid or missing access token",
+  )
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException("No file uploaded");

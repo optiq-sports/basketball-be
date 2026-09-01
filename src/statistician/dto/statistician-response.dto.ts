@@ -69,4 +69,29 @@ export class StatisticianResponseDto {
 
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   updatedAt: Date;
+
+  @ApiProperty({
+    example: [
+      {
+        matchId: "match_123",
+        homeTeam: { id: "team1", name: "Lakers" },
+        awayTeam: { id: "team2", name: "Bulls" },
+        scheduledDate: "2024-06-01T18:00:00Z",
+        venue: "Staples Center",
+      }
+    ],
+    required: false,
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        matchId: { type: "string" },
+        scheduledDate: { type: "string", format: "date-time" },
+        venue: { type: "string", nullable: true },
+        homeTeam: { type: "object" },
+        awayTeam: { type: "object" }
+      }
+    }
+  })
+  gamesOfficiated?: any[];
 }

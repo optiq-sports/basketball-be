@@ -94,10 +94,11 @@ export class StatdashEventsService {
     const requestHash = this.hashRequest(command);
     const lockOwner = `${actorUserId}:${command.idempotencyKey}`;
 
-    const cachedIdempotency = await this.redisService.getIdempotencyResultCached(
-      command.sessionId,
-      command.idempotencyKey,
-    );
+    const cachedIdempotency =
+      await this.redisService.getIdempotencyResultCached(
+        command.sessionId,
+        command.idempotencyKey,
+      );
     if (cachedIdempotency) {
       if (cachedIdempotency.requestHash !== requestHash) {
         throw new ConflictException({
@@ -122,202 +123,239 @@ export class StatdashEventsService {
     try {
       const response = await this.prisma.$transaction(
         async (tx: StatdashTxClient) => {
-      const session = await tx.gameSession.findUnique({
-        where: { id: command.sessionId },
-        include: { match: true },
-      });
-      if (!session) {
-        throw new NotFoundException({
-          code: "SD_SESSION_NOT_FOUND",
-          message: "Session does not exist",
-        });
-      }
-      const existingIdempotency = await tx.idempotencyRecord.findUnique({
-        where: {
-          sessionId_key: {
-            sessionId: command.sessionId,
-            key: command.idempotencyKey,
-          },
-        },
-      });
-      if (existingIdempotency) {
-        if (existingIdempotency.requestHash && existingIdempotency.requestHash !== requestHash) {
-          throw new ConflictException({
-            code: "SD_IDEMPOTENCY_KEY_REUSED_DIFFERENT_REQUEST",
-            message:
-              "idempotencyKey already exists for a different request payload",
+          const session = await tx.gameSession.findUnique({
+            where: { id: command.sessionId },
+            include: { match: true },
           });
-        }
-        this.logger.log(
-          JSON.stringify({
-            event: "statdash.idempotency.hit",
-            sessionId: command.sessionId,
-            idempotencyKey: command.idempotencyKey,
-          }),
-        );
-        return existingIdempotency.responseSnapshot as unknown as CommandResult;
-      }
-
-      try {
-        assertExpectedVersion(session.version, command.expectedVersion);
-      } catch {
-        this.logger.warn(
-          JSON.stringify({
-            event: "statdash.version.conflict",
-            sessionId: command.sessionId,
-            expectedVersion: command.expectedVersion,
-            actualVersion: session.version,
-          }),
-        );
-        throw new ConflictException({
-          code: "SD_VERSION_CONFLICT",
-          message: `Stale version. Expected ${command.expectedVersion}, latest is ${session.version}`,
-          latestVersion: session.version,
-        });
-      }
-
-      const latestLineup = await tx.lineupState.findFirst({
-        where: { sessionId: session.id },
-        orderBy: { capturedAt: "desc" },
-      });
-      const lineupSnapshot = latestLineup
-        ? {
-            homeLineup: (latestLineup.homeLineup as string[]) ?? [],
-            awayLineup: (latestLineup.awayLineup as string[]) ?? [],
+          if (!session) {
+            throw new NotFoundException({
+              code: "SD_SESSION_NOT_FOUND",
+              message: "Session does not exist",
+            });
           }
-        : null;
+          const existingIdempotency = await tx.idempotencyRecord.findUnique({
+            where: {
+              sessionId_key: {
+                sessionId: command.sessionId,
+                key: command.idempotencyKey,
+              },
+            },
+          });
+          if (existingIdempotency) {
+            if (
+              existingIdempotency.requestHash &&
+              existingIdempotency.requestHash !== requestHash
+            ) {
+              throw new ConflictException({
+                code: "SD_IDEMPOTENCY_KEY_REUSED_DIFFERENT_REQUEST",
+                message:
+                  "idempotencyKey already exists for a different request payload",
+              });
+            }
+            this.logger.log(
+              JSON.stringify({
+                event: "statdash.idempotency.hit",
+                sessionId: command.sessionId,
+                idempotencyKey: command.idempotencyKey,
+              }),
+            );
+            return existingIdempotency.responseSnapshot as unknown as CommandResult;
+          }
 
-      const actorPlayerFields = [
-        "playerId",
-        "shooterPlayerId",
-        "assistedPlayerId",
-        "blockerPlayerId",
-        "againstPlayerId",
-        "foulerPlayerId",
-        "fouledPlayerId",
-        "playerOutId",
-        "playerInId",
-      ] as const;
+          try {
+            assertExpectedVersion(session.version, command.expectedVersion);
+          } catch {
+            this.logger.warn(
+              JSON.stringify({
+                event: "statdash.version.conflict",
+                sessionId: command.sessionId,
+                expectedVersion: command.expectedVersion,
+                actualVersion: session.version,
+              }),
+            );
+            throw new ConflictException({
+              code: "SD_VERSION_CONFLICT",
+              message: `Stale version. Expected ${command.expectedVersion}, latest is ${session.version}`,
+              latestVersion: session.version,
+            });
+          }
 
-      for (const field of actorPlayerFields) {
-        const candidate = command.payload[field];
-        if (typeof candidate === "string" && candidate.trim().length > 0) {
-          validateOnCourtPlayer(
-            lineupSnapshot,
-            candidate,
-            "SD_LINEUP_PLAYER_NOT_ON_COURT",
+          const latestLineup = await tx.lineupState.findFirst({
+            where: { sessionId: session.id },
+            orderBy: { capturedAt: "desc" },
+          });
+          const lineupSnapshot = latestLineup
+            ? {
+                homeLineup: (latestLineup.homeLineup as string[]) ?? [],
+                awayLineup: (latestLineup.awayLineup as string[]) ?? [],
+              }
+            : null;
+
+          const actorPlayerFields = [
+            "shooterPlayerId",
+            "assistPlayerId",
+            "blockPlayerId",
+            "reboundPlayerId",
+            "turnoverPlayerId",
+            "stealPlayerId",
+            "foulerPlayerId",
+            "fouledPlayerId",
+            "assistCandidatePlayerId",
+            "playerOutId",
+            "playerInId",
+          ] as const;
+
+          for (const field of actorPlayerFields) {
+            const candidate = command.payload[field];
+            if (typeof candidate === "string" && candidate.trim().length > 0) {
+              validateOnCourtPlayer(
+                lineupSnapshot,
+                candidate,
+                "SD_LINEUP_PLAYER_NOT_ON_COURT",
+              );
+            }
+          }
+
+          const recentEventsRecords = await tx.gameEvent.findMany({
+            where: { sessionId: session.id },
+            orderBy: { sequence: "desc" },
+            take: 5,
+          });
+
+          const ruleResult = applyCommandRules(
+            command.commandType,
+            command.payload,
+            {
+              session: {
+                id: session.id,
+                matchId: session.matchId,
+                homeScore: session.homeScore,
+                awayScore: session.awayScore,
+                match: {
+                  homeTeamId: session.match.homeTeamId,
+                  awayTeamId: session.match.awayTeamId,
+                },
+              },
+              lineupSnapshot,
+              recentEvents: recentEventsRecords.map((e) => ({
+                eventType: e.eventType,
+                payload: e.payload as Record<string, unknown>,
+              })),
+            },
           );
-        }
-      }
 
-      const ruleResult = applyCommandRules(command.commandType, command.payload, {
-        session: {
-          id: session.id,
-          matchId: session.matchId,
-          homeScore: session.homeScore,
-          awayScore: session.awayScore,
-          match: {
-            homeTeamId: session.match.homeTeamId,
-            awayTeamId: session.match.awayTeamId,
-          },
-        },
-        lineupSnapshot,
-      });
+          const currentMax = await tx.gameEvent.aggregate({
+            where: { sessionId: session.id },
+            _max: { sequence: true },
+          });
+          let nextSequence = (currentMax._max.sequence ?? 0) + 1;
 
-      const currentMax = await tx.gameEvent.aggregate({
-        where: { sessionId: session.id },
-        _max: { sequence: true },
-      });
-      let nextSequence = (currentMax._max.sequence ?? 0) + 1;
-
-      const emittedEvents = [];
-      const batchSize = ruleResult.emittedEvents.length;
-      for (let i = 0; i < batchSize; i += 1) {
-        const draft = ruleResult.emittedEvents[i];
-        const event = await tx.gameEvent.create({
-          data: {
-            sessionId: session.id,
-            sequence: nextSequence,
-            eventType: draft.eventType,
-            payload: draft.payload as Prisma.InputJsonValue,
-            actorUserId,
-            expectedVersion: command.expectedVersion,
-            resultingVersion: command.expectedVersion + i + 1,
-          },
-        });
-        emittedEvents.push(event);
-        nextSequence += 1;
-      }
-
-      const resultingVersion = command.expectedVersion + batchSize;
-      const updatedSession = await tx.gameSession.update({
-        where: { id: session.id },
-        data: {
-          version: resultingVersion,
-          homeScore: session.homeScore + ruleResult.scoreDelta.home,
-          awayScore: session.awayScore + ruleResult.scoreDelta.away,
-          quarter: ruleResult.sessionUpdates?.quarter !== undefined ? ruleResult.sessionUpdates.quarter : undefined,
-          clockSecondsRemaining: ruleResult.sessionUpdates?.clockSecondsRemaining !== undefined ? ruleResult.sessionUpdates.clockSecondsRemaining : undefined,
-          possessionTeamId: ruleResult.sessionUpdates?.possessionTeamId !== undefined ? ruleResult.sessionUpdates.possessionTeamId : undefined,
-          jumpBallWinnerTeamId: ruleResult.sessionUpdates?.jumpBallWinnerTeamId !== undefined ? ruleResult.sessionUpdates.jumpBallWinnerTeamId : undefined,
-        },
-      });
-
-      if (ruleResult.newLineup) {
-        await tx.lineupState.create({
-          data: {
-            sessionId: session.id,
-            quarter: ruleResult.sessionUpdates?.quarter ?? session.quarter,
-            homeLineup: ruleResult.newLineup.homeLineup,
-            awayLineup: ruleResult.newLineup.awayLineup,
+          const emittedEvents = [];
+          const batchSize = ruleResult.emittedEvents.length;
+          for (let i = 0; i < batchSize; i += 1) {
+            const draft = ruleResult.emittedEvents[i];
+            const event = await tx.gameEvent.create({
+              data: {
+                sessionId: session.id,
+                sequence: nextSequence,
+                eventType: draft.eventType,
+                payload: draft.payload as Prisma.InputJsonValue,
+                actorUserId,
+                period: typeof command.payload.period === 'number' ? command.payload.period : null,
+                clockSecondsRemaining: typeof command.payload.clockSecondsRemaining === 'number' ? command.payload.clockSecondsRemaining : null,
+                expectedVersion: command.expectedVersion,
+                resultingVersion: command.expectedVersion + i + 1,
+                parentEventId: command.parentEventId,
+              },
+            });
+            emittedEvents.push(event);
+            nextSequence += 1;
           }
-        });
-      }
 
-      const response: CommandResult = {
-        sessionId: updatedSession.id,
-        version: updatedSession.version,
-        score: {
-          home: updatedSession.homeScore,
-          away: updatedSession.awayScore,
+          const resultingVersion = command.expectedVersion + batchSize;
+          const updatedSession = await tx.gameSession.update({
+            where: { id: session.id },
+            data: {
+              version: resultingVersion,
+              homeScore: session.homeScore + ruleResult.scoreDelta.home,
+              awayScore: session.awayScore + ruleResult.scoreDelta.away,
+              quarter:
+                ruleResult.sessionUpdates?.quarter !== undefined
+                  ? ruleResult.sessionUpdates.quarter
+                  : undefined,
+              clockSecondsRemaining:
+                ruleResult.sessionUpdates?.clockSecondsRemaining !== undefined
+                  ? ruleResult.sessionUpdates.clockSecondsRemaining
+                  : undefined,
+              possessionTeamId:
+                ruleResult.sessionUpdates?.possessionTeamId !== undefined
+                  ? ruleResult.sessionUpdates.possessionTeamId
+                  : undefined,
+              jumpBallWinnerTeamId:
+                ruleResult.sessionUpdates?.jumpBallWinnerTeamId !== undefined
+                  ? ruleResult.sessionUpdates.jumpBallWinnerTeamId
+                  : undefined,
+            },
+          });
+
+          if (ruleResult.newLineup) {
+            await tx.lineupState.create({
+              data: {
+                sessionId: session.id,
+                quarter: ruleResult.sessionUpdates?.quarter ?? session.quarter,
+                homeLineup: ruleResult.newLineup.homeLineup,
+                awayLineup: ruleResult.newLineup.awayLineup,
+              },
+            });
+          }
+
+          const response: CommandResult = {
+            sessionId: updatedSession.id,
+            version: updatedSession.version,
+            score: {
+              home: updatedSession.homeScore,
+              away: updatedSession.awayScore,
+            },
+            emittedEvents: emittedEvents.map((event) => ({
+              id: event.id,
+              sequence: event.sequence,
+              eventType: event.eventType,
+              createdAt: event.createdAt,
+            })),
+          };
+
+          await tx.idempotencyRecord.create({
+            data: {
+              key: command.idempotencyKey,
+              sessionId: command.sessionId,
+              requestHash,
+              commandType: command.commandType,
+              responseSnapshot: response as Prisma.InputJsonValue,
+              expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+            },
+          });
+
+          this.logger.log(
+            JSON.stringify({
+              event: "statdash.command.applied",
+              sessionId: command.sessionId,
+              commandType: command.commandType,
+              expectedVersion: command.expectedVersion,
+              resultingVersion,
+              emittedCount: emittedEvents.length,
+            }),
+          );
+
+          return response;
         },
-        emittedEvents: emittedEvents.map((event) => ({
-          id: event.id,
-          sequence: event.sequence,
-          eventType: event.eventType,
-          createdAt: event.createdAt,
-        })),
-      };
-
-      await tx.idempotencyRecord.create({
-        data: {
-          key: command.idempotencyKey,
-          sessionId: command.sessionId,
-          requestHash,
-          commandType: command.commandType,
-          responseSnapshot: response as Prisma.InputJsonValue,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
-        },
-      });
-
-      this.logger.log(
-        JSON.stringify({
-          event: "statdash.command.applied",
-          sessionId: command.sessionId,
-          commandType: command.commandType,
-          expectedVersion: command.expectedVersion,
-          resultingVersion,
-          emittedCount: emittedEvents.length,
-        }),
+        STATDASH_COMMAND_TX_OPTIONS,
       );
 
-      return response;
-      },
-      STATDASH_COMMAND_TX_OPTIONS,
-    );
-
       try {
-        if (Array.isArray(response.emittedEvents) && response.emittedEvents.length > 0) {
+        if (
+          Array.isArray(response.emittedEvents) &&
+          response.emittedEvents.length > 0
+        ) {
           this.statdashRealtimeService.publish({
             sessionId: response.sessionId,
             source: "command",
@@ -365,7 +403,9 @@ export class StatdashEventsService {
             sessionId: command.sessionId,
             commandType: command.commandType,
             message:
-              sideEffectErr instanceof Error ? sideEffectErr.message : String(sideEffectErr),
+              sideEffectErr instanceof Error
+                ? sideEffectErr.message
+                : String(sideEffectErr),
           }),
           sideEffectErr instanceof Error ? sideEffectErr.stack : undefined,
         );
@@ -377,85 +417,96 @@ export class StatdashEventsService {
     }
   }
 
-  async correctEvent(eventId: string, dto: CorrectEventDto, actorUserId: string) {
+  async correctEvent(
+    eventId: string,
+    dto: CorrectEventDto,
+    actorUserId: string,
+  ) {
     const response = await this.prisma.$transaction(
       async (tx: StatdashTxClient) => {
-      const targetEvent = await tx.gameEvent.findUnique({
-        where: { id: eventId },
-      });
-      if (!targetEvent) {
-        throw new NotFoundException({
-          code: "SD_EVENT_NOT_FOUND",
-          message: "Target event does not exist",
+        const targetEvent = await tx.gameEvent.findUnique({
+          where: { id: eventId },
         });
-      }
-      if (targetEvent.eventType === "correction" || targetEvent.eventType === "reversal") {
-        throw new BadRequestException({
-          code: "SD_EVENT_CORRECTION_INVALID_TARGET",
-          message: "Cannot correct correction/reversal events",
+        if (!targetEvent) {
+          throw new NotFoundException({
+            code: "SD_EVENT_NOT_FOUND",
+            message: "Target event does not exist",
+          });
+        }
+        if (
+          targetEvent.eventType === "correction" ||
+          targetEvent.eventType === "reversal"
+        ) {
+          throw new BadRequestException({
+            code: "SD_EVENT_CORRECTION_INVALID_TARGET",
+            message: "Cannot correct correction/reversal events",
+          });
+        }
+
+        const maxSequence = await tx.gameEvent.aggregate({
+          where: { sessionId: targetEvent.sessionId },
+          _max: { sequence: true },
         });
-      }
+        const nextSequence = (maxSequence._max.sequence ?? 0) + 1;
 
-      const maxSequence = await tx.gameEvent.aggregate({
-        where: { sessionId: targetEvent.sessionId },
-        _max: { sequence: true },
-      });
-      const nextSequence = (maxSequence._max.sequence ?? 0) + 1;
+        await tx.gameEvent.create({
+          data: {
+            sessionId: targetEvent.sessionId,
+            sequence: nextSequence,
+            eventType: "correction",
+            payload: {
+              targetEventId: targetEvent.id,
+              originalEventType: targetEvent.eventType,
+              correctedPayload: dto.correctedPayload,
+              reason: dto.reason,
+              audit: {
+                createdBy: actorUserId,
+                updatedBy: actorUserId,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            } as Prisma.InputJsonValue,
+            actorUserId,
+            expectedVersion: targetEvent.resultingVersion,
+            resultingVersion: targetEvent.resultingVersion + 1,
+          },
+        });
 
-      await tx.gameEvent.create({
-        data: {
-          sessionId: targetEvent.sessionId,
-          sequence: nextSequence,
-          eventType: "correction",
-          payload: {
-            targetEventId: targetEvent.id,
-            originalEventType: targetEvent.eventType,
-            correctedPayload: dto.correctedPayload,
-            reason: dto.reason,
-            audit: {
-              createdBy: actorUserId,
-              updatedBy: actorUserId,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-          } as Prisma.InputJsonValue,
-          actorUserId,
-          expectedVersion: targetEvent.resultingVersion,
-          resultingVersion: targetEvent.resultingVersion + 1,
-        },
-      });
+        const events = await tx.gameEvent.findMany({
+          where: { sessionId: targetEvent.sessionId },
+          orderBy: { sequence: "asc" },
+        });
+        const resolvedEvents =
+          this.statdashProjectionsService.resolveEvents(events);
+        const replay = this.statdashProjectionsService.replayScoreFromEvents(
+          resolvedEvents,
+          events.length,
+        );
+        const updatedSession = await tx.gameSession.update({
+          where: { id: targetEvent.sessionId },
+          data: {
+            homeScore: replay.homeScore,
+            awayScore: replay.awayScore,
+            quarter: replay.quarter,
+            clockSecondsRemaining: replay.clockSecondsRemaining,
+            possessionTeamId: replay.possessionTeamId,
+            jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
+            version: replay.version,
+          },
+        });
 
-      const events = await tx.gameEvent.findMany({
-        where: { sessionId: targetEvent.sessionId },
-        orderBy: { sequence: "asc" },
-      });
-      const resolvedEvents = this.statdashProjectionsService.resolveEvents(events);
-      const replay = this.statdashProjectionsService.replayScoreFromEvents(resolvedEvents, events.length);
-      const updatedSession = await tx.gameSession.update({
-        where: { id: targetEvent.sessionId },
-        data: {
-          homeScore: replay.homeScore,
-          awayScore: replay.awayScore,
-          quarter: replay.quarter,
-          clockSecondsRemaining: replay.clockSecondsRemaining,
-          possessionTeamId: replay.possessionTeamId,
-          jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
-          version: replay.version,
-        },
-      });
-
-      const response: CorrectionOrReversalResult = {
-        sessionId: updatedSession.id,
-        version: updatedSession.version,
-        score: {
-          home: updatedSession.homeScore,
-          away: updatedSession.awayScore,
-        },
-        correctedEventId: targetEvent.id,
-      };
-      return response;
-    },
-    STATDASH_COMMAND_TX_OPTIONS,
+        const response: CorrectionOrReversalResult = {
+          sessionId: updatedSession.id,
+          version: updatedSession.version,
+          score: {
+            home: updatedSession.homeScore,
+            away: updatedSession.awayScore,
+          },
+          correctedEventId: targetEvent.id,
+        };
+        return response;
+      },
+      STATDASH_COMMAND_TX_OPTIONS,
     );
 
     try {
@@ -490,7 +541,9 @@ export class StatdashEventsService {
           sessionId: response.sessionId,
           eventId,
           message:
-            sideEffectErr instanceof Error ? sideEffectErr.message : String(sideEffectErr),
+            sideEffectErr instanceof Error
+              ? sideEffectErr.message
+              : String(sideEffectErr),
         }),
         sideEffectErr instanceof Error ? sideEffectErr.stack : undefined,
       );
@@ -499,29 +552,34 @@ export class StatdashEventsService {
     return response;
   }
 
-  async reverseEvent(eventId: string, dto: ReverseEventDto, actorUserId: string) {
+  async reverseEvent(
+    eventId: string,
+    dto: ReverseEventDto,
+    actorUserId: string,
+  ) {
     const response = await this.prisma.$transaction(
       async (tx: StatdashTxClient) => {
-      const targetEvent = await tx.gameEvent.findUnique({
-        where: { id: eventId },
-      });
-      if (!targetEvent) {
-        throw new NotFoundException({
-          code: "SD_EVENT_NOT_FOUND",
-          message: "Target event does not exist",
+        const targetEvent = await tx.gameEvent.findUnique({
+          where: { id: eventId },
         });
-      }
+        if (!targetEvent) {
+          throw new NotFoundException({
+            code: "SD_EVENT_NOT_FOUND",
+            message: "Target event does not exist",
+          });
+        }
 
-      const maxSequence = await tx.gameEvent.aggregate({
-        where: { sessionId: targetEvent.sessionId },
-        _max: { sequence: true },
-      });
-      const nextSequence = (maxSequence._max.sequence ?? 0) + 1;
+        const maxSequence = await tx.gameEvent.aggregate({
+          where: { sessionId: targetEvent.sessionId },
+          _max: { sequence: true },
+        });
+        const nextSequence = (maxSequence._max.sequence ?? 0) + 1;
+        let currentSequence = nextSequence;
+        const eventsToCreate = [];
 
-      await tx.gameEvent.create({
-        data: {
+        eventsToCreate.push({
           sessionId: targetEvent.sessionId,
-          sequence: nextSequence,
+          sequence: currentSequence++,
           eventType: "reversal",
           payload: {
             reversedEventId: targetEvent.id,
@@ -537,40 +595,74 @@ export class StatdashEventsService {
           actorUserId,
           expectedVersion: targetEvent.resultingVersion,
           resultingVersion: targetEvent.resultingVersion + 1,
-        },
-      });
+        });
 
-      const events = await tx.gameEvent.findMany({
-        where: { sessionId: targetEvent.sessionId },
-        orderBy: { sequence: "asc" },
-      });
-      const resolvedEvents = this.statdashProjectionsService.resolveEvents(events);
-      const replay = this.statdashProjectionsService.replayScoreFromEvents(resolvedEvents, events.length);
-      const updatedSession = await tx.gameSession.update({
-        where: { id: targetEvent.sessionId },
-        data: {
-          homeScore: replay.homeScore,
-          awayScore: replay.awayScore,
-          quarter: replay.quarter,
-          clockSecondsRemaining: replay.clockSecondsRemaining,
-          possessionTeamId: replay.possessionTeamId,
-          jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
-          version: replay.version,
-        },
-      });
+        const childEvents = await tx.gameEvent.findMany({
+          where: { parentEventId: targetEvent.id },
+          orderBy: { sequence: "asc" },
+        });
 
-      const response: CorrectionOrReversalResult = {
-        sessionId: updatedSession.id,
-        version: updatedSession.version,
-        score: {
-          home: updatedSession.homeScore,
-          away: updatedSession.awayScore,
-        },
-        reversedEventId: targetEvent.id,
-      };
-      return response;
-    },
-    STATDASH_COMMAND_TX_OPTIONS,
+        for (const child of childEvents) {
+          eventsToCreate.push({
+            sessionId: child.sessionId,
+            sequence: currentSequence++,
+            eventType: "reversal",
+            payload: {
+              reversedEventId: child.id,
+              originalEventType: child.eventType,
+              reason: dto.reason,
+              audit: {
+                createdBy: actorUserId,
+                updatedBy: actorUserId,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            } as Prisma.InputJsonValue,
+            actorUserId,
+            expectedVersion: child.resultingVersion,
+            resultingVersion: child.resultingVersion + 1,
+          });
+        }
+
+        await tx.gameEvent.createMany({
+          data: eventsToCreate,
+        });
+
+        const events = await tx.gameEvent.findMany({
+          where: { sessionId: targetEvent.sessionId },
+          orderBy: { sequence: "asc" },
+        });
+        const resolvedEvents =
+          this.statdashProjectionsService.resolveEvents(events);
+        const replay = this.statdashProjectionsService.replayScoreFromEvents(
+          resolvedEvents,
+          events.length,
+        );
+        const updatedSession = await tx.gameSession.update({
+          where: { id: targetEvent.sessionId },
+          data: {
+            homeScore: replay.homeScore,
+            awayScore: replay.awayScore,
+            quarter: replay.quarter,
+            clockSecondsRemaining: replay.clockSecondsRemaining,
+            possessionTeamId: replay.possessionTeamId,
+            jumpBallWinnerTeamId: replay.jumpBallWinnerTeamId,
+            version: replay.version,
+          },
+        });
+
+        const response: CorrectionOrReversalResult = {
+          sessionId: updatedSession.id,
+          version: updatedSession.version,
+          score: {
+            home: updatedSession.homeScore,
+            away: updatedSession.awayScore,
+          },
+          reversedEventId: targetEvent.id,
+        };
+        return response;
+      },
+      STATDASH_COMMAND_TX_OPTIONS,
     );
 
     try {
@@ -605,7 +697,9 @@ export class StatdashEventsService {
           sessionId: response.sessionId,
           eventId,
           message:
-            sideEffectErr instanceof Error ? sideEffectErr.message : String(sideEffectErr),
+            sideEffectErr instanceof Error
+              ? sideEffectErr.message
+              : String(sideEffectErr),
         }),
         sideEffectErr instanceof Error ? sideEffectErr.stack : undefined,
       );

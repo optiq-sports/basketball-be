@@ -20,7 +20,9 @@ export class TournamentsService {
     return crypto.randomBytes(6).toString("hex").toUpperCase();
   }
 
-  async create(createTournamentDto: CreateTournamentDto): Promise<TournamentResponseDto> {
+  async create(
+    createTournamentDto: CreateTournamentDto,
+  ): Promise<TournamentResponseDto> {
     // Check for idempotency: Prevent duplicates with same name and division
     const duplicate = await this.prisma.tournament.findFirst({
       where: {
@@ -226,10 +228,13 @@ export class TournamentsService {
               teamId,
             },
           },
-          update: {},
+          update: {
+            group: addTeamDto.group,
+          },
           create: {
             tournamentId: id,
             teamId,
+            group: addTeamDto.group,
           },
         }),
       ),
@@ -251,7 +256,10 @@ export class TournamentsService {
     });
   }
 
-  async updateFlyer(id: string, flyerUrl: string): Promise<TournamentResponseDto> {
+  async updateFlyer(
+    id: string,
+    flyerUrl: string,
+  ): Promise<TournamentResponseDto> {
     await this.findOne(id);
     return this.prisma.tournament.update({
       where: { id },

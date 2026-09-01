@@ -51,20 +51,17 @@
 //   }
 // }
 
-
-
-
-
-
-
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 2000;
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   async onModuleInit() {
     await this.connectWithRetry();
   }
@@ -79,8 +76,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       await this.$connect();
     } catch (error: unknown) {
       const isConnectionError =
-        error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'P1017';
-      if (retries > 0 && (isConnectionError || (error instanceof Error && /closed the connection|ECONNRESET|connect/i.test(error.message)))) {
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code?: string }).code === "P1017";
+      if (
+        retries > 0 &&
+        (isConnectionError ||
+          (error instanceof Error &&
+            /closed the connection|ECONNRESET|connect/i.test(error.message)))
+      ) {
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
         return this.connectWithRetry(retries - 1);
       }
@@ -88,4 +93,3 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
   }
 }
-

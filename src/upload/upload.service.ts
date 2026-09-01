@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryResponse } from "./types/cloudinary-response.type";
 import * as streamifier from "streamifier";
-import {
+import type {
   IUploadProvider,
   UploadResponse,
 } from "./interfaces/upload-provider.interface";

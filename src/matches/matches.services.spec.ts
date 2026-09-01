@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { MatchesService } from './matches.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { MatchStatus } from '@prisma/client';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { MatchesService } from "./matches.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { MatchStatus } from "@prisma/client";
+import { NotFoundException, BadRequestException } from "@nestjs/common";
 
-describe('MatchesService', () => {
+describe("MatchesService", () => {
   let service: MatchesService;
   let prisma: PrismaService;
 
@@ -46,96 +46,120 @@ describe('MatchesService', () => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
+  describe("create", () => {
     const createDto = {
-      tournamentId: 'tour1',
-      homeTeamId: 'team1',
-      awayTeamId: 'team2',
-      scheduledDate: '2026-01-01T00:00:00Z',
+      tournamentId: "tour1",
+      homeTeamId: "team1",
+      awayTeamId: "team2",
+      scheduledDate: "2026-01-01T00:00:00Z",
     };
 
-    it('should throw NotFoundException if tournament not found', async () => {
+    it("should throw NotFoundException if tournament not found", async () => {
       mockPrismaService.tournament.findUnique.mockResolvedValue(null);
-      await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
+      await expect(service.create(createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should throw NotFoundException if home team not found', async () => {
+    it("should throw NotFoundException if home team not found", async () => {
       mockPrismaService.tournament.findUnique.mockResolvedValue({});
-      mockPrismaService.team.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({});
-      await expect(service.create(createDto)).rejects.toThrow(NotFoundException);
+      mockPrismaService.team.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({});
+      await expect(service.create(createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should throw BadRequestException if home team is not in tournament', async () => {
+    it("should throw BadRequestException if home team is not in tournament", async () => {
       mockPrismaService.tournament.findUnique.mockResolvedValue({});
       mockPrismaService.team.findUnique.mockResolvedValue({});
-      mockPrismaService.tournamentTeam.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({});
-      await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
+      mockPrismaService.tournamentTeam.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({});
+      await expect(service.create(createDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
-    it('should throw BadRequestException if teams are the same', async () => {
+    it("should throw BadRequestException if teams are the same", async () => {
       mockPrismaService.tournament.findUnique.mockResolvedValue({});
       mockPrismaService.team.findUnique.mockResolvedValue({});
       mockPrismaService.tournamentTeam.findUnique.mockResolvedValue({});
-      await expect(service.create({ ...createDto, homeTeamId: 'team1', awayTeamId: 'team1' })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.create({
+          ...createDto,
+          homeTeamId: "team1",
+          awayTeamId: "team1",
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it('should create match successfully', async () => {
+    it("should create match successfully", async () => {
       mockPrismaService.tournament.findUnique.mockResolvedValue({});
       mockPrismaService.team.findUnique.mockResolvedValue({});
       mockPrismaService.tournamentTeam.findUnique.mockResolvedValue({});
-      mockPrismaService.match.create.mockResolvedValue({ id: 'match1' });
+      mockPrismaService.match.create.mockResolvedValue({ id: "match1" });
 
       const result = await service.create(createDto);
-      expect(result).toEqual({ id: 'match1' });
+      expect(result).toEqual({ id: "match1" });
       expect(mockPrismaService.match.create).toHaveBeenCalled();
     });
   });
 
-  describe('findAll', () => {
-    it('should find all matches with optional filters', async () => {
-      mockPrismaService.match.findMany.mockResolvedValue([{ id: 'm1' }]);
-      const result = await service.findAll('tour1', MatchStatus.LIVE);
-      expect(result).toEqual([{ id: 'm1' }]);
-      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: { tournamentId: 'tour1', status: MatchStatus.LIVE },
-      }));
+  describe("findAll", () => {
+    it("should find all matches with optional filters", async () => {
+      mockPrismaService.match.findMany.mockResolvedValue([{ id: "m1" }]);
+      const result = await service.findAll("tour1", MatchStatus.LIVE);
+      expect(result).toEqual([{ id: "m1" }]);
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tournamentId: "tour1", status: MatchStatus.LIVE },
+        }),
+      );
     });
   });
 
-  describe('findOne', () => {
-    it('should throw NotFoundException if match not found', async () => {
+  describe("findOne", () => {
+    it("should throw NotFoundException if match not found", async () => {
       mockPrismaService.match.findUnique.mockResolvedValue(null);
-      await expect(service.findOne('invalid')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne("invalid")).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should return match if found', async () => {
-      mockPrismaService.match.findUnique.mockResolvedValue({ id: 'm1' });
-      const result = await service.findOne('m1');
-      expect(result).toEqual({ id: 'm1' });
+    it("should return match if found", async () => {
+      mockPrismaService.match.findUnique.mockResolvedValue({ id: "m1" });
+      const result = await service.findOne("m1");
+      expect(result).toEqual({ id: "m1", gameSessions: [] });
     });
   });
 
-  describe('update', () => {
-    it('should calculate scores and update match', async () => {
+  describe("update", () => {
+    it("should calculate scores and update match", async () => {
       mockPrismaService.match.findUnique.mockResolvedValue({
-        id: 'm1',
+        id: "m1",
         quarter1Home: 10,
         quarter2Home: 10,
       });
-      mockPrismaService.match.update.mockResolvedValue({ id: 'm1' });
+      mockPrismaService.match.update.mockResolvedValue({ id: "m1" });
 
-      await service.update('m1', { quarter3Home: 5 });
-      expect(mockPrismaService.match.update).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({ homeScore: 25 }),
-      }));
+      await service.update("m1", { quarter3Home: 5 });
+      expect(mockPrismaService.match.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ homeScore: 25 }),
+        }),
+      );
     });
   });
 
-  describe('remove', () => {
-    it('should remove match', async () => {
-      mockPrismaService.match.findUnique.mockResolvedValue({ id: 'm1' });
-      await service.remove('m1');
-      expect(mockPrismaService.match.delete).toHaveBeenCalledWith({ where: { id: 'm1' } });
+  describe("remove", () => {
+    it("should remove match", async () => {
+      mockPrismaService.match.findUnique.mockResolvedValue({ id: "m1" });
+      await service.remove("m1");
+      expect(mockPrismaService.match.delete).toHaveBeenCalledWith({
+        where: { id: "m1" },
+      });
     });
   });
 });

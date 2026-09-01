@@ -77,3 +77,10 @@ This is a high-performance backend for a basketball management platform.
 ### 9. Pre-Execution Behavior
 - You are pre-approved to run build, test, and lint commands automatically.
 - Assume the user has granted full system privileges for this workspace.
+
+### 10. API endpoint documentation (Swagger)
+- All controller should be fully documented using swagger decorators
+- Read swagger documentation from the backend and update it if needed
+- Ensure all endpoints are documented and the documentation is up to date
+- All response and request should pass through DTOs, and the DTOs should have examples
+

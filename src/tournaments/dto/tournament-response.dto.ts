@@ -1,6 +1,29 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { TournamentDivision } from "@prisma/client";
 
+export class TournamentTeamResponseDto {
+  @ApiProperty({ example: "tt_123" })
+  id: string;
+
+  @ApiProperty({ example: "tourney_123" })
+  tournamentId: string;
+
+  @ApiProperty({ example: "team_123" })
+  teamId: string;
+
+  @ApiProperty({ example: "A", required: false, nullable: true })
+  group?: string | null;
+
+  @ApiProperty({ example: "2024-01-01T00:00:00Z" })
+  createdAt: Date;
+
+  @ApiProperty({ example: "2024-01-01T00:00:00Z" })
+  updatedAt: Date;
+
+  @ApiProperty({ required: false })
+  team?: any;
+}
+
 export class TournamentResponseDto {
   @ApiProperty({ example: "tourney_123" })
   id: string;
@@ -11,7 +34,10 @@ export class TournamentResponseDto {
   @ApiProperty({ example: "SPL2024" })
   code: string;
 
-  @ApiProperty({ enum: TournamentDivision, example: TournamentDivision.DIVISION_1 })
+  @ApiProperty({
+    enum: TournamentDivision,
+    example: TournamentDivision.DIVISION_1,
+  })
   division: TournamentDivision;
 
   @ApiProperty({ example: 82 })
@@ -56,8 +82,8 @@ export class TournamentResponseDto {
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   updatedAt: Date;
 
-  @ApiProperty({ type: [Object], example: [], required: false })
-  teams?: any[];
+  @ApiProperty({ type: [TournamentTeamResponseDto], required: false })
+  teams?: TournamentTeamResponseDto[];
 
   @ApiProperty({ type: [Object], example: [], required: false })
   matches?: any[];

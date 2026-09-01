@@ -50,8 +50,10 @@ export class AuthService {
       role: user.role,
     };
 
-    const refreshExpiresIn = this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d";
-    const expiresInStr = this.configService.get<string>("JWT_EXPIRES_IN") || "24h";
+    const refreshExpiresIn =
+      this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "7d";
+    const expiresInStr =
+      this.configService.get<string>("JWT_EXPIRES_IN") || "24h";
 
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: expiresInStr as StringValue,
@@ -150,7 +152,9 @@ export class AuthService {
     } catch {
       // If token expired or invalid, delete session
       await this.prisma.session.delete({ where: { id: session.id } });
-      throw new UnauthorizedException("Refresh token has expired or is invalid");
+      throw new UnauthorizedException(
+        "Refresh token has expired or is invalid",
+      );
     }
 
     if (payload.sub !== session.user.id) {
