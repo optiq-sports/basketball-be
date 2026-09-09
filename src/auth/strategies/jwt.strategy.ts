@@ -67,7 +67,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       include: { profile: true },
     });
 
-    if (!user) {
+    if (!user || user.status !== "ACTIVE") {
       throw new UnauthorizedException();
     }
 
