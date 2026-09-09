@@ -26,6 +26,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 
 @ApiTags("Matches")
 @ApiBearerAuth()
@@ -103,10 +104,12 @@ export class MatchesController {
     "Invalid or missing access token",
   )
   findAll(
+    @CurrentUser() user: any,
     @Query("tournamentId") tournamentId?: string,
     @Query("status") status?: MatchStatus,
   ) {
-    return this.matchesService.findAll(tournamentId, status);
+    const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
+    return this.matchesService.findAll(tournamentId, status, statisticianId);
   }
 
   @Get(":id")

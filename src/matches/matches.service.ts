@@ -101,6 +101,7 @@ export class MatchesService {
   async findAll(
     tournamentId?: string,
     status?: MatchStatus,
+    statisticianId?: string,
   ): Promise<MatchResponseDto[]> {
     const where: any = {};
     if (tournamentId) {
@@ -108,6 +109,9 @@ export class MatchesService {
     }
     if (status) {
       where.status = status;
+    }
+    if (statisticianId) {
+      where.statisticianId = statisticianId;
     }
 
     return this.prisma.match.findMany({

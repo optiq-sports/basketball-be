@@ -27,7 +27,7 @@ export class AuthService {
       include: { profile: true },
     });
 
-    if (!user || !user.password) {
+    if (!user || !user.password || user.status !== "ACTIVE") {
       return null;
     }
 

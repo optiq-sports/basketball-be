@@ -27,7 +27,42 @@ async function main() {
     },
   });
 
-  console.log("✅ Seed complete:", user);
+  const customPassword = "123456";
+  const customHashedPassword = await bcrypt.hash(customPassword, 10);
+
+  const adminUser = await prisma.user.upsert({
+    where: { email: "admin@gmail.com" },
+    update: {},
+    create: {
+      email: "admin@gmail.com",
+      password: customHashedPassword,
+      role: "ADMIN",
+      emailVerified: true,
+      profile: {
+        create: {
+          fullName: "System Admin",
+        },
+      },
+    },
+  });
+
+  const statisticianUser = await prisma.user.upsert({
+    where: { email: "stat@gmail.com" },
+    update: {},
+    create: {
+      email: "stat@gmail.com",
+      password: customHashedPassword,
+      role: "STATISTICIAN",
+      emailVerified: true,
+      profile: {
+        create: {
+          fullName: "System Statistician",
+        },
+      },
+    },
+  });
+
+  console.log("✅ Seed complete:", user.email, adminUser.email, statisticianUser.email);
 }
 
 main()

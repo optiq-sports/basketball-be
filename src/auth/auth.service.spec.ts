@@ -76,6 +76,7 @@ describe("AuthService", () => {
         email: "test@example.com",
         password: "hashedPassword",
         role: "ADMIN",
+        status: "ACTIVE",
       };
 
       mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
@@ -117,6 +118,7 @@ describe("AuthService", () => {
         id: "user1",
         email: "new@example.com",
         role: "STATISTICIAN",
+        status: "ACTIVE",
       });
       mockJwtService.sign.mockReturnValue("token123");
       mockPrismaService.session.create.mockResolvedValue({});
