@@ -72,7 +72,7 @@ describe("StatdashProjectionsService", () => {
         id: "e1",
         eventType: "shot",
         sequence: 1,
-        payload: { result: "made", shotValue: 2, teamId: "home_team" },
+        payload: { shot: { result: "made", value: 2 }, teamId: "home_team" },
       },
       {
         id: "e2",
@@ -81,8 +81,7 @@ describe("StatdashProjectionsService", () => {
         payload: {
           targetEventId: "e1",
           correctedPayload: {
-            result: "made",
-            shotValue: 3,
+            shot: { result: "made", value: 3 },
             teamId: "home_team",
           },
         },
@@ -142,15 +141,14 @@ describe("StatdashProjectionsService", () => {
         payload: {
           shooterPlayerId: "p1",
           playerId: "p1",
-          result: "made",
-          shotValue: 2,
+          shot: { result: "made", value: 2 },
         },
       },
       {
         id: "e2",
         eventType: "rebound",
         sequence: 2,
-        payload: { playerId: "p1" },
+        payload: { reboundPlayerId: "p1" },
       },
     ]);
 

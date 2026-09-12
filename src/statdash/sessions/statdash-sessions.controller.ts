@@ -19,6 +19,7 @@ import {
   StatdashSessionDto,
   StatdashSessionSnapshotDto,
 } from "./dto/statdash-session-responses.dto";
+import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 
 @ApiTags("Statdash Sessions")
 @ApiBearerAuth()
@@ -61,8 +62,12 @@ export class StatdashSessionsController {
     "/api/statdash/sessions/resolve-match-key",
     "No match found for supplied match key",
   )
-  resolveMatchKey(@Body() dto: ResolveMatchKeyDto) {
-    return this.statdashSessionsService.resolveMatchKey(dto.matchKey);
+  resolveMatchKey(
+    @Body() dto: ResolveMatchKeyDto,
+    @CurrentUser() user: any,
+  ) {
+    const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
+    return this.statdashSessionsService.resolveMatchKey(dto.matchKey, statisticianId);
   }
 
   @Post("bootstrap")
@@ -94,8 +99,12 @@ export class StatdashSessionsController {
     "/api/statdash/sessions/bootstrap",
     "Match or Session does not exist",
   )
-  bootstrap(@Body() dto: BootstrapSessionDto) {
-    return this.statdashSessionsService.bootstrap(dto);
+  bootstrap(
+    @Body() dto: BootstrapSessionDto,
+    @CurrentUser() user: any,
+  ) {
+    const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
+    return this.statdashSessionsService.bootstrap(dto, statisticianId);
   }
 
   @Post(":sessionId/start")

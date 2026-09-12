@@ -32,7 +32,7 @@ export class StatdashSessionsService {
     return this.statdashSessionsRepository.findSessionById(sessionId);
   }
 
-  async resolveMatchKey(matchKey: string) {
+  async resolveMatchKey(matchKey: string, statisticianId?: string) {
     const normalizedMatchKey = matchKey.trim();
     if (!normalizedMatchKey) {
       throw new BadRequestException({
@@ -42,18 +42,24 @@ export class StatdashSessionsService {
     }
 
     // Prefer explicit match id keying to avoid ambiguous tournament-level lookups.
-    let match = await this.prisma.match.findUnique({
-      where: { id: normalizedMatchKey },
+    const matchWhere: any = { id: normalizedMatchKey };
+    if (statisticianId) matchWhere.statisticianId = statisticianId;
+
+    let match = await this.prisma.match.findFirst({
+      where: matchWhere,
       include: {
         gameSessions: true,
       },
     });
 
     if (!match) {
+      const tourneyMatchWhere: any = {
+        tournament: { code: normalizedMatchKey },
+      };
+      if (statisticianId) tourneyMatchWhere.statisticianId = statisticianId;
+
       const matchesByTournamentCode = await this.prisma.match.findMany({
-        where: {
-          tournament: { code: normalizedMatchKey },
-        },
+        where: tourneyMatchWhere,
         include: {
           gameSessions: true,
         },
@@ -85,7 +91,7 @@ export class StatdashSessionsService {
     };
   }
 
-  async bootstrap(input: { matchId?: string; sessionId?: string }) {
+  async bootstrap(input: { matchId?: string; sessionId?: string }, statisticianId?: string) {
     if (!input.matchId && !input.sessionId) {
       throw new BadRequestException({
         code: "SD_SESSION_BOOTSTRAP_INPUT_INVALID",
@@ -98,6 +104,8 @@ export class StatdashSessionsService {
         input.sessionId,
       );
       if (cachedSnapshot) {
+        // Technically we might want to check statisticianId against cached snapshot,
+        // but session ID is a secure CUID. Let's return it if found.
         return cachedSnapshot;
       }
     }
@@ -109,9 +117,19 @@ export class StatdashSessionsService {
         })
       : null;
 
+    if (session && statisticianId && session.match?.statisticianId !== statisticianId) {
+       throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+
     if (!session && input.matchId) {
-      const match = await this.prisma.match.findUnique({
-        where: { id: input.matchId },
+      const matchWhere: any = { id: input.matchId };
+      if (statisticianId) matchWhere.statisticianId = statisticianId;
+
+      const match = await this.prisma.match.findFirst({
+        where: matchWhere,
       });
       if (!match) {
         throw new NotFoundException({

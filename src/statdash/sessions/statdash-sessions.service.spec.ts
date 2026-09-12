@@ -19,6 +19,7 @@ describe("StatdashSessionsService", () => {
   const prismaService = {
     match: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
     },
@@ -102,7 +103,7 @@ describe("StatdashSessionsService", () => {
   });
 
   it("resolves match key with existing session", async () => {
-    prismaService.match.findUnique.mockResolvedValue({
+    prismaService.match.findFirst.mockResolvedValue({
       id: "match_1",
       status: MatchStatus.LIVE,
       gameSessions: { id: "session_1", status: GameSessionStatus.IN_PROGRESS },
@@ -118,7 +119,7 @@ describe("StatdashSessionsService", () => {
   });
 
   it("fails resolve when tournament key maps to multiple matches", async () => {
-    prismaService.match.findUnique.mockResolvedValue(null);
+    prismaService.match.findFirst.mockResolvedValue(null);
     prismaService.match.findMany.mockResolvedValue([
       { id: "m1", status: MatchStatus.SCHEDULED, gameSessions: null },
       { id: "m2", status: MatchStatus.SCHEDULED, gameSessions: null },
