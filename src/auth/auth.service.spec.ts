@@ -7,7 +7,10 @@ import { Role } from "@prisma/client";
 import { UnauthorizedException, ConflictException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 
-jest.mock("bcrypt");
+jest.mock("bcrypt", () => ({
+  hash: jest.fn(),
+  compare: jest.fn(),
+}));
 
 describe("AuthService", () => {
   let service: AuthService;
