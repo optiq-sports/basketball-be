@@ -63,14 +63,15 @@ export class StatdashProjectionsService {
       .filter((event) => event.eventType === "shot")
       .map((event) => {
         const payload = event.payload as Record<string, unknown>;
+        const shot = payload.shot as Record<string, unknown> | undefined;
         return {
           eventId: event.id,
           teamId: payload.teamId ?? null,
           shooterPlayerId: payload.shooterPlayerId ?? null,
-          result: payload.result ?? null,
-          shotValue: payload.shotValue ?? null,
-          x: payload.x ?? null,
-          y: payload.y ?? null,
+          result: shot?.result ?? null,
+          shotValue: shot?.value ?? null,
+          x: shot?.x ?? null,
+          y: shot?.y ?? null,
           sequence: event.sequence,
           period: event.period ?? null,
         };
@@ -284,11 +285,14 @@ export class StatdashProjectionsService {
 
     for (const event of resolvedEvents) {
       const payload = event.payload as Record<string, unknown>;
-      if (event.eventType === "shot" && payload.result === "made") {
-        const value = Number(payload.shotValue ?? 0);
-        const isHome = this.isHomeTeamPayload(payload, teamContext);
-        if (isHome) homeScore += value;
-        else awayScore += value;
+      if (event.eventType === "shot") {
+        const shot = payload.shot as Record<string, unknown> | undefined;
+        if (shot?.result === "made") {
+          const value = Number(shot.value ?? 0);
+          const isHome = this.isHomeTeamPayload(payload, teamContext);
+          if (isHome) homeScore += value;
+          else awayScore += value;
+        }
       }
       if (event.eventType === "free_throw" && payload.result === "made") {
         const isHome = this.isHomeTeamPayload(payload, teamContext);
@@ -296,8 +300,8 @@ export class StatdashProjectionsService {
         else awayScore += 1;
       }
 
-      if (typeof payload.quarter === "number") {
-        quarter = payload.quarter;
+      if (typeof payload.period === "number") {
+        quarter = payload.period;
       }
       if (typeof payload.clockSecondsRemaining === "number") {
         clockSecondsRemaining = payload.clockSecondsRemaining;
@@ -362,19 +366,36 @@ export class StatdashProjectionsService {
       const playerId =
         (payload.playerId as string | undefined) ??
         (payload.shooterPlayerId as string | undefined) ??
-        (payload.foulerPlayerId as string | undefined);
+        (payload.foulerPlayerId as string | undefined) ??
+        (payload.reboundPlayerId as string | undefined) ??
+        (payload.turnoverPlayerId as string | undefined);
       if (!playerId) continue;
       if (!players[playerId])
         players[playerId] = this.emptyPlayerProjection(playerId);
 
       switch (event.eventType) {
-        case "shot":
-          if (payload.result === "made") {
-            const points = Number(payload.shotValue ?? 0);
+        case "shot": {
+          const shot = payload.shot as Record<string, unknown> | undefined;
+          if (shot?.result === "made") {
+            const points = Number(shot.value ?? 0);
             players[playerId].points += points;
             totals.points += points;
           }
+
+          if (payload.assistPlayerId) {
+            const aId = payload.assistPlayerId as string;
+            if (!players[aId]) players[aId] = this.emptyPlayerProjection(aId);
+            players[aId].assists += 1;
+            totals.assists += 1;
+          }
+          if (payload.blockPlayerId) {
+            const bId = payload.blockPlayerId as string;
+            if (!players[bId]) players[bId] = this.emptyPlayerProjection(bId);
+            players[bId].blocks += 1;
+            totals.blocks += 1;
+          }
           break;
+        }
         case "free_throw":
           if (payload.result === "made") {
             players[playerId].points += 1;
@@ -385,26 +406,22 @@ export class StatdashProjectionsService {
           players[playerId].rebounds += 1;
           totals.rebounds += 1;
           break;
-        case "assist":
-          players[playerId].assists += 1;
-          totals.assists += 1;
-          break;
-        case "block":
-          players[playerId].blocks += 1;
-          totals.blocks += 1;
-          break;
-        case "steal":
-          players[playerId].steals += 1;
-          totals.steals += 1;
-          break;
         case "foul":
           players[playerId].fouls += 1;
           totals.fouls += 1;
           break;
-        case "turnover":
+        case "turnover": {
           players[playerId].turnovers += 1;
           totals.turnovers += 1;
+
+          if (payload.stealPlayerId) {
+            const sId = payload.stealPlayerId as string;
+            if (!players[sId]) players[sId] = this.emptyPlayerProjection(sId);
+            players[sId].steals += 1;
+            totals.steals += 1;
+          }
           break;
+        }
         default:
           break;
       }
