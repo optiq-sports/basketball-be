@@ -43,7 +43,12 @@ export class StatdashSessionsService {
 
     // Prefer explicit match id keying to avoid ambiguous tournament-level lookups.
     const matchWhere: any = { id: normalizedMatchKey };
-    if (statisticianId) matchWhere.statisticianId = statisticianId;
+    if (statisticianId) {
+      matchWhere.OR = [
+        { statisticianId: statisticianId },
+        { statisticianId: null }
+      ];
+    }
 
     let match = await this.prisma.match.findFirst({
       where: matchWhere,
@@ -56,7 +61,12 @@ export class StatdashSessionsService {
       const tourneyMatchWhere: any = {
         tournament: { code: normalizedMatchKey },
       };
-      if (statisticianId) tourneyMatchWhere.statisticianId = statisticianId;
+      if (statisticianId) {
+        tourneyMatchWhere.OR = [
+          { statisticianId: statisticianId },
+          { statisticianId: null }
+        ];
+      }
 
       const matchesByTournamentCode = await this.prisma.match.findMany({
         where: tourneyMatchWhere,
@@ -117,7 +127,12 @@ export class StatdashSessionsService {
         })
       : null;
 
-    if (session && statisticianId && session.match?.statisticianId !== statisticianId) {
+    if (
+      session && 
+      statisticianId && 
+      session.match?.statisticianId !== null && 
+      session.match?.statisticianId !== statisticianId
+    ) {
        throw new NotFoundException({
         code: "SD_SESSION_NOT_FOUND",
         message: "Session does not exist",
@@ -126,7 +141,12 @@ export class StatdashSessionsService {
 
     if (!session && input.matchId) {
       const matchWhere: any = { id: input.matchId };
-      if (statisticianId) matchWhere.statisticianId = statisticianId;
+      if (statisticianId) {
+        matchWhere.OR = [
+          { statisticianId: statisticianId },
+          { statisticianId: null }
+        ];
+      }
 
       const match = await this.prisma.match.findFirst({
         where: matchWhere,
@@ -135,6 +155,14 @@ export class StatdashSessionsService {
         throw new NotFoundException({
           code: "SD_SESSION_MATCH_NOT_FOUND",
           message: "Match does not exist",
+        });
+      }
+
+      // Claim the match if it is unassigned
+      if (!match.statisticianId && statisticianId) {
+        await this.prisma.match.update({
+          where: { id: match.id },
+          data: { statisticianId },
         });
       }
 
