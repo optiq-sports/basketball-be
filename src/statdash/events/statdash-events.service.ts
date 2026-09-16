@@ -472,6 +472,24 @@ export class StatdashEventsService {
           },
         });
 
+        const sessionForTeamContext = await tx.gameSession.findUnique({
+          where: { id: targetEvent.sessionId },
+          include: {
+            match: {
+              select: {
+                homeTeamId: true,
+                awayTeamId: true,
+              },
+            },
+          },
+        });
+        if (!sessionForTeamContext) {
+          throw new NotFoundException({
+            code: "SD_SESSION_NOT_FOUND",
+            message: "Session does not exist",
+          });
+        }
+
         const events = await tx.gameEvent.findMany({
           where: { sessionId: targetEvent.sessionId },
           orderBy: { sequence: "asc" },
@@ -481,6 +499,10 @@ export class StatdashEventsService {
         const replay = this.statdashProjectionsService.replayScoreFromEvents(
           resolvedEvents,
           events.length,
+          {
+            homeTeamId: sessionForTeamContext.match.homeTeamId,
+            awayTeamId: sessionForTeamContext.match.awayTeamId,
+          },
         );
         const updatedSession = await tx.gameSession.update({
           where: { id: targetEvent.sessionId },
@@ -628,6 +650,24 @@ export class StatdashEventsService {
           data: eventsToCreate,
         });
 
+        const sessionForTeamContext = await tx.gameSession.findUnique({
+          where: { id: targetEvent.sessionId },
+          include: {
+            match: {
+              select: {
+                homeTeamId: true,
+                awayTeamId: true,
+              },
+            },
+          },
+        });
+        if (!sessionForTeamContext) {
+          throw new NotFoundException({
+            code: "SD_SESSION_NOT_FOUND",
+            message: "Session does not exist",
+          });
+        }
+
         const events = await tx.gameEvent.findMany({
           where: { sessionId: targetEvent.sessionId },
           orderBy: { sequence: "asc" },
@@ -637,6 +677,10 @@ export class StatdashEventsService {
         const replay = this.statdashProjectionsService.replayScoreFromEvents(
           resolvedEvents,
           events.length,
+          {
+            homeTeamId: sessionForTeamContext.match.homeTeamId,
+            awayTeamId: sessionForTeamContext.match.awayTeamId,
+          },
         );
         const updatedSession = await tx.gameSession.update({
           where: { id: targetEvent.sessionId },
