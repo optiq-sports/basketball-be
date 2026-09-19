@@ -51,4 +51,13 @@ export class CreateMatchDto {
   @IsOptional()
   @IsString()
   venue?: string;
+
+  @ApiProperty({
+    example: "cuid-statistician-id",
+    description: "ID of the statistician assigned to the match",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  statisticianId?: string;
 }

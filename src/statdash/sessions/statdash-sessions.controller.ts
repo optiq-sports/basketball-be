@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { BootstrapSessionDto } from "./dto/bootstrap-session.dto";
+import { UpdateOrientationDto } from "./dto/update-orientation.dto";
 import { ResolveMatchKeyDto } from "./dto/resolve-match-key.dto";
 import { StatdashSessionsService } from "./statdash-sessions.service";
 import {
@@ -105,6 +106,38 @@ export class StatdashSessionsController {
   ) {
     const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
     return this.statdashSessionsService.bootstrap(dto, statisticianId);
+  }
+
+  @Patch(":sessionId/orientation")
+  @ApiOperation({ summary: "Update session orientation" })
+  @ApiResponse({
+    status: 200,
+    description: "Orientation successfully updated",
+    type: StatdashSessionSnapshotDto,
+  })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "PATCH",
+    "/api/statdash/sessions/:sessionId/orientation",
+    "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "PATCH",
+    "/api/statdash/sessions/:sessionId/orientation",
+    "Session does not exist",
+  )
+  updateOrientation(
+    @Param("sessionId") sessionId: string,
+    @Body() dto: UpdateOrientationDto,
+  ) {
+    return this.statdashSessionsService.updateOrientation(
+      sessionId,
+      dto.homeOnLeft,
+      dto.homeAttacksLeft,
+    );
   }
 
   @Post(":sessionId/start")

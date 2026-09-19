@@ -201,6 +201,12 @@ export class MatchesService {
     const match = await this.findOne(id);
 
     const updateData: any = { ...updateMatchDto };
+    
+    // Handle unassigning statistician if frontend passes an empty string
+    if (updateData.statisticianId === "") {
+      updateData.statisticianId = null;
+    }
+
     if (updateMatchDto.scheduledDate) {
       updateData.scheduledDate = new Date(
         updateMatchDto.scheduledDate.endsWith("Z") ||
