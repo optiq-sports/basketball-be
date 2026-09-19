@@ -202,7 +202,6 @@ export class StatdashEventsService {
             "fouledPlayerId",
             "assistCandidatePlayerId",
             "playerOutId",
-            "playerInId",
           ] as const;
 
           for (const field of actorPlayerFields) {
@@ -213,6 +212,18 @@ export class StatdashEventsService {
                 candidate,
                 "SD_LINEUP_PLAYER_NOT_ON_COURT",
               );
+            }
+          }
+
+          if (typeof command.payload.playerInId === "string" && command.payload.playerInId.trim().length > 0) {
+            if (lineupSnapshot) {
+              const { homeLineup, awayLineup } = lineupSnapshot;
+              if (homeLineup.includes(command.payload.playerInId) || awayLineup.includes(command.payload.playerInId)) {
+                throw new BadRequestException({
+                  code: "SD_LINEUP_PLAYER_ALREADY_ON_COURT",
+                  message: `Player ${command.payload.playerInId} is already on court`,
+                });
+              }
             }
           }
 

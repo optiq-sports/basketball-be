@@ -237,6 +237,28 @@ export class StatdashSessionsService {
     return snapshot;
   }
 
+  async updateOrientation(sessionId: string, homeOnLeft: boolean, homeAttacksLeft: boolean) {
+    const session = await this.prisma.gameSession.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) {
+      throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+
+    await this.prisma.gameSession.update({
+      where: { id: sessionId },
+      data: { homeOnLeft, homeAttacksLeft },
+    });
+
+    await this.redisService.invalidateSessionSnapshotCache(sessionId);
+
+    // Return the updated snapshot
+    return this.bootstrap({ sessionId });
+  }
+
   async startSession(sessionId: string) {
     const session = await this.prisma.gameSession.findUnique({
       where: { id: sessionId },
