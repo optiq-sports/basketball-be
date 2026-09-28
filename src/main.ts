@@ -6,6 +6,7 @@ import logger from "./logger/logger";
 import { WinstonModule } from "nest-winston";
 import helmet from "helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { ClientApiModule } from "./client-api/client-api.module";
 
 function resolveCorsOrigin():
   | boolean
@@ -132,6 +133,15 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
       },
       "bearer",
     )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key',
+        description: 'Enter your API Key',
+      },
+      'x-api-key',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -147,6 +157,34 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
       persistAuthorization: true,
       tagsSorter: "alpha",
       operationsSorter: "alpha",
+    },
+  });
+
+  // Integration Swagger
+  const integrationConfig = new DocumentBuilder()
+    .setTitle('OptiQ Sports Client Integration API')
+    .setDescription('Integration API documentation for OptiQ Sports Client')
+    .setVersion('1.0')
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key',
+        description: 'Enter your API Key',
+      },
+      'x-api-key',
+    )
+    .build();
+
+  const integrationDocument = SwaggerModule.createDocument(app, integrationConfig, {
+    include: [ClientApiModule],
+  });
+
+  SwaggerModule.setup('client-docs', app, integrationDocument, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
     },
   });
 
