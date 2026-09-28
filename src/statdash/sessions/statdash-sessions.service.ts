@@ -15,7 +15,7 @@ export class StatdashSessionsService {
     private readonly statdashSessionsRepository: StatdashSessionsRepository,
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-  ) {}
+  ) { }
 
   async createSessionSeed(input: {
     matchId: string;
@@ -41,12 +41,23 @@ export class StatdashSessionsService {
       });
     }
 
-    // Prefer explicit match id keying to avoid ambiguous tournament-level lookups.
-    const matchWhere: any = { id: normalizedMatchKey };
+    // Prefer explicit match id keying to avoid ambiguous tournament-level lookups, 
+    // but also support looking up by matchKey.
+    const matchWhere: any = {
+      OR: [
+        { id: normalizedMatchKey },
+        { matchKey: normalizedMatchKey },
+      ],
+    };
+    
     if (statisticianId) {
-      matchWhere.OR = [
-        { statisticianId: statisticianId },
-        { statisticianId: null }
+      matchWhere.AND = [
+        {
+          OR: [
+            { statisticianId: statisticianId },
+            { statisticianId: null },
+          ],
+        },
       ];
     }
 
@@ -101,7 +112,7 @@ export class StatdashSessionsService {
     };
   }
 
-  async bootstrap(input: { matchId?: string; sessionId?: string }, statisticianId?: string) {
+  async bootstrap(input: { matchId?: string; sessionId?: string }, statisticianId?: string, skipCache: boolean = false) {
     if (!input.matchId && !input.sessionId) {
       throw new BadRequestException({
         code: "SD_SESSION_BOOTSTRAP_INPUT_INVALID",
@@ -109,7 +120,7 @@ export class StatdashSessionsService {
       });
     }
 
-    if (input.sessionId) {
+    if (input.sessionId && !skipCache) {
       const cachedSnapshot = await this.redisService.getSessionSnapshotCached(
         input.sessionId,
       );
@@ -122,18 +133,18 @@ export class StatdashSessionsService {
 
     let session = input.sessionId
       ? await this.prisma.gameSession.findUnique({
-          where: { id: input.sessionId },
-          include: { match: true },
-        })
+        where: { id: input.sessionId },
+        include: { match: true },
+      })
       : null;
 
     if (
-      session && 
-      statisticianId && 
-      session.match?.statisticianId !== null && 
+      session &&
+      statisticianId &&
+      session.match?.statisticianId !== null &&
       session.match?.statisticianId !== statisticianId
     ) {
-       throw new NotFoundException({
+      throw new NotFoundException({
         code: "SD_SESSION_NOT_FOUND",
         message: "Session does not exist",
       });
@@ -191,21 +202,21 @@ export class StatdashSessionsService {
     const [recentEvents, latestLineup] = await Promise.all([
       cachedRecentEvents
         ? Promise.resolve(
-            cachedRecentEvents as Array<{
-              id: string;
-              sequence: number;
-              eventType: string;
-              payload: unknown;
-              createdAt: Date;
-              period: number | null;
-              clockSecondsRemaining: number | null;
-            }>,
-          )
+          cachedRecentEvents as Array<{
+            id: string;
+            sequence: number;
+            eventType: string;
+            payload: unknown;
+            createdAt: Date;
+            period: number | null;
+            clockSecondsRemaining: number | null;
+          }>,
+        )
         : this.prisma.gameEvent.findMany({
-            where: { sessionId: session.id },
-            orderBy: { sequence: "desc" },
-            take: 25,
-          }),
+          where: { sessionId: session.id },
+          orderBy: { sequence: "desc" },
+          take: 25,
+        }),
       this.prisma.lineupState.findFirst({
         where: { sessionId: session.id },
         orderBy: { capturedAt: "desc" },
@@ -214,14 +225,14 @@ export class StatdashSessionsService {
 
     const orderedEvents = cachedRecentEvents
       ? (recentEvents as Array<{
-          id: string;
-          sequence: number;
-          eventType: string;
-          payload: unknown;
-          createdAt: Date;
-          period: number | null;
-          clockSecondsRemaining: number | null;
-        }>)
+        id: string;
+        sequence: number;
+        eventType: string;
+        payload: unknown;
+        createdAt: Date;
+        period: number | null;
+        clockSecondsRemaining: number | null;
+      }>)
       : recentEvents.reverse();
 
     const snapshot = this.buildSnapshot(session, orderedEvents, latestLineup);
@@ -294,6 +305,7 @@ export class StatdashSessionsService {
         },
       }),
     ]);
+    await this.redisService.invalidateSessionSnapshotCache(sessionId);
     return updatedSession;
   }
 
@@ -314,12 +326,14 @@ export class StatdashSessionsService {
       });
     }
 
-    return this.prisma.gameSession.update({
+    const updatedSession = await this.prisma.gameSession.update({
       where: { id: sessionId },
       data: {
         status: GameSessionStatus.PAUSED,
       },
     });
+    await this.redisService.invalidateSessionSnapshotCache(sessionId);
+    return updatedSession;
   }
 
   async completeSession(sessionId: string) {
@@ -358,6 +372,7 @@ export class StatdashSessionsService {
         },
       }),
     ]);
+    await this.redisService.invalidateSessionSnapshotCache(sessionId);
     return updatedSession;
   }
 
@@ -396,11 +411,12 @@ export class StatdashSessionsService {
         },
       }),
     ]);
+    await this.redisService.invalidateSessionSnapshotCache(sessionId);
     return updatedSession;
   }
 
   async getState(sessionId: string) {
-    return this.bootstrap({ sessionId });
+    return this.bootstrap({ sessionId }, undefined, true);
   }
 
   private buildSnapshot(

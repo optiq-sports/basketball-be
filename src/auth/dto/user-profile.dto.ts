@@ -8,7 +8,7 @@ export class UserProfileDto {
   })
   id: string;
   @ApiProperty({
-    example: "test@basketball.com",
+    example: "test@optiqsport.com",
     description: "User email",
   })
   email: string;

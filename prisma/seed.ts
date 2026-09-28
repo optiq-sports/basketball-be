@@ -1,68 +1,27 @@
-// prisma/seed.ts
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
+import { seedUsers } from "./seeds/01-users";
+import { seedTeamsAndPlayers } from "./seeds/02-teams-players";
+import { seedTournamentsAndMatches } from "./seeds/03-tournaments-matches";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding database...");
+  console.log("🌱 Starting complete database seed...");
 
-  const password = "password123"; // default admin password
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // 1. Clean the database first (optional but recommended for seeds)
+  // Be careful with this in production! We will just rely on upserts or unique constraints for now,
+  // or we can clean specific tables if needed. 
 
-  const user = await prisma.user.upsert({
-    where: { email: "test@basketball.com" },
-    update: {},
-    create: {
-      email: "test@basketball.com",
-      password: hashedPassword, // renamed field
-      role: "ADMIN",
-      emailVerified: true, // now a Boolean
-      profile: {
-        create: {
-          fullName: "Test Admin",
-          bio: "Coach of the university basketball team.",
-        },
-      },
-    },
-  });
+  // 2. Seed Users & Clients
+  const { clients, statisticians } = await seedUsers(prisma);
 
-  const customPassword = "123456";
-  const customHashedPassword = await bcrypt.hash(customPassword, 10);
+  // 3. Seed Teams & Players
+  const { teams } = await seedTeamsAndPlayers(prisma);
 
-  const adminUser = await prisma.user.upsert({
-    where: { email: "admin@gmail.com" },
-    update: {},
-    create: {
-      email: "admin@gmail.com",
-      password: customHashedPassword,
-      role: "ADMIN",
-      emailVerified: true,
-      profile: {
-        create: {
-          fullName: "System Admin",
-        },
-      },
-    },
-  });
+  // 4. Seed Tournaments & Matches
+  await seedTournamentsAndMatches(prisma, clients, teams, statisticians);
 
-  const statisticianUser = await prisma.user.upsert({
-    where: { email: "stat@gmail.com" },
-    update: {},
-    create: {
-      email: "stat@gmail.com",
-      password: customHashedPassword,
-      role: "STATISTICIAN",
-      emailVerified: true,
-      profile: {
-        create: {
-          fullName: "System Statistician",
-        },
-      },
-    },
-  });
-
-  console.log("✅ Seed complete:", user.email, adminUser.email, statisticianUser.email);
+  console.log("✅ All seeding completed successfully!");
 }
 
 main()

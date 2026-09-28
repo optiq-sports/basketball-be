@@ -20,12 +20,13 @@ export class CreateAdminDto {
 
   @ApiProperty({
     example: "Password123!",
-    description: "Strong password, at least 6 characters",
+    description: "Strong password, at least 6 characters (auto-generated if omitted)",
+    required: false
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MinLength(6)
-  password: string;
+  password?: string;
 
   @ApiProperty({ example: "Admin Manager", required: false })
   @IsString()

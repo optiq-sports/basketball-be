@@ -128,4 +128,12 @@ export class CreateTournamentDto {
   @IsOptional()
   @IsString()
   commissioner?: string;
+
+  @ApiProperty({
+    example: "c473c4b4-8b7f-4a2c-9d0a-1f2e3c4d5e6f",
+    description: "Client ID",
+  })
+  @IsString()
+  @IsOptional()
+  clientId?: string;
 }

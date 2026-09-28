@@ -8,10 +8,13 @@ import { CreateStatisticianDto } from "./dto/create-statistician.dto";
 import { UpdateStatisticianDto } from "./dto/update-statistician.dto";
 import * as bcrypt from "bcrypt";
 import { Role, UserStatus } from "@prisma/client";
+import { StatisticianFilterDto } from "./dto/statistician-filter.dto";
+import { buildPrismaPagination } from "../common/utils/pagination.util";
+import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
 
 @Injectable()
 export class StatisticianService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createStatisticianDto: CreateStatisticianDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -87,12 +90,35 @@ export class StatisticianService {
     });
   }
 
-  findAll() {
-    return this.prisma.user.findMany({
-      where: { role: Role.STATISTICIAN, status: UserStatus.ACTIVE },
-      omit: { password: true },
-      include: { profile: true },
+  async findAll(filterDto: StatisticianFilterDto) {
+    const { status, page = 1, limit = 10, sortBy, sortOrder, search } = filterDto || {};
+
+    const where: any = { role: Role.STATISTICIAN };
+
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = UserStatus.ACTIVE;
+    }
+
+    const { skip, take, orderBy } = buildPrismaPagination(filterDto, {
+      defaultOrderBy: { createdAt: "desc" },
+      searchFields: ["name", "email"],
     });
+
+    const [items, itemCount] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take,
+        orderBy,
+        omit: { password: true },
+        include: { profile: true },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return new PaginatedResponseDto(items, new PageMetaDto({ page, limit, itemCount }));
   }
 
   async findOne(id: string) {

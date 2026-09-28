@@ -7,16 +7,21 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateMatchDto } from "./dto/create-match.dto";
 import { UpdateMatchDto } from "./dto/update-match.dto";
 import { MatchResponseDto } from "./dto/match-response.dto";
-import { MatchStatus } from "@prisma/client";
+import { MatchStatus, Prisma } from "@prisma/client";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
+import { getTenantFilter } from "../common/filters/tenant.filter";
+import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import { MatchFilterDto } from "./dto/match-filter.dto";
+import { buildPrismaPagination } from "../common/utils/pagination.util";
 
 @Injectable()
 export class MatchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  async create(createMatchDto: CreateMatchDto): Promise<MatchResponseDto> {
-    // Verify tournament exists
-    const tournament = await this.prisma.tournament.findUnique({
-      where: { id: createMatchDto.tournamentId },
+  async create(createMatchDto: CreateMatchDto, user: AuthenticatedUser): Promise<MatchResponseDto> {
+    // Verify tournament exists and belongs to the user's tenants
+    const tournament = await this.prisma.tournament.findFirst({
+      where: { id: createMatchDto.tournamentId, ...getTenantFilter(user) },
     });
 
     if (!tournament) {
@@ -79,7 +84,12 @@ export class MatchesService {
 
     return this.prisma.match.create({
       data: {
-        ...createMatchDto,
+        tournamentId: createMatchDto.tournamentId,
+        homeTeamId: createMatchDto.homeTeamId,
+        awayTeamId: createMatchDto.awayTeamId,
+        venue: createMatchDto.venue,
+        statisticianId: createMatchDto.statisticianId,
+        clientId: tournament.clientId,
         scheduledDate: new Date(
           createMatchDto.scheduledDate.endsWith("Z") ||
             createMatchDto.scheduledDate.includes("+") ||
@@ -99,11 +109,18 @@ export class MatchesService {
   }
 
   async findAll(
-    tournamentId?: string,
-    status?: MatchStatus,
+    user: AuthenticatedUser,
+    filterDto: MatchFilterDto,
     statisticianId?: string,
-  ): Promise<MatchResponseDto[]> {
-    const where: any = {};
+  ): Promise<PaginatedResponseDto<MatchResponseDto>> {
+
+    const { tournamentId, status, page = 1, limit = 10, sortBy, sortOrder, search, ...otherParams } = filterDto || {};
+    
+    const { skip, take, orderBy } = buildPrismaPagination(filterDto, {
+      defaultOrderBy: { scheduledDate: 'asc' }
+    });
+
+    const where: any = { tournament: getTenantFilter(user) };
     if (tournamentId) {
       where.tournamentId = tournamentId;
     }
@@ -114,34 +131,56 @@ export class MatchesService {
       where.statisticianId = statisticianId;
     }
 
-    return this.prisma.match.findMany({
-      where,
-      include: {
-        tournament: true,
-        homeTeam: true,
-        awayTeam: true,
-        statistician: true,
-        stats: {
-          include: {
-            player: {
-              include: {
-                playerTeams: {
-                  include: {
-                    team: true,
+    const [items, itemCount] = await Promise.all([
+      this.prisma.match.findMany({
+        where: {
+          ...where,
+          ...otherParams
+        },
+        skip,
+        take,
+        include: {
+          tournament: true,
+          homeTeam: true,
+          awayTeam: true,
+          statistician: true,
+          stats: {
+            include: {
+              player: {
+                include: {
+                  playerTeams: {
+                    include: {
+                      team: true,
+                    },
                   },
                 },
               },
             },
           },
+          client: {
+            select: {
+              id: true,
+              name: true,
+              logo: true,
+            }
+          },
         },
-      },
-      orderBy: { scheduledDate: "asc" },
-    });
+        orderBy
+      }),
+      this.prisma.match.count({
+        where: {
+          ...where,
+          ...otherParams
+        },
+      }),
+    ]);
+
+    return new PaginatedResponseDto(items, new PageMetaDto({ page, limit, itemCount }));
   }
 
-  async findOne(id: string): Promise<MatchResponseDto> {
-    const match = await this.prisma.match.findUnique({
-      where: { id },
+  async findOne(id: string, user: AuthenticatedUser): Promise<MatchResponseDto> {
+    const match = await this.prisma.match.findFirst({
+      where: { id, tournament: getTenantFilter(user) },
       include: {
         tournament: true,
         statistician: true,
@@ -197,11 +236,12 @@ export class MatchesService {
   async update(
     id: string,
     updateMatchDto: UpdateMatchDto,
+    user: AuthenticatedUser,
   ): Promise<MatchResponseDto> {
-    const match = await this.findOne(id);
+    const match = await this.findOne(id, user);
 
     const updateData: any = { ...updateMatchDto };
-    
+
     // Handle unassigning statistician if frontend passes an empty string
     if (updateData.statisticianId === "") {
       updateData.statisticianId = null;
@@ -267,8 +307,8 @@ export class MatchesService {
     });
   }
 
-  async remove(id: string): Promise<void> {
-    const match = await this.findOne(id);
+  async remove(id: string, user: AuthenticatedUser): Promise<void> {
+    const match = await this.findOne(id, user);
     await this.prisma.match.delete({
       where: { id },
     });

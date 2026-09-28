@@ -11,6 +11,7 @@ describe("TeamsService", () => {
     team: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -67,7 +68,7 @@ describe("TeamsService", () => {
     it("should return all teams", async () => {
       mockPrismaService.team.findMany.mockResolvedValue([{ id: "t1" }]);
       const result = await service.findAll();
-      expect(result).toEqual([{ id: "t1" }]);
+      expect(result.items).toEqual([{ id: "t1" }]);
     });
   });
 

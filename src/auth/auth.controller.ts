@@ -16,6 +16,8 @@ import { RolesGuard } from "./guards/roles.guard";
 import { Roles } from "./decorators/roles.decorator";
 import { AuthResponseDto } from "./dto/auth-response.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { BypassPasswordChange } from "./decorators/bypass-password-change.decorator";
 import {
   ApiBearerAuth,
   ApiBody,
@@ -221,5 +223,32 @@ export class AuthController {
   })
   getProfile(@Request() req) {
     return req.user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @BypassPasswordChange()
+  @ApiBearerAuth()
+  @Post("change-password")
+  @ApiOperation({ summary: "Change user password" })
+  @AppErrorResponse(
+    400,
+    "Bad Request",
+    "POST",
+    "/api/auth/change-password",
+    "Validation failed",
+  )
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "POST",
+    "/api/auth/change-password",
+    "Invalid or missing access token / Invalid old password",
+  )
+  @ApiResponse({
+    status: 200,
+    description: "Password changed successfully",
+  })
+  async changePassword(@Request() req, @Body() body: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, body);
   }
 }

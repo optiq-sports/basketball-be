@@ -19,6 +19,9 @@ import { TransformInterceptor } from "./common/interceptors/transform.intercepto
 import { UploadModule } from "./upload/upload.module";
 import { StatdashModule } from "./statdash/statdash.module";
 import { HealthModule } from "./health/health.module";
+import { ClientApiModule } from "./client-api/client-api.module";
+import { ClientsModule } from "./clients/clients.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   imports: [
@@ -56,6 +59,9 @@ import { HealthModule } from "./health/health.module";
     UploadModule,
     StatdashModule,
     HealthModule,
+    ClientsModule,
+    ClientApiModule,
+    NotificationsModule
   ],
   providers: [
     {

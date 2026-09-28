@@ -93,6 +93,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
     };
 
+    if (exception instanceof HttpException) {
+      const responseObj = exception.getResponse();
+      if (typeof responseObj === "object" && responseObj !== null) {
+        for (const [key, value] of Object.entries(responseObj)) {
+          if (!["message", "statusCode", "error"].includes(key)) {
+            errorResponse[key] = value;
+          }
+        }
+      }
+    }
+
     if (prismaInfo?.code) {
       errorResponse.code = prismaInfo.code;
     }

@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Basketball Management Backend - Agent Guidelines
 
 ## 🏀 Project Overview
@@ -84,3 +88,11 @@ This is a high-performance backend for a basketball management platform.
 - Ensure all endpoints are documented and the documentation is up to date
 - All response and request should pass through DTOs, and the DTOs should have examples
 
+### 11. Type Safety
+- Never use the `any` type in TypeScript.
+- All data structures, function parameters, and return types must be explicitly typed.
+- Use `unknown` if the type truly cannot be determined at compile time.
+
+### 12. Code Quality 
+- **Mandatory Unit Tests:** Every single new feature, function modification, or bug fix must include an accompanying unit test file.
+- Before considering a task complete, write and provide the code for the tests using the project's existing testing stack.

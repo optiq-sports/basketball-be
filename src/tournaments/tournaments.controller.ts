@@ -21,12 +21,18 @@ import {
   ApiConsumes,
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { TournamentsService } from "./tournaments.service";
 import { CreateTournamentDto } from "./dto/create-tournament.dto";
 import { UpdateTournamentDto } from "./dto/update-tournament.dto";
 import { AddTeamToTournamentDto } from "./dto/add-team-to-tournament.dto";
 import { TournamentResponseDto } from "./dto/tournament-response.dto";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
+import { PaginationQueryDto } from "../common/dto/pagination-query.dto";
+import { Query } from "@nestjs/common";
+import { PaginatedResponseDto } from "../common/dto/paginated-response.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -42,7 +48,7 @@ export class TournamentsController {
   constructor(
     private readonly tournamentsService: TournamentsService,
     @Inject(UPLOAD_PROVIDER) private readonly uploadProvider: IUploadProvider,
-  ) {}
+  ) { }
 
   @Post()
   @UseGuards(RolesGuard)
@@ -75,17 +81,13 @@ export class TournamentsController {
     "/api/tournaments",
     "Requires ADMIN or STATISTICIAN role",
   )
-  create(@Body() createTournamentDto: CreateTournamentDto) {
-    return this.tournamentsService.create(createTournamentDto);
+  create(@Body() createTournamentDto: CreateTournamentDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.tournamentsService.create(createTournamentDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: "Get all tournaments" })
-  @ApiResponse({
-    status: 200,
-    description: "Tournaments fetched successfully",
-    type: [TournamentResponseDto],
-  })
+  @ApiPaginatedResponse(TournamentResponseDto)
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -93,8 +95,8 @@ export class TournamentsController {
     "/api/tournaments",
     "Invalid or missing access token",
   )
-  findAll() {
-    return this.tournamentsService.findAll();
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query() paginationDto?: PaginationQueryDto) {
+    return this.tournamentsService.findAll(user, paginationDto);
   }
 
   @Get("code/:code")
@@ -143,8 +145,8 @@ export class TournamentsController {
     "/api/tournaments/:id",
     "Tournament not found",
   )
-  findOne(@Param("id") id: string) {
-    return this.tournamentsService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.tournamentsService.findOne(id, user);
   }
 
   @Patch(":id")
@@ -188,8 +190,9 @@ export class TournamentsController {
   update(
     @Param("id") id: string,
     @Body() updateTournamentDto: UpdateTournamentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.tournamentsService.update(id, updateTournamentDto);
+    return this.tournamentsService.update(id, updateTournamentDto, user);
   }
 
   @Patch(":id/flyer")
@@ -252,6 +255,7 @@ export class TournamentsController {
   async uploadFlyer(
     @Param("id") id: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!file) {
       throw new BadRequestException(
@@ -259,7 +263,7 @@ export class TournamentsController {
       );
     }
     const { url } = await this.uploadProvider.uploadFile(file);
-    return this.tournamentsService.updateFlyer(id, url);
+    return this.tournamentsService.updateFlyer(id, url, user);
   }
 
   @Post(":id/teams")
@@ -303,8 +307,9 @@ export class TournamentsController {
   addTeams(
     @Param("id") id: string,
     @Body() addTeamDto: AddTeamToTournamentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.tournamentsService.addTeams(id, addTeamDto);
+    return this.tournamentsService.addTeams(id, addTeamDto, user);
   }
 
   @Delete(":id/teams/:teamId")
@@ -333,8 +338,8 @@ export class TournamentsController {
     "/api/tournaments/:id/teams/:teamId",
     "Tournament or Team not found",
   )
-  removeTeam(@Param("id") id: string, @Param("teamId") teamId: string) {
-    return this.tournamentsService.removeTeam(id, teamId);
+  removeTeam(@Param("id") id: string, @Param("teamId") teamId: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.tournamentsService.removeTeam(id, teamId, user);
   }
 
   @Delete(":id")
@@ -363,7 +368,7 @@ export class TournamentsController {
     "/api/tournaments/:id",
     "Tournament not found",
   )
-  remove(@Param("id") id: string) {
-    return this.tournamentsService.remove(id);
+  remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.tournamentsService.remove(id, user);
   }
 }

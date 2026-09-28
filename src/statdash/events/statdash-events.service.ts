@@ -528,6 +528,17 @@ export class StatdashEventsService {
           },
         });
 
+        if (targetEvent.eventType === "substitution" && (replay.homeLineup.length > 0 || replay.awayLineup.length > 0)) {
+          await tx.lineupState.create({
+            data: {
+              sessionId: targetEvent.sessionId,
+              quarter: replay.quarter,
+              homeLineup: replay.homeLineup,
+              awayLineup: replay.awayLineup,
+            },
+          });
+        }
+
         const response: CorrectionOrReversalResult = {
           sessionId: updatedSession.id,
           version: updatedSession.version,
@@ -705,6 +716,17 @@ export class StatdashEventsService {
             version: replay.version,
           },
         });
+
+        if (targetEvent.eventType === "substitution" && (replay.homeLineup.length > 0 || replay.awayLineup.length > 0)) {
+          await tx.lineupState.create({
+            data: {
+              sessionId: targetEvent.sessionId,
+              quarter: replay.quarter,
+              homeLineup: replay.homeLineup,
+              awayLineup: replay.awayLineup,
+            },
+          });
+        }
 
         const response: CorrectionOrReversalResult = {
           sessionId: updatedSession.id,
