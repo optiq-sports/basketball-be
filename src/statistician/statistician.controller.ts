@@ -31,6 +31,9 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
+import { StatisticianFilterDto } from "./dto/statistician-filter.dto";
+import { Query } from "@nestjs/common";
 import { StatisticianResponseDto } from "./dto/statistician-response.dto";
 
 @ApiTags("Statisticians")
@@ -89,11 +92,7 @@ export class StatisticianController {
   @UseGuards(RolesGuard)
   @Roles(Role.SUPER_ADMIN, Role.ADMIN)
   @ApiOperation({ summary: "Get all statisticians" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns a list of statisticians",
-    type: [StatisticianResponseDto],
-  })
+  @ApiPaginatedResponse(StatisticianResponseDto)
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -108,8 +107,8 @@ export class StatisticianController {
     "/api/statistician",
     "Requires SUPER_ADMIN or ADMIN role",
   )
-  findAll() {
-    return this.statisticianService.findAll();
+  findAll(@Query() filterDto: StatisticianFilterDto) {
+    return this.statisticianService.findAll(filterDto);
   }
 
   @Get(":id")

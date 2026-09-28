@@ -11,11 +11,14 @@ import { CreatePlayerDto } from "./dto/create-player.dto";
 import { CreatePlayerForTeamDto } from "./dto/create-player-for-team.dto";
 import { BulkCreatePlayersForTeamDto } from "./dto/bulk-create-players-for-team.dto";
 import { UpdatePlayerDto } from "./dto/update-player.dto";
-import { Player, PlayerTeam, PlayerPosition } from "@prisma/client";
+import { Prisma, Player, PlayerTeam, PlayerPosition } from "@prisma/client";
 import {
   BulkCreatePlayersResponseDto,
   PlayerResponseDto,
 } from "./dto/player-response.dto";
+import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import { PlayerFilterDto } from "./dto/player-filter.dto";
+import { buildPrismaPagination } from "../common/utils/pagination.util";
 import * as xlsx from "xlsx";
 
 @Injectable()
@@ -25,7 +28,7 @@ export class PlayersService {
   constructor(
     private prisma: PrismaService,
     private deduplicationService: PlayerDeduplicationService,
-  ) {}
+  ) { }
 
   /**
    * Create a standalone player (not assigned to any team)
@@ -466,9 +469,15 @@ export class PlayersService {
    * Get all players (optionally filtered by team or unassigned)
    */
   async findAll(
-    teamId?: string,
-    unassigned?: boolean,
-  ): Promise<PlayerResponseDto[]> {
+    filterDto?: PlayerFilterDto,
+  ): Promise<PaginatedResponseDto<PlayerResponseDto>> {
+    const { teamId, unassigned, page, limit, sortBy, sortOrder, search, ...otherParams } = filterDto || {};
+    
+    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(filterDto, {
+      defaultOrderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      searchFields: ['firstName', 'lastName']
+    });
+
     let where: any = {};
 
     if (teamId) {
@@ -486,26 +495,42 @@ export class PlayersService {
       };
     }
 
-    const players = await this.prisma.player.findMany({
-      where,
-      include: {
-        playerTeams: {
-          where: teamId ? { teamId, isActive: true } : { isActive: true },
-          include: {
-            team: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
+    const [items, itemCount] = await Promise.all([
+      this.prisma.player.findMany({
+        where: {
+          ...where,
+          ...searchWhere,
+          ...otherParams
+        },
+        skip,
+        take,
+        include: {
+          playerTeams: {
+            where: teamId ? { teamId, isActive: true } : { isActive: true },
+            include: {
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    });
+        orderBy,
+      }),
+      this.prisma.player.count({
+        where: {
+          ...where,
+          ...searchWhere,
+          ...otherParams
+        }
+      })
+    ]);
 
-    return Promise.all(players.map((p) => this.formatPlayerResponse(p)));
+    const formattedPlayers = await Promise.all(items.map((p) => this.formatPlayerResponse(p)));
+    return new PaginatedResponseDto(formattedPlayers, new PageMetaDto({ page, limit, itemCount }));
   }
 
   /**
@@ -875,9 +900,9 @@ export class PlayersService {
         // Basic Mapping & Validation
         const firstName =
           normalizedRow["first name"] || normalizedRow["firstname"];
-        const lastName = 
+        const lastName =
           normalizedRow["last name"] || normalizedRow["lastname"];
-          
+
         if (!firstName || !lastName) {
           result.errors.push({
             row: rowNumber,
@@ -901,8 +926,8 @@ export class PlayersService {
               : undefined,
           nationality: nationalityVal ? String(nationalityVal).trim() : undefined,
           jerseyNumber: jerseyVal !== undefined && jerseyVal !== null && jerseyVal !== ""
-              ? parseInt(String(jerseyVal))
-              : undefined,
+            ? parseInt(String(jerseyVal))
+            : undefined,
           position: normalizedRow["position"]
             ? (normalizedRow["position"] as PlayerPosition)
             : undefined,
@@ -960,21 +985,21 @@ export class PlayersService {
               });
 
               if (!alreadyInTeam) {
-              try {
-                await this.prisma.playerTeam.create({
-                  data: {
-                    playerId: duplicateCheck.existingPlayer.id,
-                    teamId,
-                    jerseyNumber: candidate.jerseyNumber || 0, // Fallback to 0 or null if optional
-                    isActive: true,
-                  },
-                });
-              } catch (error: any) {
-                if (error.code === 'P2002') {
-                  throw new ConflictException(`Jersey number ${candidate.jerseyNumber} is already taken in this team`);
+                try {
+                  await this.prisma.playerTeam.create({
+                    data: {
+                      playerId: duplicateCheck.existingPlayer.id,
+                      teamId,
+                      jerseyNumber: candidate.jerseyNumber || 0, // Fallback to 0 or null if optional
+                      isActive: true,
+                    },
+                  });
+                } catch (error: any) {
+                  if (error.code === 'P2002') {
+                    throw new ConflictException(`Jersey number ${candidate.jerseyNumber} is already taken in this team`);
+                  }
+                  throw error;
                 }
-                throw error;
-              }
                 result.details[result.details.length - 1].action = "LINKED";
               } else {
                 result.details[result.details.length - 1].action =

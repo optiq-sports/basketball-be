@@ -7,13 +7,16 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateTeamDto } from "./dto/create-team.dto";
 import { UpdateTeamDto } from "./dto/update-team.dto";
-import { Team } from "@prisma/client";
+import { Prisma, Team } from "@prisma/client";
+import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import { TeamFilterDto } from "./dto/team-filter.dto";
+import { buildPrismaPagination } from "../common/utils/pagination.util";
 
 @Injectable()
 export class TeamsService {
   private readonly logger = new Logger(TeamsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createTeamDto: CreateTeamDto): Promise<Team> {
     this.logger.log(
@@ -36,29 +39,51 @@ export class TeamsService {
     });
   }
 
-  async findAll(tournamentId?: string): Promise<Team[]> {
-    return this.prisma.team.findMany({
-      where: tournamentId
-        ? { tournamentTeams: { some: { tournamentId } } }
-        : undefined,
-      include: {
-        playerTeams: {
-          where: { isActive: true },
-          include: {
-            player: true,
-          },
-          orderBy: { jerseyNumber: "asc" },
+  async findAll(filterDto?: TeamFilterDto): Promise<PaginatedResponseDto<Team>> {
+    const { tournamentId, page, limit, sortBy, sortOrder, search, ...otherParams } = filterDto || {};
+    
+    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(filterDto, {
+      defaultOrderBy: [{ name: 'asc' }],
+      searchFields: ['name']
+    });
+
+    const [items, itemCount] = await Promise.all([
+      this.prisma.team.findMany({
+        where: {
+          ...(tournamentId && { tournamentTeams: { some: { tournamentId } } }),
+          ...searchWhere,
+          ...otherParams
         },
-        _count: {
-          select: {
-            playerTeams: {
-              where: { isActive: true },
+        include: {
+          playerTeams: {
+            where: { isActive: true },
+            include: {
+              player: true,
+            },
+            orderBy: { jerseyNumber: "asc" },
+          },
+          _count: {
+            select: {
+              playerTeams: {
+                where: { isActive: true },
+              },
             },
           },
         },
-      },
-      orderBy: { name: "asc" },
-    });
+        orderBy,
+        skip,
+        take,
+      }),
+      this.prisma.team.count({
+        where: {
+          ...(tournamentId && { tournamentTeams: { some: { tournamentId } } }),
+          ...searchWhere,
+          ...otherParams
+        }
+      }),
+    ]);
+
+    return new PaginatedResponseDto(items, new PageMetaDto({ page, limit, itemCount }));
   }
 
   async findOne(id: string): Promise<Team> {

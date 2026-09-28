@@ -110,6 +110,8 @@ describe("StatdashProjectionsService", () => {
       possessionTeamId: null,
       jumpBallWinnerTeamId: null,
       version: 4,
+      homeLineup: [],
+      awayLineup: [],
     });
   });
 

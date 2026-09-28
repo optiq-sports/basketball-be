@@ -39,6 +39,7 @@ describe("StatdashSessionsService", () => {
   const redisService = {
     getSessionSnapshotCached: jest.fn(),
     setSessionSnapshotCached: jest.fn(),
+    invalidateSessionSnapshotCache: jest.fn(),
     getRecentEventsCached: jest.fn(),
     setRecentEventsCached: jest.fn(),
   };

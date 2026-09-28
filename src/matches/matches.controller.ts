@@ -27,13 +27,15 @@ import {
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
+import { MatchFilterDto } from "./dto/match-filter.dto";
 
 @ApiTags("Matches")
 @ApiBearerAuth()
 @Controller("matches")
 @UseGuards(JwtAuthGuard)
 export class MatchesController {
-  constructor(private readonly matchesService: MatchesService) {}
+  constructor(private readonly matchesService: MatchesService) { }
 
   @Post()
   @UseGuards(RolesGuard)
@@ -73,29 +75,13 @@ export class MatchesController {
     "/api/matches",
     "Tournament or Teams not found",
   )
-  create(@Body() createMatchDto: CreateMatchDto) {
-    return this.matchesService.create(createMatchDto);
+  create(@Body() createMatchDto: CreateMatchDto, @CurrentUser() user: any) {
+    return this.matchesService.create(createMatchDto, user);
   }
 
   @Get()
   @ApiOperation({ summary: "Get all matches" })
-  @ApiQuery({
-    name: "tournamentId",
-    required: false,
-    type: String,
-    description: "Filter by tournament ID",
-  })
-  @ApiQuery({
-    name: "status",
-    required: false,
-    enum: MatchStatus,
-    description: "Filter by match status",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Returns a list of matches",
-    type: [MatchResponseDto],
-  })
+  @ApiPaginatedResponse(MatchResponseDto)
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -105,11 +91,10 @@ export class MatchesController {
   )
   findAll(
     @CurrentUser() user: any,
-    @Query("tournamentId") tournamentId?: string,
-    @Query("status") status?: MatchStatus,
+    @Query() filterDto: MatchFilterDto,
   ) {
     const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
-    return this.matchesService.findAll(tournamentId, status, statisticianId);
+    return this.matchesService.findAll(user, filterDto, statisticianId);
   }
 
   @Get(":id")
@@ -133,8 +118,8 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  findOne(@Param("id") id: string) {
-    return this.matchesService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.matchesService.findOne(id, user);
   }
 
   @Patch(":id")
@@ -175,8 +160,8 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  update(@Param("id") id: string, @Body() updateMatchDto: UpdateMatchDto) {
-    return this.matchesService.update(id, updateMatchDto);
+  update(@Param("id") id: string, @Body() updateMatchDto: UpdateMatchDto, @CurrentUser() user: any) {
+    return this.matchesService.update(id, updateMatchDto, user);
   }
 
   @Delete(":id")
@@ -205,7 +190,7 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  remove(@Param("id") id: string) {
-    return this.matchesService.remove(id);
+  remove(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.matchesService.remove(id, user);
   }
 }

@@ -25,6 +25,11 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
+import { AdminFilterDto } from "./dto/admin-filter.dto";
+import { Query } from "@nestjs/common";
+import { CurrentUser } from "src/auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "src/common/interfaces/user.interface";
 
 @ApiTags("Admins")
 @ApiBearerAuth()
@@ -32,7 +37,7 @@ import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Post()
   @ApiOperation({ summary: "Create a new admin" })
@@ -76,11 +81,7 @@ export class AdminController {
 
   @Get()
   @ApiOperation({ summary: "Get all admins" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns a list of admins",
-    type: [AdminResponseDto],
-  })
+  @ApiPaginatedResponse(AdminResponseDto)
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -95,8 +96,8 @@ export class AdminController {
     "/api/admin",
     "Requires SUPER_ADMIN role",
   )
-  findAll() {
-    return this.adminService.findAll();
+  findAll(@Query() filterDto: AdminFilterDto) {
+    return this.adminService.findAll(filterDto);
   }
 
   @Get(":id")
@@ -168,11 +169,11 @@ export class AdminController {
     "Admin not found",
   )
   update(
-    @Request() req,
+    @CurrentUser() user: AuthenticatedUser,
     @Param("id") id: string,
     @Body() updateAdminDto: UpdateAdminDto,
   ) {
-    return this.adminService.update(req.user, id, updateAdminDto);
+    return this.adminService.update(user, id, updateAdminDto);
   }
 
   @Delete(":id")

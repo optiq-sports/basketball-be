@@ -14,6 +14,7 @@ export function applyTurnoverRules(payload: TurnoverPayload): RuleResult {
     {
       eventType: "turnover",
       payload: {
+        ...payload,
         teamId: payload.teamId,
         playerId: payload.turnoverPlayerId,
         turnoverType: payload.turnover.type,

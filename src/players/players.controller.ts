@@ -22,6 +22,8 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
+import { PlayerFilterDto } from "./dto/player-filter.dto";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { PlayersService } from "./players.service";
 import { CreatePlayerDto } from "./dto/create-player.dto";
@@ -221,18 +223,7 @@ export class PlayersController {
    */
   @Get()
   @ApiOperation({ summary: "Get all players" })
-  @ApiQuery({ name: "teamId", required: false, type: String })
-  @ApiQuery({
-    name: "unassigned",
-    required: false,
-    type: String,
-    description: "Set to 'true' to get unassigned players",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Players fetched successfully",
-    type: [PlayerResponseDto],
-  })
+  @ApiPaginatedResponse(PlayerResponseDto)
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -240,11 +231,8 @@ export class PlayersController {
     "/api/players",
     "Invalid or missing access token",
   )
-  findAll(
-    @Query("teamId") teamId?: string,
-    @Query("unassigned") unassigned?: string,
-  ) {
-    return this.playersService.findAll(teamId, unassigned === "true");
+  findAll(@Query() filterDto: PlayerFilterDto) {
+    return this.playersService.findAll(filterDto);
   }
 
   /**

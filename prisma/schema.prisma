@@ -13,6 +13,7 @@ model User {
   password      String?      @map("password")
   role          Role         @default(STATISTICIAN) @map("role")
   emailVerified Boolean      @default(false) @map("email_verified")
+  forcePasswordChange Boolean @default(false) @map("force_password_change")
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   name          String?      @map("name")
@@ -21,6 +22,7 @@ model User {
   sessions      Session[]
   profile       UserProfile?
   matches       Match[]
+  clientUsers   ClientUser[]
 
   @@map("user")
 }
@@ -142,10 +144,12 @@ model Tournament {
   umpire2          String?            @map("umpire_2")
   commissioner     String?            @map("commissioner")
   code             String             @unique @map("code")
+  clientId         String             @map("client_id")
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
   matches          Match[]
   teams            TournamentTeam[]
+  client           Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("tournament")
 }
@@ -185,6 +189,8 @@ model Match {
   overtimeAway   Int?          @map("overtime_away")
   venue          String?       @map("venue")
   statisticianId String?       @map("statistician_id")
+  clientId       String        @map("client_id")
+  matchKey       String?       @unique @map("match_key")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   gameSessions   GameSession?
@@ -192,6 +198,7 @@ model Match {
   awayTeam       Team          @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Cascade)
   homeTeam       Team          @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Cascade)
   tournament     Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   matchPlayers   MatchPlayer[]
   stats          MatchStat[]
 
@@ -341,6 +348,7 @@ enum Role {
   ADMIN
   STATISTICIAN
   SUPER_ADMIN
+  CLIENT
 }
 
 enum UserStatus {
@@ -378,4 +386,49 @@ enum GameSessionStatus {
   PAUSED
   COMPLETED
   CANCELLED
+}
+
+model Client {
+  id          String   @id @default(cuid()) @map("id")
+  name        String   @map("name")
+  websiteUrl  String?  @map("website_url")
+  logo        String?  @map("logo")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  clientUsers   ClientUser[]
+  apiKeys     ClientApiKey[]
+  tournaments Tournament[]
+  matches     Match[]
+
+  @@map("client")
+}
+
+model ClientUser {
+  id        String   @id @default(cuid()) @map("id")
+  clientId  String   @map("client_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+  @@index([userId])
+  @@map("client_user")
+}
+
+model ClientApiKey {
+  id        String   @id @default(cuid()) @map("id")
+  clientId  String   @map("client_id")
+  keyHash   String   @unique @map("key_hash") // Hashed API key
+  name      String   @map("name")             // e.g., "Production Website"
+  createdAt DateTime @default(now()) @map("created_at")
+  lastUsed  DateTime? @map("last_used")
+
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_api_key")
 }

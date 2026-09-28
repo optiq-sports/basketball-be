@@ -18,6 +18,8 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
+import { TeamFilterDto } from "./dto/team-filter.dto";
 import { TeamsService } from "./teams.service";
 import { CreateTeamDto } from "./dto/create-team.dto";
 import { UpdateTeamDto } from "./dto/update-team.dto";
@@ -82,17 +84,7 @@ export class TeamsController {
 
   @Get()
   @ApiOperation({ summary: "Get all teams" })
-  @ApiQuery({
-    name: "tournamentId",
-    required: false,
-    type: String,
-    description: "Filter teams by tournament",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Teams fetched successfully",
-    type: [TeamWithPlayersResponseDto],
-  })
+  @ApiPaginatedResponse(TeamWithPlayersResponseDto)
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -100,8 +92,8 @@ export class TeamsController {
     "/api/teams",
     "Invalid or missing access token",
   )
-  findAll(@Query("tournamentId") tournamentId?: string) {
-    return this.teamsService.findAll(tournamentId);
+  findAll(@Query() filterDto: TeamFilterDto) {
+    return this.teamsService.findAll(filterDto);
   }
 
   @Get(":id")

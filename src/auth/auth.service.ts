@@ -19,12 +19,12 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { profile: true },
+      include: { profile: true, clientUsers: true },
     });
 
     if (!user || !user.password || user.status !== "ACTIVE") {
@@ -172,6 +172,28 @@ export class AuthService {
     if (session) {
       await this.prisma.session.delete({ where: { id: session.id } });
     }
+
+    return { success: true };
+  }
+
+  async changePassword(userId: string, changePasswordDto: any): Promise<{ success: boolean }> {
+    const { oldPassword, newPassword } = changePasswordDto;
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isPasswordValid) throw new UnauthorizedException('Invalid old password');
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedNewPassword,
+        forcePasswordChange: false
+      },
+    });
 
     return { success: true };
   }
