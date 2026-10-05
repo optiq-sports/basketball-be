@@ -206,6 +206,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @BypassPasswordChange()
   @ApiBearerAuth()
   @Get("profile")
   @ApiOperation({ summary: "Get user profile" })
