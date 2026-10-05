@@ -79,9 +79,14 @@ export async function seedUsers(prisma: PrismaClient) {
         name: `Organization ${i}`,
         websiteUrl: `https://org${i}.com`,
         clientUsers: {
-          create: [
+          create: i === 1 ? [
             { userId: clientUser.id }, // The client user role
-            { userId: admin.id } // Assigned to the admin
+            { userId: admin.id }, // Assigned to the admin
+            { userId: superAdmin.id },
+            ...statisticians.map(s => ({ userId: s.id }))
+          ] : [
+            { userId: clientUser.id },
+            { userId: admin.id }
           ]
         }
       }
