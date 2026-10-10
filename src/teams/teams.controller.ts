@@ -83,6 +83,8 @@ export class TeamsController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN)
   @ApiOperation({ summary: "Get all teams" })
   @ApiPaginatedResponse(TeamWithPlayersResponseDto)
   @AppErrorResponse(
@@ -97,6 +99,8 @@ export class TeamsController {
   }
 
   @Get(":id")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN)
   @ApiOperation({ summary: "Get a specific team by ID" })
   @ApiResponse({
     status: 200,

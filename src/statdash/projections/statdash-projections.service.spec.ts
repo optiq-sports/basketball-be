@@ -25,6 +25,9 @@ describe("StatdashProjectionsService", () => {
     matchStat: {
       upsert: jest.fn(),
     },
+    match: {
+      update: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
   const redisService = {

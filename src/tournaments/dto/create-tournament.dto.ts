@@ -8,7 +8,7 @@ import {
   Min,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
-import { TournamentDivision } from "@prisma/client";
+import { TournamentDivision, TournamentFormat } from "@prisma/client";
 
 export class CreateTournamentDto {
   @ApiProperty({
@@ -136,4 +136,14 @@ export class CreateTournamentDto {
   @IsString()
   @IsOptional()
   clientId?: string;
+
+  @ApiProperty({
+    enum: TournamentFormat,
+    example: TournamentFormat.ROUND_ROBIN,
+    description: "Format of the tournament",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(TournamentFormat)
+  format?: TournamentFormat;
 }

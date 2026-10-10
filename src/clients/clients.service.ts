@@ -1,31 +1,40 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateApiKeyDto } from './dto/create-api-key.dto';
-import { CreateClientDto } from './dto/create-client.dto';
-import { AssignUserDto } from './dto/assign-user.dto';
-import * as crypto from 'crypto';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
-import { AuthenticatedUser } from 'src/common/interfaces/user.interface';
-import { EmailService } from '../notifications/email.service';
-import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+  InternalServerErrorException,
+} from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateApiKeyDto } from "./dto/create-api-key.dto";
+import { CreateClientDto } from "./dto/create-client.dto";
+import { AssignUserDto } from "./dto/assign-user.dto";
+import * as crypto from "crypto";
+import { PaginationQueryDto } from "src/common/dto/pagination-query.dto";
+import { AuthenticatedUser } from "src/common/interfaces/user.interface";
+import { EmailService } from "../notifications/email.service";
+import * as bcrypt from "bcrypt";
+import { Role } from "@prisma/client";
 
 @Injectable()
 export class ClientsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly emailService: EmailService
-  ) { }
+    private readonly emailService: EmailService,
+  ) {}
 
   private checkClientAccess(user: AuthenticatedUser, clientId: string) {
-    if (user.role !== 'SUPER_ADMIN') {
+    if (user.role !== "SUPER_ADMIN") {
       if (!user.clientIds?.includes(clientId)) {
-        throw new ForbiddenException('Not authorized for this client');
+        throw new ForbiddenException("Not authorized for this client");
       }
     }
   }
 
-  async createApiKey(user: AuthenticatedUser, createApiKeyDto: CreateApiKeyDto) {
+  async createApiKey(
+    user: AuthenticatedUser,
+    createApiKeyDto: CreateApiKeyDto,
+  ) {
     const { clientId, name } = createApiKeyDto;
 
     this.checkClientAccess(user, clientId);
@@ -35,15 +44,15 @@ export class ClientsService {
     });
 
     if (!client) {
-      throw new NotFoundException('Client not found');
+      throw new NotFoundException("Client not found");
     }
 
     // Generate a secure random string for the API key
-    const rawKey = crypto.randomBytes(32).toString('hex');
+    const rawKey = crypto.randomBytes(32).toString("hex");
     const apiKey = `optiq_${rawKey}`;
 
     // Hash the key for storage
-    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+    const keyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
 
     const createdKey = await this.prisma.clientApiKey.create({
       data: {
@@ -79,7 +88,7 @@ export class ClientsService {
 
   async revokeApiKey(user: AuthenticatedUser, id: string) {
     const apiKey = await this.prisma.clientApiKey.findUnique({ where: { id } });
-    if (!apiKey) throw new NotFoundException('API Key not found');
+    if (!apiKey) throw new NotFoundException("API Key not found");
 
     this.checkClientAccess(user, apiKey.clientId);
 
@@ -89,7 +98,8 @@ export class ClientsService {
   }
 
   async createClient(createClientDto: CreateClientDto) {
-    const { userEmail, userFirstName, userLastName, ...clientData } = createClientDto;
+    const { userEmail, userFirstName, userLastName, ...clientData } =
+      createClientDto;
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -97,16 +107,16 @@ export class ClientsService {
     });
 
     if (existingUser) {
-      throw new ConflictException('A user with this email already exists');
+      throw new ConflictException("A user with this email already exists");
     }
 
     // Auto-generate password
-    const plainTextPassword = Math.random().toString(36).slice(-10) + 'Aa1!';
+    const plainTextPassword = Math.random().toString(36).slice(-10) + "Aa1!";
     const hashedPassword = await bcrypt.hash(plainTextPassword, 10);
 
-    return this.prisma.$transaction(async (prisma) => {
+    const client = await this.prisma.$transaction(async (prisma) => {
       // 1. Create the Client Organization
-      const client = await prisma.client.create({
+      const newClient = await prisma.client.create({
         data: clientData,
       });
 
@@ -123,24 +133,35 @@ export class ClientsService {
             create: {
               fullName,
               email: userEmail,
-            }
-          }
+            },
+          },
         },
       });
 
       // 3. Link them via ClientUser
       await prisma.clientUser.create({
         data: {
-          clientId: client.id,
+          clientId: newClient.id,
           userId: user.id,
         },
       });
 
-      // Fire off welcome email in background
-      this.emailService.sendWelcomeEmail(userEmail, plainTextPassword, Role.CLIENT);
+      const emailSent = await this.emailService.sendWelcomeEmail(
+        userEmail,
+        plainTextPassword,
+        Role.CLIENT,
+      );
 
-      return client;
+      if (!emailSent) {
+        throw new InternalServerErrorException(
+          "Failed to send welcome email. Client creation aborted.",
+        );
+      }
+
+      return newClient;
     });
+
+    return { ...client, emailSent: true };
   }
 
   async listClients(paginationQuery: PaginationQueryDto) {
@@ -149,15 +170,19 @@ export class ClientsService {
 
     const [data, itemCount] = await Promise.all([
       this.prisma.client.findMany({
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
       this.prisma.client.count(),
     ]);
 
-    const { PageMetaDto, PaginatedResponseDto } = await import('../common/dto/paginated-response.dto');
-    return new PaginatedResponseDto(data, new PageMetaDto({ page, limit, itemCount }));
+    const { PageMetaDto, PaginatedResponseDto } =
+      await import("../common/dto/paginated-response.dto");
+    return new PaginatedResponseDto(
+      data,
+      new PageMetaDto({ page, limit, itemCount }),
+    );
   }
 
   async assignUserToClient(clientId: string, dto: AssignUserDto) {
@@ -168,7 +193,7 @@ export class ClientsService {
       where: { id: clientId },
     });
     if (!client) {
-      throw new NotFoundException('Client not found');
+      throw new NotFoundException("Client not found");
     }
 
     // Ensure user exists
@@ -176,7 +201,7 @@ export class ClientsService {
       where: { id: userId },
     });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // Check if already assigned
@@ -198,6 +223,26 @@ export class ClientsService {
         clientId,
         userId,
       },
+    });
+  }
+
+  async updateClient(id: string, data: any) {
+    const client = await this.prisma.client.findUnique({ where: { id } });
+    if (!client) throw new NotFoundException("Client not found");
+
+    return this.prisma.client.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteClient(id: string) {
+    const client = await this.prisma.client.findUnique({ where: { id } });
+    if (!client) throw new NotFoundException("Client not found");
+
+    return this.prisma.client.update({
+      where: { id },
+      data: { isActive: false },
     });
   }
 }

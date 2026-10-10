@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -63,12 +71,13 @@ export class StatdashSessionsController {
     "/api/statdash/sessions/resolve-match-key",
     "No match found for supplied match key",
   )
-  resolveMatchKey(
-    @Body() dto: ResolveMatchKeyDto,
-    @CurrentUser() user: any,
-  ) {
-    const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
-    return this.statdashSessionsService.resolveMatchKey(dto.matchKey, statisticianId);
+  resolveMatchKey(@Body() dto: ResolveMatchKeyDto, @CurrentUser() user: any) {
+    const statisticianId =
+      user.role === Role.STATISTICIAN ? user.id : undefined;
+    return this.statdashSessionsService.resolveMatchKey(
+      dto.matchKey,
+      statisticianId,
+    );
   }
 
   @Post("bootstrap")
@@ -100,11 +109,9 @@ export class StatdashSessionsController {
     "/api/statdash/sessions/bootstrap",
     "Match or Session does not exist",
   )
-  bootstrap(
-    @Body() dto: BootstrapSessionDto,
-    @CurrentUser() user: any,
-  ) {
-    const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
+  bootstrap(@Body() dto: BootstrapSessionDto, @CurrentUser() user: any) {
+    const statisticianId =
+      user.role === Role.STATISTICIAN ? user.id : undefined;
     return this.statdashSessionsService.bootstrap(dto, statisticianId);
   }
 

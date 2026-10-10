@@ -4,7 +4,9 @@ import IORedis from "ioredis";
 
 type QueuePayload = Record<string, unknown>;
 type QueueName =
-  "statdash-projections" | "statdash-recompute" | "statdash-matchstat-sync";
+  | "statdash-projections"
+  | "statdash-recompute"
+  | "statdash-matchstat-sync";
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {
@@ -39,6 +41,15 @@ export class QueueService implements OnModuleDestroy {
       connection: this.connection,
       defaultJobOptions: { removeOnComplete: true },
     });
+  }
+
+  getQueues(): Queue[] {
+    return [
+      this.projectionQueue,
+      this.recomputeQueue,
+      this.matchStatSyncQueue,
+      this.deadLetterQueue,
+    ].filter(Boolean) as Queue[];
   }
 
   async onModuleDestroy() {

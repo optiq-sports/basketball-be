@@ -13,13 +13,16 @@ import * as crypto from "crypto";
 import { TournamentResponseDto } from "./dto/tournament-response.dto";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 import { PaginationQueryDto } from "../common/dto/pagination-query.dto";
-import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import {
+  PageMetaDto,
+  PaginatedResponseDto,
+} from "../common/dto/paginated-response.dto";
 import { getTenantFilter } from "../common/filters/tenant.filter";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
 @Injectable()
 export class TournamentsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   private generateTournamentCode(): string {
     return crypto.randomBytes(6).toString("hex").toUpperCase();
@@ -32,12 +35,16 @@ export class TournamentsService {
     const clientIdToUse = createTournamentDto.clientId || user.clientIds?.[0];
 
     if (!clientIdToUse) {
-      throw new BadRequestException("A valid clientId must be provided to create a tournament");
+      throw new BadRequestException(
+        "A valid clientId must be provided to create a tournament",
+      );
     }
 
     if (user.role !== "SUPER_ADMIN") {
       if (!user.clientIds?.includes(clientIdToUse)) {
-        throw new BadRequestException(`You are not authorized to create a tournament for client ${clientIdToUse}`);
+        throw new BadRequestException(
+          `You are not authorized to create a tournament for client ${clientIdToUse}`,
+        );
       }
     } else {
       // Verify the client exists since Super Admins bypass the token-based clientIds check
@@ -46,7 +53,9 @@ export class TournamentsService {
         select: { id: true },
       });
       if (!clientExists) {
-        throw new BadRequestException(`The provided client ID "${clientIdToUse}" does not exist.`);
+        throw new BadRequestException(
+          `The provided client ID "${clientIdToUse}" does not exist.`,
+        );
       }
     }
     // Check for idempotency: Prevent duplicates with same name and division
@@ -98,12 +107,19 @@ export class TournamentsService {
     });
   }
 
-  async findAll(user: AuthenticatedUser, paginationDto?: PaginationQueryDto): Promise<PaginatedResponseDto<TournamentResponseDto>> {
-    const { page, limit, sortBy, sortOrder, search, ...otherParams } = paginationDto || {};
-    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(paginationDto, {
-      defaultOrderBy: { createdAt: 'desc' },
-      searchFields: ['name']
-    });
+  async findAll(
+    user: AuthenticatedUser,
+    paginationDto?: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<TournamentResponseDto>> {
+    const { page, limit, sortBy, sortOrder, search, ...otherParams } =
+      paginationDto || {};
+    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(
+      paginationDto,
+      {
+        defaultOrderBy: { createdAt: "desc" },
+        searchFields: ["name"],
+      },
+    );
     const [data, itemCount] = await Promise.all([
       this.prisma.tournament.findMany({
         where: {
@@ -128,7 +144,7 @@ export class TournamentsService {
               id: true,
               name: true,
               logo: true,
-            }
+            },
           },
           _count: {
             select: {
@@ -146,14 +162,20 @@ export class TournamentsService {
           ...getTenantFilter(user),
           ...searchWhere,
           ...otherParams,
-        }
-      })
+        },
+      }),
     ]);
 
-    return new PaginatedResponseDto(data, new PageMetaDto({ page, limit, itemCount }));
+    return new PaginatedResponseDto(
+      data,
+      new PageMetaDto({ page, limit, itemCount }),
+    );
   }
 
-  async findOne(id: string, user: AuthenticatedUser): Promise<TournamentResponseDto> {
+  async findOne(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<TournamentResponseDto> {
     const tournament = await this.prisma.tournament.findFirst({
       where: { id, ...getTenantFilter(user) },
       include: {
@@ -303,7 +325,11 @@ export class TournamentsService {
     return this.findOne(id, user);
   }
 
-  async removeTeam(id: string, teamId: string, user: AuthenticatedUser): Promise<void> {
+  async removeTeam(
+    id: string,
+    teamId: string,
+    user: AuthenticatedUser,
+  ): Promise<void> {
     const tournament = await this.findOne(id, user);
 
     await this.prisma.tournamentTeam.delete({

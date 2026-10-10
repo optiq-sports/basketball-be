@@ -10,11 +10,14 @@ import * as bcrypt from "bcrypt";
 import { Role, UserStatus } from "@prisma/client";
 import { StatisticianFilterDto } from "./dto/statistician-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
-import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import {
+  PageMetaDto,
+  PaginatedResponseDto,
+} from "../common/dto/paginated-response.dto";
 
 @Injectable()
 export class StatisticianService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createStatisticianDto: CreateStatisticianDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -60,6 +63,7 @@ export class StatisticianService {
             (firstName && lastName ? `${firstName} ${lastName}` : undefined),
           role: Role.STATISTICIAN,
           status: status || UserStatus.ACTIVE,
+          forcePasswordChange: true,
         },
       });
 
@@ -91,7 +95,14 @@ export class StatisticianService {
   }
 
   async findAll(filterDto: StatisticianFilterDto) {
-    const { status, page = 1, limit = 10, sortBy, sortOrder, search } = filterDto || {};
+    const {
+      status,
+      page = 1,
+      limit = 10,
+      sortBy,
+      sortOrder,
+      search,
+    } = filterDto || {};
 
     const where: any = { role: Role.STATISTICIAN };
 
@@ -101,10 +112,15 @@ export class StatisticianService {
       where.status = UserStatus.ACTIVE;
     }
 
-    const { skip, take, orderBy } = buildPrismaPagination(filterDto, {
-      defaultOrderBy: { createdAt: "desc" },
-      searchFields: ["name", "email"],
-    });
+    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(
+      filterDto,
+      {
+        defaultOrderBy: { createdAt: "desc" },
+        searchFields: ["name", "email"],
+      },
+    );
+
+    Object.assign(where, searchWhere);
 
     const [items, itemCount] = await Promise.all([
       this.prisma.user.findMany({
@@ -118,53 +134,57 @@ export class StatisticianService {
       this.prisma.user.count({ where }),
     ]);
 
-    return new PaginatedResponseDto(items, new PageMetaDto({ page, limit, itemCount }));
+    return new PaginatedResponseDto(
+      items,
+      new PageMetaDto({ page, limit, itemCount }),
+    );
   }
 
-  async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
+  async findOne(id: string, user: any) {
+    const statistician = await this.prisma.user.findUnique({
       where: { id },
       omit: { password: true },
       include: {
         profile: true,
-        gameEvents: {
-          include: {
-            session: {
-              include: {
-                match: {
-                  include: { homeTeam: true, awayTeam: true },
-                },
-              },
-            },
-          },
-        },
       },
     });
-    if (!user) throw new NotFoundException("Statistician not found");
+    if (!statistician) throw new NotFoundException("Statistician not found");
 
-    const uniqueSessions = new Map();
-    if (user.gameEvents) {
-      for (const event of user.gameEvents) {
-        if (event.session && !uniqueSessions.has(event.sessionId)) {
-          uniqueSessions.set(event.sessionId, event.session);
-        }
-      }
-    }
+    const { getTenantFilter } = await import("../common/filters/tenant.filter");
+    const tenantFilter = getTenantFilter(user);
 
-    const gamesOfficiated = Array.from(uniqueSessions.values()).map(
-      (session: any) => ({
-        matchId: session.match.id,
-        homeTeam: session.match.homeTeam,
-        awayTeam: session.match.awayTeam,
-        scheduledDate: session.match.scheduledDate,
-        venue: session.match.venue,
-      })
-    );
+    const matches = await this.prisma.match.findMany({
+      where: {
+        statisticianId: id,
+        tournament: tenantFilter,
+      },
+      select: {
+        id: true,
+        homeTeam: true,
+        awayTeam: true,
+        scheduledDate: true,
+        venue: true,
+        status: true,
+        tournamentId: true,
+        homeScore: true,
+        awayScore: true,
+      },
+    });
 
-    const { gameEvents, ...userWithoutEvents } = user as any;
+    const gamesOfficiated = matches.map((match) => ({
+      matchId: match.id,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      scheduledDate: match.scheduledDate,
+      venue: match.venue,
+      status: match.status,
+      tournamentId: match.tournamentId,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+    }));
 
     return {
-      ...userWithoutEvents,
+      ...statistician,
       gamesOfficiated,
     };
   }
@@ -190,24 +210,41 @@ export class StatisticianService {
     } = updateStatisticianDto;
 
     const userData: any = {};
-    if (email) userData.email = email;
-    if (name) userData.name = name;
-    if (status) userData.status = status;
+    if (email !== undefined) userData.email = email;
+    if (name !== undefined) userData.name = name;
+    if (status !== undefined) userData.status = status;
     if (password) {
       userData.password = await bcrypt.hash(password, 10);
+      userData.forcePasswordChange = true;
     }
 
     const profileData: any = {};
-    if (firstName || lastName)
-      profileData.fullName = `${firstName || ""} ${lastName || ""}`.trim();
-    if (dobDay) profileData.dobDay = dobDay;
-    if (dobMonth) profileData.dobMonth = dobMonth;
-    if (dobYear) profileData.dobYear = dobYear;
-    if (phone) profileData.phone = phone;
-    if (country) profileData.country = country;
-    if (state) profileData.state = state;
-    if (homeAddress) profileData.homeAddress = homeAddress;
-    if (bio) profileData.bio = bio;
+    if (firstName !== undefined || lastName !== undefined) {
+      const existingProfile = await this.prisma.userProfile.findUnique({
+        where: { userId: id },
+      });
+      const newFirstName =
+        firstName !== undefined
+          ? firstName
+          : existingProfile?.fullName?.split(" ")[0] || "";
+      const newLastName =
+        lastName !== undefined
+          ? lastName
+          : existingProfile?.fullName?.split(" ").slice(1).join(" ") || "";
+      const newFullName = `${newFirstName || ""} ${newLastName || ""}`.trim();
+      profileData.fullName = newFullName;
+      if (name === undefined) {
+        userData.name = newFullName;
+      }
+    }
+    if (dobDay !== undefined) profileData.dobDay = dobDay;
+    if (dobMonth !== undefined) profileData.dobMonth = dobMonth;
+    if (dobYear !== undefined) profileData.dobYear = dobYear;
+    if (phone !== undefined) profileData.phone = phone;
+    if (country !== undefined) profileData.country = country;
+    if (state !== undefined) profileData.state = state;
+    if (homeAddress !== undefined) profileData.homeAddress = homeAddress;
+    if (bio !== undefined) profileData.bio = bio;
 
     // Handle photo updates: single URL prepended to the array
     if (photo || photos) {
@@ -236,7 +273,8 @@ export class StatisticianService {
 
   async updatePhoto(id: string, photoUrl: string) {
     // Ensure user exists
-    await this.findOne(id);
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("Statistician not found");
     // Prepend the new photo URL, replacing any existing first photo if same URL
     const existing = await this.prisma.userProfile.findUnique({
       where: { userId: id },

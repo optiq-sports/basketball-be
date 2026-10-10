@@ -10,7 +10,7 @@ export function buildPrismaPagination(
   options?: PaginationOptions,
 ) {
   const { page = 1, limit = 10, sortBy, sortOrder, search } = dto || {};
-  
+
   const skip = (Number(page) - 1) * Number(limit);
   const take = Number(limit);
 
@@ -18,9 +18,9 @@ export function buildPrismaPagination(
   let orderBy = options?.defaultOrderBy || { createdAt: "desc" };
   if (sortBy) {
     if (Array.isArray(orderBy)) {
-       orderBy = [{ [sortBy]: sortOrder || "asc" }];
+      orderBy = [{ [sortBy]: sortOrder || "asc" }];
     } else {
-       orderBy = { [sortBy]: sortOrder || "asc" };
+      orderBy = { [sortBy]: sortOrder || "asc" };
     }
   }
 
@@ -28,7 +28,10 @@ export function buildPrismaPagination(
   const searchWhere: any = {};
   if (search && options?.searchFields?.length) {
     if (options.searchFields.length === 1) {
-      searchWhere[options.searchFields[0]] = { contains: search, mode: "insensitive" };
+      searchWhere[options.searchFields[0]] = {
+        contains: search,
+        mode: "insensitive",
+      };
     } else {
       searchWhere["OR"] = options.searchFields.map((field) => ({
         [field]: { contains: search, mode: "insensitive" },

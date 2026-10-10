@@ -37,7 +37,7 @@ import { AuthenticatedUser } from "src/common/interfaces/user.interface";
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) { }
+  constructor(private readonly adminService: AdminService) {}
 
   @Post()
   @ApiOperation({ summary: "Create a new admin" })
@@ -200,7 +200,7 @@ export class AdminController {
     "/api/admin/:id",
     "Admin not found",
   )
-  remove(@Param("id") id: string) {
-    return this.adminService.remove(id);
+  remove(@CurrentUser() user: any, @Param("id") id: string) {
+    return this.adminService.remove(user, id);
   }
 }

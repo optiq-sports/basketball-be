@@ -10,8 +10,13 @@ type FoulPayload = {
 };
 
 export function applyFoulRules(payload: FoulPayload): RuleResult {
-  if (!payload.foulerPlayerId && (!payload.foulerRole || payload.foulerRole === "player")) {
-    throw new BadRequestException("foulerPlayerId is required for player fouls");
+  if (
+    !payload.foulerPlayerId &&
+    (!payload.foulerRole || payload.foulerRole === "player")
+  ) {
+    throw new BadRequestException(
+      "foulerPlayerId is required for player fouls",
+    );
   }
 
   if (payload.foulerPlayerId && !payload.foulerRole) {

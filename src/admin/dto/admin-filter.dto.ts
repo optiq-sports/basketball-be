@@ -9,7 +9,10 @@ export class AdminFilterDto extends PaginationQueryDto {
   @IsEnum(Role)
   role?: Role;
 
-  @ApiPropertyOptional({ enum: UserStatus, description: "Filter by user status" })
+  @ApiPropertyOptional({
+    enum: UserStatus,
+    description: "Filter by user status",
+  })
   @IsOptional()
   @IsEnum(UserStatus)
   status?: UserStatus;

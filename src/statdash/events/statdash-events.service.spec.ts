@@ -220,7 +220,7 @@ describe("StatdashEventsService", () => {
         eventType: "shot",
         payload: { shotValue: 2, result: "made" },
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
-      }
+      },
     ]);
     tx.gameSession.update.mockResolvedValue({
       id: "session_1",

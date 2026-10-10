@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from "class-validator";
+import { IsString, IsNotEmpty, IsOptional, IsInt, IsEmail } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateTeamDto {
@@ -68,4 +68,31 @@ export class CreateTeamDto {
   @IsOptional()
   @IsString()
   assistantCoach?: string;
+
+  @ApiProperty({
+    example: "United Center",
+    description: "Home arena of the team",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  arena?: string;
+
+  @ApiProperty({
+    example: 1966,
+    description: "Year the team was founded",
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  foundedYear?: number;
+
+  @ApiProperty({
+    example: "contact@chicagobulls.com",
+    description: "Contact email of the team",
+    required: false,
+  })
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
 }

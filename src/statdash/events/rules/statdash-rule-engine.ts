@@ -80,11 +80,14 @@ export function applyCommandRules(
 
     if (hasFullLineup) {
       result.newLineup = {
-        homeLineup: homeLineup ?? (context.lineupSnapshot?.homeLineup ?? []),
-        awayLineup: awayLineup ?? (context.lineupSnapshot?.awayLineup ?? []),
+        homeLineup: homeLineup ?? context.lineupSnapshot?.homeLineup ?? [],
+        awayLineup: awayLineup ?? context.lineupSnapshot?.awayLineup ?? [],
       };
     } else if (context.lineupSnapshot) {
-      const { playerOutId, playerInId, teamId } = payload as Record<string, string>;
+      const { playerOutId, playerInId, teamId } = payload as Record<
+        string,
+        string
+      >;
       const isHome = teamId === context.session.match.homeTeamId;
       const isAway = teamId === context.session.match.awayTeamId;
 
@@ -94,7 +97,9 @@ export function applyCommandRules(
           awayLineup: [...context.lineupSnapshot.awayLineup],
         };
 
-        const targetLineup = isHome ? newLineup.homeLineup : newLineup.awayLineup;
+        const targetLineup = isHome
+          ? newLineup.homeLineup
+          : newLineup.awayLineup;
         const index = targetLineup.indexOf(playerOutId);
         if (index !== -1) {
           targetLineup[index] = playerInId;

@@ -7,13 +7,18 @@ import { WinstonModule } from "nest-winston";
 import helmet from "helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ClientApiModule } from "./client-api/client-api.module";
+import { QueueService } from "./common/queue/queue.service";
+import { createBullBoard } from "@bull-board/api";
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
+import { ExpressAdapter } from "@bull-board/express";
+import express from "express";
 
 function resolveCorsOrigin():
   | boolean
   | ((
-    origin: string | undefined,
-    callback: (err: Error | null, allow?: boolean) => void,
-  ) => void) {
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => void) {
   const raw = process.env.CORS_ORIGINS?.trim();
   if (!raw) {
     return true;
@@ -135,12 +140,12 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
     )
     .addApiKey(
       {
-        type: 'apiKey',
-        in: 'header',
-        name: 'x-api-key',
-        description: 'Enter your API Key',
+        type: "apiKey",
+        in: "header",
+        name: "x-api-key",
+        description: "Enter your API Key",
       },
-      'x-api-key',
+      "x-api-key",
     )
     .build();
 
@@ -162,34 +167,55 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
 
   // Integration Swagger
   const integrationConfig = new DocumentBuilder()
-    .setTitle('OptiQ Sports Client Integration API')
-    .setDescription('Integration API documentation for OptiQ Sports Client')
-    .setVersion('1.0')
+    .setTitle("OptiQ Sports Client Integration API")
+    .setDescription("Integration API documentation for OptiQ Sports Client")
+    .setVersion("1.0")
     .addApiKey(
       {
-        type: 'apiKey',
-        in: 'header',
-        name: 'x-api-key',
-        description: 'Enter your API Key',
+        type: "apiKey",
+        in: "header",
+        name: "x-api-key",
+        description: "Enter your API Key",
       },
-      'x-api-key',
+      "x-api-key",
     )
     .build();
 
-  const integrationDocument = SwaggerModule.createDocument(app, integrationConfig, {
-    include: [ClientApiModule],
-  });
+  const integrationDocument = SwaggerModule.createDocument(
+    app,
+    integrationConfig,
+    {
+      include: [ClientApiModule],
+    },
+  );
 
-  SwaggerModule.setup('client-docs', app, integrationDocument, {
+  SwaggerModule.setup("client-docs", app, integrationDocument, {
     swaggerOptions: {
       persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
+      tagsSorter: "alpha",
+      operationsSorter: "alpha",
     },
   });
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
+
+  const queueService = app.get(QueueService);
+  const queues = queueService.getQueues();
+  if (queues.length > 0) {
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath("/api/admin/queues");
+    createBullBoard({
+      queues: queues.map((q) => new BullMQAdapter(q)),
+      serverAdapter: serverAdapter,
+    });
+
+    // We need to get the underlying Express instance to add the router properly
+    const expressApp = app
+      .getHttpAdapter()
+      .getInstance() as express.Application;
+    expressApp.use("/api/admin/queues", serverAdapter.getRouter());
+  }
 
   const port = process.env.PORT || 3000;
 

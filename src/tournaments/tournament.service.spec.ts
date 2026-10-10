@@ -66,13 +66,16 @@ describe("TournamentsService", () => {
     it("should throw ConflictException if duplicate name and division", async () => {
       mockPrismaService.tournament.findFirst.mockResolvedValue({ id: "t1" });
       await expect(
-        service.create({
-          name: "League",
-          division: TournamentDivision.PREMIER,
-          startDate: "2026-01-01",
-          numberOfGames: 10,
-          quarterDuration: 10,
-        }, mockUser),
+        service.create(
+          {
+            name: "League",
+            division: TournamentDivision.PREMIER,
+            startDate: "2026-01-01",
+            numberOfGames: 10,
+            quarterDuration: 10,
+          },
+          mockUser,
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -82,13 +85,16 @@ describe("TournamentsService", () => {
       const tournament = { id: "t1", code: "ABCDEF" };
       mockPrismaService.tournament.create.mockResolvedValue(tournament);
 
-      const result = await service.create({
-        name: "League",
-        division: TournamentDivision.PREMIER,
-        startDate: "2026-01-01",
-        numberOfGames: 10,
-        quarterDuration: 10,
-      }, mockUser);
+      const result = await service.create(
+        {
+          name: "League",
+          division: TournamentDivision.PREMIER,
+          startDate: "2026-01-01",
+          numberOfGames: 10,
+          quarterDuration: 10,
+        },
+        mockUser,
+      );
       expect(result).toEqual(tournament);
       expect(mockPrismaService.tournament.create).toHaveBeenCalled();
     });
@@ -98,13 +104,16 @@ describe("TournamentsService", () => {
       mockPrismaService.tournament.findUnique.mockResolvedValue({}); // Always returns existing
 
       await expect(
-        service.create({
-          name: "League",
-          division: TournamentDivision.PREMIER,
-          startDate: "2026-01-01",
-          numberOfGames: 10,
-          quarterDuration: 10,
-        }, mockUser),
+        service.create(
+          {
+            name: "League",
+            division: TournamentDivision.PREMIER,
+            startDate: "2026-01-01",
+            numberOfGames: 10,
+            quarterDuration: 10,
+          },
+          mockUser,
+        ),
       ).rejects.toThrow(ConflictException);
     });
   });

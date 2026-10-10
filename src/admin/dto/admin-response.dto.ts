@@ -22,4 +22,11 @@ export class AdminResponseDto {
 
   @ApiProperty({ example: "2024-01-01T00:00:00Z", required: false })
   updatedAt?: Date;
+
+  @ApiProperty({
+    required: false,
+    example: true,
+    description: "Indicates if the welcome email was successfully sent",
+  })
+  emailSent?: boolean;
 }

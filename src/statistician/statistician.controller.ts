@@ -35,6 +35,8 @@ import { ApiPaginatedResponse } from "../common/decorators/api-paginated-respons
 import { StatisticianFilterDto } from "./dto/statistician-filter.dto";
 import { Query } from "@nestjs/common";
 import { StatisticianResponseDto } from "./dto/statistician-response.dto";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
 
 @ApiTags("Statisticians")
 @ApiBearerAuth()
@@ -141,8 +143,8 @@ export class StatisticianController {
     "/api/statistician/:id",
     "Statistician not found",
   )
-  findOne(@Param("id") id: string) {
-    return this.statisticianService.findOne(id);
+  findOne(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.statisticianService.findOne(id, user);
   }
 
   @Patch(":id")

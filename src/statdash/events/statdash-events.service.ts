@@ -215,10 +215,16 @@ export class StatdashEventsService {
             }
           }
 
-          if (typeof command.payload.playerInId === "string" && command.payload.playerInId.trim().length > 0) {
+          if (
+            typeof command.payload.playerInId === "string" &&
+            command.payload.playerInId.trim().length > 0
+          ) {
             if (lineupSnapshot) {
               const { homeLineup, awayLineup } = lineupSnapshot;
-              if (homeLineup.includes(command.payload.playerInId) || awayLineup.includes(command.payload.playerInId)) {
+              if (
+                homeLineup.includes(command.payload.playerInId) ||
+                awayLineup.includes(command.payload.playerInId)
+              ) {
                 throw new BadRequestException({
                   code: "SD_LINEUP_PLAYER_ALREADY_ON_COURT",
                   message: `Player ${command.payload.playerInId} is already on court`,
@@ -272,8 +278,14 @@ export class StatdashEventsService {
                 eventType: draft.eventType,
                 payload: draft.payload as Prisma.InputJsonValue,
                 actorUserId,
-                period: typeof command.payload.period === 'number' ? command.payload.period : null,
-                clockSecondsRemaining: typeof command.payload.clockSecondsRemaining === 'number' ? command.payload.clockSecondsRemaining : null,
+                period:
+                  typeof command.payload.period === "number"
+                    ? command.payload.period
+                    : null,
+                clockSecondsRemaining:
+                  typeof command.payload.clockSecondsRemaining === "number"
+                    ? command.payload.clockSecondsRemaining
+                    : null,
                 expectedVersion: command.expectedVersion,
                 resultingVersion: command.expectedVersion + i + 1,
                 parentEventId: command.parentEventId,
@@ -528,7 +540,10 @@ export class StatdashEventsService {
           },
         });
 
-        if (targetEvent.eventType === "substitution" && (replay.homeLineup.length > 0 || replay.awayLineup.length > 0)) {
+        if (
+          targetEvent.eventType === "substitution" &&
+          (replay.homeLineup.length > 0 || replay.awayLineup.length > 0)
+        ) {
           await tx.lineupState.create({
             data: {
               sessionId: targetEvent.sessionId,
@@ -717,7 +732,10 @@ export class StatdashEventsService {
           },
         });
 
-        if (targetEvent.eventType === "substitution" && (replay.homeLineup.length > 0 || replay.awayLineup.length > 0)) {
+        if (
+          targetEvent.eventType === "substitution" &&
+          (replay.homeLineup.length > 0 || replay.awayLineup.length > 0)
+        ) {
           await tx.lineupState.create({
             data: {
               sessionId: targetEvent.sessionId,

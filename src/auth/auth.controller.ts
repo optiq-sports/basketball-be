@@ -17,6 +17,8 @@ import { Roles } from "./decorators/roles.decorator";
 import { AuthResponseDto } from "./dto/auth-response.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { BypassPasswordChange } from "./decorators/bypass-password-change.decorator";
 import {
   ApiBearerAuth,
@@ -251,5 +253,46 @@ export class AuthController {
   })
   async changePassword(@Request() req, @Body() body: ChangePasswordDto) {
     return this.authService.changePassword(req.user.id, body);
+  }
+
+  @Post("forgot-password")
+  @ApiOperation({ summary: "Request a password reset email" })
+  @AppErrorResponse(
+    400,
+    "Bad Request",
+    "POST",
+    "/api/auth/forgot-password",
+    "Validation failed",
+  )
+  @ApiResponse({
+    status: 200,
+    description: "If the email is valid, a reset link will be sent.",
+  })
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.forgotPassword(body);
+  }
+
+  @Post("reset-password")
+  @ApiOperation({ summary: "Reset password using token" })
+  @AppErrorResponse(
+    400,
+    "Bad Request",
+    "POST",
+    "/api/auth/reset-password",
+    "Validation failed",
+  )
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "POST",
+    "/api/auth/reset-password",
+    "Invalid or expired token",
+  )
+  @ApiResponse({
+    status: 200,
+    description: "Password reset successfully.",
+  })
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body);
   }
 }

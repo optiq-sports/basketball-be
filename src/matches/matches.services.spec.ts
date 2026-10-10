@@ -122,15 +122,20 @@ describe("MatchesService", () => {
     });
   });
 
-
   describe("findAll", () => {
     it("should find all matches with optional filters", async () => {
       mockPrismaService.match.findMany.mockResolvedValue([{ id: "m1" }]);
-      const result = await service.findAll(mockUser, { tournamentId: "tour1", status: MatchStatus.LIVE });
+      const result = await service.findAll(mockUser, {
+        tournamentId: "tour1",
+        status: MatchStatus.LIVE,
+      });
       expect(result.items).toEqual([{ id: "m1" }]);
       expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ tournamentId: "tour1", status: MatchStatus.LIVE }),
+          where: expect.objectContaining({
+            tournamentId: "tour1",
+            status: MatchStatus.LIVE,
+          }),
         }),
       );
     });

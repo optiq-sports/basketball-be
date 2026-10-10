@@ -21,6 +21,51 @@ export class ProjectionTotalsDto {
 
   @ApiProperty({ example: 4 })
   turnovers: number;
+
+  @ApiProperty({ example: 10 })
+  fga: number;
+
+  @ApiProperty({ example: 5 })
+  fgm: number;
+
+  @ApiProperty({ example: 4 })
+  fg3a: number;
+
+  @ApiProperty({ example: 2 })
+  fg3m: number;
+
+  @ApiProperty({ example: 6 })
+  fta: number;
+
+  @ApiProperty({ example: 5 })
+  ftm: number;
+
+  @ApiProperty({ example: 10 })
+  twoPa: number;
+
+  @ApiProperty({ example: 5 })
+  twoPm: number;
+
+  @ApiProperty({ example: 4 })
+  threePa: number;
+
+  @ApiProperty({ example: 2 })
+  threePm: number;
+
+  @ApiProperty({ example: 2 })
+  oreb: number;
+
+  @ApiProperty({ example: 8 })
+  dreb: number;
+
+  @ApiProperty({ example: 12 })
+  plusMinus: number;
+
+  @ApiProperty({ example: 25 })
+  eff: number;
+
+  @ApiProperty({ example: 1800 })
+  secondsPlayed: number;
 }
 
 export class PlayerProjectionDto extends ProjectionTotalsDto {
@@ -88,6 +133,20 @@ class ScoreDto {
   away: number;
 }
 
+class AdvancedTeamStatsDto {
+  @ApiProperty({ example: 100.5 })
+  possessions: number;
+
+  @ApiProperty({ example: 0.55 })
+  trueShooting: number;
+
+  @ApiProperty({ example: 110.2 })
+  offensiveRating: number;
+
+  @ApiProperty({ example: 105.4 })
+  defensiveRating: number;
+}
+
 export class MatchSummaryResponseDto {
   @ApiProperty({ example: "session_123" })
   sessionId: string;
@@ -100,6 +159,9 @@ export class MatchSummaryResponseDto {
 
   @ApiProperty({ type: ProjectionTotalsDto })
   totals: ProjectionTotalsDto;
+
+  @ApiProperty({ type: AdvancedTeamStatsDto, required: false })
+  advanced?: AdvancedTeamStatsDto;
 
   @ApiProperty({ example: 150 })
   totalEvents: number;
@@ -123,4 +185,24 @@ export class RebuildResponseDto {
 
   @ApiProperty({ type: BoxScoreResponseDto })
   boxScore: BoxScoreResponseDto;
+}
+
+export class TimelineEventDto {
+  @ApiProperty({ example: "event_123" })
+  id: string;
+
+  @ApiProperty({ example: 1 })
+  sequence: number;
+
+  @ApiProperty({ example: "shot" })
+  eventType: string;
+
+  @ApiProperty({ example: 1 })
+  period: number;
+
+  @ApiProperty({ example: 600 })
+  clockSecondsRemaining: number;
+
+  @ApiProperty({ type: Object })
+  payload: Record<string, any>;
 }

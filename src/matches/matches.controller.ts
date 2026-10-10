@@ -35,7 +35,7 @@ import { MatchFilterDto } from "./dto/match-filter.dto";
 @Controller("matches")
 @UseGuards(JwtAuthGuard)
 export class MatchesController {
-  constructor(private readonly matchesService: MatchesService) { }
+  constructor(private readonly matchesService: MatchesService) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -89,11 +89,9 @@ export class MatchesController {
     "/api/matches",
     "Invalid or missing access token",
   )
-  findAll(
-    @CurrentUser() user: any,
-    @Query() filterDto: MatchFilterDto,
-  ) {
-    const statisticianId = user.role === Role.STATISTICIAN ? user.id : undefined;
+  findAll(@CurrentUser() user: any, @Query() filterDto: MatchFilterDto) {
+    const statisticianId =
+      user.role === Role.STATISTICIAN ? user.id : undefined;
     return this.matchesService.findAll(user, filterDto, statisticianId);
   }
 
@@ -160,7 +158,11 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  update(@Param("id") id: string, @Body() updateMatchDto: UpdateMatchDto, @CurrentUser() user: any) {
+  update(
+    @Param("id") id: string,
+    @Body() updateMatchDto: UpdateMatchDto,
+    @CurrentUser() user: any,
+  ) {
     return this.matchesService.update(id, updateMatchDto, user);
   }
 

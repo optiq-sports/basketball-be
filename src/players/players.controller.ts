@@ -222,6 +222,8 @@ export class PlayersController {
    * Get all players (optionally filtered by team or unassigned)
    */
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN)
   @ApiOperation({ summary: "Get all players" })
   @ApiPaginatedResponse(PlayerResponseDto)
   @AppErrorResponse(
@@ -239,6 +241,8 @@ export class PlayersController {
    * Get player by ID
    */
   @Get(":id")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN)
   @ApiOperation({ summary: "Get player by ID" })
   @ApiResponse({
     status: 200,
@@ -430,8 +434,41 @@ export class PlayersController {
     "/api/players/:id",
     "Player not found",
   )
-  remove(@Param("id") id: string) {
-    return this.playersService.remove(id);
+  remove(@Param("id") id: string, @Query("teamId") teamId?: string) {
+    return this.playersService.remove(id, teamId);
+  }
+
+  /**
+   * Hard delete player
+   */
+  @Delete(":id/hard")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Hard delete a player" })
+  @ApiResponse({ status: 200, description: "Player permanently deleted" })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "DELETE",
+    "/api/players/:id/hard",
+    "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "DELETE",
+    "/api/players/:id/hard",
+    "Requires ADMIN role",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "DELETE",
+    "/api/players/:id/hard",
+    "Player not found",
+  )
+  hardDelete(@Param("id") id: string) {
+    return this.playersService.hardDelete(id);
   }
 
   /**

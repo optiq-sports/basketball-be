@@ -77,7 +77,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       name: user.name,
       role: user.role,
       profile: user.profile,
-      clientIds: user.clientUsers ? user.clientUsers.map((cu: any) => cu.clientId) : [],
+      clientIds: user.clientUsers
+        ? user.clientUsers.map((cu: any) => cu.clientId)
+        : [],
       forcePasswordChange: user.forcePasswordChange,
     };
   }

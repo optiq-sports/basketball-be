@@ -48,7 +48,7 @@ export class TournamentsController {
   constructor(
     private readonly tournamentsService: TournamentsService,
     @Inject(UPLOAD_PROVIDER) private readonly uploadProvider: IUploadProvider,
-  ) { }
+  ) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -81,7 +81,10 @@ export class TournamentsController {
     "/api/tournaments",
     "Requires ADMIN or STATISTICIAN role",
   )
-  create(@Body() createTournamentDto: CreateTournamentDto, @CurrentUser() user: AuthenticatedUser) {
+  create(
+    @Body() createTournamentDto: CreateTournamentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.tournamentsService.create(createTournamentDto, user);
   }
 
@@ -95,7 +98,10 @@ export class TournamentsController {
     "/api/tournaments",
     "Invalid or missing access token",
   )
-  findAll(@CurrentUser() user: AuthenticatedUser, @Query() paginationDto?: PaginationQueryDto) {
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() paginationDto?: PaginationQueryDto,
+  ) {
     return this.tournamentsService.findAll(user, paginationDto);
   }
 
@@ -338,7 +344,11 @@ export class TournamentsController {
     "/api/tournaments/:id/teams/:teamId",
     "Tournament or Team not found",
   )
-  removeTeam(@Param("id") id: string, @Param("teamId") teamId: string, @CurrentUser() user: AuthenticatedUser) {
+  removeTeam(
+    @Param("id") id: string,
+    @Param("teamId") teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.tournamentsService.removeTeam(id, teamId, user);
   }
 
