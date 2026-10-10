@@ -61,7 +61,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
     HealthModule,
     ClientsModule,
     ClientApiModule,
-    NotificationsModule
+    NotificationsModule,
   ],
   providers: [
     {

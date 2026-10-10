@@ -7,11 +7,15 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import ms, { StringValue } from "ms";
 import * as bcrypt from "bcrypt";
+import * as crypto from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { AuthResponseDto } from "./dto/auth-response.dto";
 import { Role } from "@prisma/client";
+import { EmailService } from "../notifications/email.service";
 
 @Injectable()
 export class AuthService {
@@ -19,7 +23,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+    private emailService: EmailService,
+  ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
@@ -176,14 +181,18 @@ export class AuthService {
     return { success: true };
   }
 
-  async changePassword(userId: string, changePasswordDto: any): Promise<{ success: boolean }> {
+  async changePassword(
+    userId: string,
+    changePasswordDto: any,
+  ): Promise<{ success: boolean }> {
     const { oldPassword, newPassword } = changePasswordDto;
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException("User not found");
 
     const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
-    if (!isPasswordValid) throw new UnauthorizedException('Invalid old password');
+    if (!isPasswordValid)
+      throw new UnauthorizedException("Invalid old password");
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
@@ -191,7 +200,60 @@ export class AuthService {
       where: { id: userId },
       data: {
         password: hashedNewPassword,
-        forcePasswordChange: false
+        forcePasswordChange: false,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ success: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    // We still return true to avoid leaking which emails exist
+    if (!user) return { success: true };
+
+    const token = crypto.randomUUID();
+    const expires = new Date();
+    expires.setHours(expires.getHours() + 1); // 1 hour expiry
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: token,
+        passwordResetExpires: expires,
+      },
+    });
+
+    await this.emailService.sendPasswordResetEmail(user.email, token);
+    return { success: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ success: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: dto.token },
+    });
+
+    if (
+      !user ||
+      !user.passwordResetExpires ||
+      user.passwordResetExpires < new Date()
+    ) {
+      throw new UnauthorizedException(
+        "Invalid or expired password reset token",
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
       },
     });
 

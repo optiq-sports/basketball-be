@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
+import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { QueueService } from "../../common/queue/queue.service";
 import { StatdashProjectionsService } from "./statdash-projections.service";
 import {
@@ -18,13 +19,14 @@ import {
   PlayerProjectionDto,
   RebuildResponseDto,
   ShotChartEventDto,
+  TimelineEventDto,
 } from "./dto/statdash-projection-responses.dto";
 
 @ApiTags("Statdash Projections")
 @ApiBearerAuth()
 @Controller("statdash/projections")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.STATISTICIAN)
+@Roles(Role.ADMIN, Role.STATISTICIAN, Role.CLIENT)
 export class StatdashProjectionsController {
   constructor(
     private readonly statdashProjectionsService: StatdashProjectionsService,
@@ -52,8 +54,8 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/box-score",
     "Session does not exist",
   )
-  getBoxScore(@Param("sessionId") sessionId: string) {
-    return this.statdashProjectionsService.getBoxScore(sessionId);
+  getBoxScore(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
+    return this.statdashProjectionsService.getBoxScore(sessionId, user);
   }
 
   @Get("match/:sessionId/shot-chart")
@@ -77,8 +79,11 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/shot-chart",
     "Session does not exist",
   )
-  getShotChart(@Param("sessionId") sessionId: string) {
-    return this.statdashProjectionsService.getShotChart(sessionId);
+  getShotChart(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.statdashProjectionsService.getShotChart(sessionId, user);
   }
 
   @Get("player/:playerId/game/:sessionId")
@@ -105,10 +110,12 @@ export class StatdashProjectionsController {
   getPlayerGameProjection(
     @Param("playerId") playerId: string,
     @Param("sessionId") sessionId: string,
+    @CurrentUser() user: any,
   ) {
     return this.statdashProjectionsService.getPlayerGameProjection(
       sessionId,
       playerId,
+      user,
     );
   }
 
@@ -133,10 +140,36 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/summary",
     "Session does not exist",
   )
-  getSummary(@Param("sessionId") sessionId: string) {
-    return this.statdashProjectionsService.getMatchSummary(sessionId);
+  getSummary(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
+    return this.statdashProjectionsService.getMatchSummary(sessionId, user);
   }
 
+  @Get("match/:sessionId/timeline")
+  @ApiOperation({ summary: "Get the play-by-play timeline for a match session" })
+  @ApiResponse({
+    status: 200,
+    description: "Timeline retrieved successfully",
+    type: [TimelineEventDto],
+  })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/statdash/projections/match/:sessionId/timeline",
+    "Invalid or missing access token"
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/statdash/projections/match/:sessionId/timeline",
+    "Session does not exist"
+  )
+  getTimeline(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
+    return this.statdashProjectionsService.getTimeline(sessionId, user);
+  }
+
+  @Roles(Role.ADMIN, Role.STATISTICIAN)
   @Post("match/:sessionId/rebuild")
   @ApiOperation({ summary: "Rebuild the box score projection from events" })
   @ApiResponse({
@@ -158,8 +191,11 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/rebuild",
     "Session does not exist",
   )
-  async rebuild(@Param("sessionId") sessionId: string) {
+  async rebuild(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: any,
+  ) {
     await this.queueService.enqueueReplayBackfill(sessionId);
-    return this.statdashProjectionsService.rebuildAndPersist(sessionId);
+    return this.statdashProjectionsService.rebuildAndPersist(sessionId, user);
   }
 }

@@ -5,6 +5,7 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { Role } from "@prisma/client";
 import { UnauthorizedException, ConflictException } from "@nestjs/common";
+import { EmailService } from "../notifications/email.service";
 import * as bcrypt from "bcrypt";
 
 jest.mock("bcrypt", () => ({
@@ -54,6 +55,10 @@ describe("AuthService", () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: EmailService,
+          useValue: { sendWelcomeEmail: jest.fn().mockResolvedValue(true) },
         },
       ],
     }).compile();

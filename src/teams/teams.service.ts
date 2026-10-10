@@ -8,7 +8,10 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateTeamDto } from "./dto/create-team.dto";
 import { UpdateTeamDto } from "./dto/update-team.dto";
 import { Prisma, Team } from "@prisma/client";
-import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import {
+  PageMetaDto,
+  PaginatedResponseDto,
+} from "../common/dto/paginated-response.dto";
 import { TeamFilterDto } from "./dto/team-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
@@ -16,7 +19,7 @@ import { buildPrismaPagination } from "../common/utils/pagination.util";
 export class TeamsService {
   private readonly logger = new Logger(TeamsService.name);
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(createTeamDto: CreateTeamDto): Promise<Team> {
     this.logger.log(
@@ -39,20 +42,33 @@ export class TeamsService {
     });
   }
 
-  async findAll(filterDto?: TeamFilterDto): Promise<PaginatedResponseDto<Team>> {
-    const { tournamentId, page, limit, sortBy, sortOrder, search, ...otherParams } = filterDto || {};
-    
-    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(filterDto, {
-      defaultOrderBy: [{ name: 'asc' }],
-      searchFields: ['name']
-    });
+  async findAll(
+    filterDto?: TeamFilterDto,
+  ): Promise<PaginatedResponseDto<Team>> {
+    const {
+      tournamentId,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      search,
+      ...otherParams
+    } = filterDto || {};
+
+    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(
+      filterDto,
+      {
+        defaultOrderBy: [{ name: "asc" }],
+        searchFields: ["name"],
+      },
+    );
 
     const [items, itemCount] = await Promise.all([
       this.prisma.team.findMany({
         where: {
           ...(tournamentId && { tournamentTeams: { some: { tournamentId } } }),
           ...searchWhere,
-          ...otherParams
+          ...otherParams,
         },
         include: {
           playerTeams: {
@@ -78,12 +94,15 @@ export class TeamsService {
         where: {
           ...(tournamentId && { tournamentTeams: { some: { tournamentId } } }),
           ...searchWhere,
-          ...otherParams
-        }
+          ...otherParams,
+        },
       }),
     ]);
 
-    return new PaginatedResponseDto(items, new PageMetaDto({ page, limit, itemCount }));
+    return new PaginatedResponseDto(
+      items,
+      new PageMetaDto({ page, limit, itemCount }),
+    );
   }
 
   async findOne(id: string): Promise<Team> {

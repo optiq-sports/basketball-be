@@ -1,4 +1,9 @@
-import { ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { AuthGuard } from "@nestjs/passport";
 import { BYPASS_PASSWORD_CHANGE_KEY } from "../decorators/bypass-password-change.decorator";
@@ -18,10 +23,10 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       throw err || new UnauthorizedException();
     }
 
-    const bypassPasswordCheck = this.reflector.getAllAndOverride<boolean>(BYPASS_PASSWORD_CHANGE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const bypassPasswordCheck = this.reflector.getAllAndOverride<boolean>(
+      BYPASS_PASSWORD_CHANGE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!bypassPasswordCheck && user.forcePasswordChange) {
       throw new ForbiddenException("PASSWORD_CHANGE_REQUIRED");

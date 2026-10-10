@@ -1,4 +1,11 @@
-import { IsIn, IsInt, IsNotEmpty, IsObject, IsString, IsOptional } from "class-validator";
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsString,
+  IsOptional,
+} from "class-validator";
 import { ApiProperty, ApiExtraModels, getSchemaPath } from "@nestjs/swagger";
 import {
   STATDASH_COMMAND_TYPES,
@@ -77,7 +84,8 @@ export class StatdashCommandDto {
 
   @ApiProperty({
     example: "cuid-of-parent-event",
-    description: "Optional ID of a parent event (e.g. Foul that generated this Free Throw) to enable cascading reversal",
+    description:
+      "Optional ID of a parent event (e.g. Foul that generated this Free Throw) to enable cascading reversal",
     required: false,
   })
   @IsString()

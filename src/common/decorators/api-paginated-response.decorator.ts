@@ -2,7 +2,9 @@ import { applyDecorators, Type } from "@nestjs/common";
 import { ApiExtraModels, ApiOkResponse, getSchemaPath } from "@nestjs/swagger";
 import { PaginatedResponseDto } from "../dto/paginated-response.dto";
 
-export const ApiPaginatedResponse = <DataDto extends Type<unknown>>(dataDto: DataDto) =>
+export const ApiPaginatedResponse = <DataDto extends Type<unknown>>(
+  dataDto: DataDto,
+) =>
   applyDecorators(
     ApiExtraModels(PaginatedResponseDto, dataDto),
     ApiOkResponse({
@@ -13,7 +15,10 @@ export const ApiPaginatedResponse = <DataDto extends Type<unknown>>(dataDto: Dat
             properties: {
               success: { type: "boolean", example: true },
               message: { type: "string", example: "Operation successful" },
-              timestamp: { type: "string", example: "2022-01-01T00:00:00.000Z" },
+              timestamp: {
+                type: "string",
+                example: "2022-01-01T00:00:00.000Z",
+              },
               items: {
                 type: "array",
                 items: { $ref: getSchemaPath(dataDto) },
@@ -22,5 +27,5 @@ export const ApiPaginatedResponse = <DataDto extends Type<unknown>>(dataDto: Dat
           },
         ],
       },
-    })
+    }),
   );

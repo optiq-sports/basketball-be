@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { MatchStatus } from "@prisma/client";
+import { MatchStatus, MatchStage } from "@prisma/client";
 
 export class MatchResponseDto {
   @ApiProperty({ example: "match_123" })
@@ -22,6 +22,9 @@ export class MatchResponseDto {
 
   @ApiProperty({ example: "Staples Center", required: false })
   venue?: string;
+
+  @ApiProperty({ enum: MatchStage, example: MatchStage.GROUP, required: false })
+  stage?: MatchStage;
 
   @ApiProperty({ example: 0, required: false })
   homeScore?: number;

@@ -10,7 +10,7 @@ export class PlayerFilterDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({ description: "Set to true to get unassigned players" })
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   unassigned?: boolean;
 }

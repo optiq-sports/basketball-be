@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { TournamentDivision } from "@prisma/client";
+import { TournamentDivision, TournamentFormat } from "@prisma/client";
 
 export class TournamentTeamResponseDto {
   @ApiProperty({ example: "tt_123" })
@@ -39,6 +39,13 @@ export class TournamentResponseDto {
     example: TournamentDivision.DIVISION_1,
   })
   division: TournamentDivision;
+
+  @ApiProperty({
+    enum: TournamentFormat,
+    example: TournamentFormat.ROUND_ROBIN,
+    required: false,
+  })
+  format?: TournamentFormat;
 
   @ApiProperty({ example: 82 })
   numberOfGames: number;
