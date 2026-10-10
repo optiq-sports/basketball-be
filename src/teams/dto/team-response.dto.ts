@@ -14,8 +14,32 @@ export class TeamResponseDto {
   @ApiProperty({ example: "CHI" })
   code: string;
 
+  @ApiProperty({ example: "#CE1141", required: false })
+  color?: string;
+
   @ApiProperty({ example: "https://example.com/logo.png", required: false })
   logo?: string;
+
+  @ApiProperty({ example: "USA", required: false })
+  country?: string;
+
+  @ApiProperty({ example: "Illinois", required: false })
+  state?: string;
+
+  @ApiProperty({ example: "Billy Donovan", required: false })
+  coach?: string;
+
+  @ApiProperty({ example: "Chris Fleming", required: false })
+  assistantCoach?: string;
+
+  @ApiProperty({ example: "United Center", required: false })
+  arena?: string;
+
+  @ApiProperty({ example: 1966, required: false })
+  foundedYear?: number;
+
+  @ApiProperty({ example: "contact@chicagobulls.com", required: false })
+  contactEmail?: string;
 
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   createdAt: Date;

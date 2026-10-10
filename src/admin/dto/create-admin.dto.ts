@@ -5,6 +5,7 @@ import {
   MinLength,
   IsOptional,
   IsEnum,
+  IsIn,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { Role, UserStatus } from "@prisma/client";
@@ -20,8 +21,9 @@ export class CreateAdminDto {
 
   @ApiProperty({
     example: "Password123!",
-    description: "Strong password, at least 6 characters (auto-generated if omitted)",
-    required: false
+    description:
+      "Strong password, at least 6 characters (auto-generated if omitted)",
+    required: false,
   })
   @IsString()
   @IsOptional()
@@ -33,9 +35,13 @@ export class CreateAdminDto {
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ enum: Role, example: Role.ADMIN, required: false })
+  @ApiProperty({
+    enum: [Role.ADMIN, Role.SUPER_ADMIN],
+    example: Role.ADMIN,
+    required: false,
+  })
   @IsOptional()
-  @IsEnum(Role)
+  @IsIn([Role.ADMIN, Role.SUPER_ADMIN])
   role?: Role;
 
   @ApiProperty({

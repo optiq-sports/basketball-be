@@ -11,6 +11,21 @@ type ProjectionTotals = {
   steals: number;
   fouls: number;
   turnovers: number;
+  fga: number;
+  fgm: number;
+  fg3a: number;
+  fg3m: number;
+  twoPa: number;
+  twoPm: number;
+  threePa: number;
+  threePm: number;
+  fta: number;
+  ftm: number;
+  oreb: number;
+  dreb: number;
+  plusMinus: number;
+  eff: number;
+  secondsPlayed: number;
 };
 
 @Injectable()
@@ -21,7 +36,40 @@ export class StatdashProjectionsService {
     private readonly queueService: QueueService,
   ) {}
 
-  async getBoxScore(sessionId: string) {
+  private async checkSessionAccess(sessionId: string, user?: any) {
+    if (!user || user?.role === "SUPER_ADMIN") return;
+
+    const session = await this.prisma.gameSession.findUnique({
+      where: { id: sessionId },
+      include: { match: { select: { clientId: true } } },
+    });
+
+    if (!session) {
+      throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+
+    if (
+      user?.role === "CLIENT" ||
+      user?.role === "ADMIN" ||
+      user?.role === "STATISTICIAN"
+    ) {
+      if (
+        session.match.clientId &&
+        (!user.clientIds || !user.clientIds.includes(session.match.clientId))
+      ) {
+        throw new NotFoundException({
+          code: "SD_SESSION_NOT_FOUND",
+          message: "Session does not exist",
+        });
+      }
+    }
+  }
+
+  async getBoxScore(sessionId: string, user?: any) {
+    await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
       "box_score",
@@ -47,11 +95,12 @@ export class StatdashProjectionsService {
       return state.payload;
     }
 
-    const rebuilt = await this.rebuildAndPersist(sessionId);
+    const rebuilt = await this.rebuildAndPersist(sessionId, user);
     return rebuilt.boxScore;
   }
 
-  async getShotChart(sessionId: string) {
+  async getShotChart(sessionId: string, user?: any) {
+    await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
       "shot_chart",
@@ -85,23 +134,25 @@ export class StatdashProjectionsService {
     return shotChart;
   }
 
-  async getPlayerGameProjection(sessionId: string, playerId: string) {
-    const box = await this.getBoxScore(sessionId);
+  async getPlayerGameProjection(
+    sessionId: string,
+    playerId: string,
+    user?: any,
+  ) {
+    // getBoxScore already checks session access, but we do it anyway if needed or let getBoxScore handle it.
+    // We must pass user to getBoxScore.
+    const box = await this.getBoxScore(sessionId, user);
     return box.players[playerId] ?? this.emptyPlayerProjection(playerId);
   }
 
-  async getMatchSummary(sessionId: string) {
+  async getMatchSummary(sessionId: string, user?: any) {
+    await this.checkSessionAccess(sessionId, user);
     const session = await this.prisma.gameSession.findUnique({
       where: { id: sessionId },
     });
-    if (!session) {
-      throw new NotFoundException({
-        code: "SD_SESSION_NOT_FOUND",
-        message: "Session does not exist",
-      });
-    }
+    // checkSessionAccess already throws if session is not found, so no need to check again.
 
-    const box = await this.getBoxScore(sessionId);
+    const box = await this.getBoxScore(sessionId, user);
     const summary = {
       sessionId,
       version: session.version,
@@ -110,6 +161,12 @@ export class StatdashProjectionsService {
         away: session.awayScore,
       },
       totals: box.totals,
+      advanced: {
+        possessions: box.totals.fga + 0.44 * box.totals.fta - box.totals.oreb + box.totals.turnovers,
+        trueShooting: (box.totals.fga + 0.44 * box.totals.fta) > 0 ? (box.totals.points / (2 * (box.totals.fga + 0.44 * box.totals.fta))) : 0,
+        offensiveRating: 0,
+        defensiveRating: 0
+      },
       totalEvents: box.totalEvents,
       generatedAt: new Date().toISOString(),
     };
@@ -122,7 +179,39 @@ export class StatdashProjectionsService {
     return summary;
   }
 
-  async rebuildAndPersist(sessionId: string) {
+  async getTimeline(sessionId: string, user?: any) {
+    await this.checkSessionAccess(sessionId, user);
+    const cached = await this.redisService.getProjectionCached(
+      sessionId,
+      "timeline"
+    );
+    if (cached) return cached;
+
+    const events = await this.getSessionEvents(sessionId);
+    const resolvedEvents = this.resolveEvents(events);
+    
+    // Select relevant fields to return for the timeline
+    const timeline = resolvedEvents.map(event => ({
+      id: event.id,
+      sequence: event.sequence,
+      eventType: event.eventType,
+      period: event.period,
+      clockSecondsRemaining: (event as any).clockSecondsRemaining,
+      payload: event.payload
+    }));
+
+    await this.redisService.setProjectionCached(
+      sessionId,
+      "timeline",
+      timeline,
+      60
+    );
+
+    return timeline;
+  }
+
+  async rebuildAndPersist(sessionId: string, user?: any) {
+    await this.checkSessionAccess(sessionId, user);
     const [events, sessionForTeamContext] = await Promise.all([
       this.getSessionEvents(sessionId),
       this.prisma.gameSession.findUnique({
@@ -169,6 +258,13 @@ export class StatdashProjectionsService {
           version: replay.version,
         },
       }),
+      this.prisma.match.update({
+        where: { id: sessionForTeamContext.match.id },
+        data: {
+          homeScore: replay.homeScore,
+          awayScore: replay.awayScore,
+        },
+      }),
       this.prisma.projectionState.upsert({
         where: {
           sessionId_projectionType: {
@@ -202,6 +298,7 @@ export class StatdashProjectionsService {
         60,
       ),
       this.redisService.invalidateProjectionCache(sessionId, "shot_chart"),
+      this.redisService.invalidateProjectionCache(sessionId, "timeline"),
       this.redisService.invalidateProjectionCache(sessionId, "summary"),
       this.redisService.invalidateSessionSnapshotCache(sessionId),
       this.queueService.enqueueMatchStatSync(
@@ -241,7 +338,8 @@ export class StatdashProjectionsService {
         const payload = event.payload as Record<string, unknown>;
         const targetEventId = payload.targetEventId as string | undefined;
         const correctedPayload = payload.correctedPayload as
-          Record<string, unknown> | undefined;
+          | Record<string, unknown>
+          | undefined;
         if (targetEventId && correctedPayload) {
           corrections.set(targetEventId, correctedPayload);
         }
@@ -317,7 +415,7 @@ export class StatdashProjectionsService {
       if (typeof payload.jumpBallWinnerTeamId === "string") {
         jumpBallWinnerTeamId = payload.jumpBallWinnerTeamId;
       }
-      
+
       if (event.eventType === "substitution") {
         if (payload.homeLineup && Array.isArray(payload.homeLineup)) {
           homeLineup = payload.homeLineup as string[];
@@ -325,9 +423,14 @@ export class StatdashProjectionsService {
         if (payload.awayLineup && Array.isArray(payload.awayLineup)) {
           awayLineup = payload.awayLineup as string[];
         }
-        
+
         if (payload.playerOutId && payload.playerInId && payload.teamId) {
-          const targetLineup = payload.teamId === teamContext?.homeTeamId ? homeLineup : (payload.teamId === teamContext?.awayTeamId ? awayLineup : null);
+          const targetLineup =
+            payload.teamId === teamContext?.homeTeamId
+              ? homeLineup
+              : payload.teamId === teamContext?.awayTeamId
+                ? awayLineup
+                : null;
           if (targetLineup) {
             const index = targetLineup.indexOf(payload.playerOutId as string);
             if (index !== -1) {
@@ -384,6 +487,21 @@ export class StatdashProjectionsService {
       steals: 0,
       fouls: 0,
       turnovers: 0,
+      fga: 0,
+      fgm: 0,
+      fg3a: 0,
+      fg3m: 0,
+      twoPa: 0,
+      twoPm: 0,
+      threePa: 0,
+      threePm: 0,
+      fta: 0,
+      ftm: 0,
+      oreb: 0,
+      dreb: 0,
+      plusMinus: 0,
+      eff: 0,
+      secondsPlayed: 0,
     };
 
     for (const event of resolvedEvents) {
@@ -401,10 +519,39 @@ export class StatdashProjectionsService {
       switch (event.eventType) {
         case "shot": {
           const shot = payload.shot as Record<string, unknown> | undefined;
-          if (shot?.result === "made") {
+
+          if (shot) {
             const points = Number(shot.value ?? 0);
-            players[playerId].points += points;
-            totals.points += points;
+
+            players[playerId].fga += 1;
+            totals.fga += 1;
+
+            if (points === 3) {
+              players[playerId].fg3a += 1;
+              totals.fg3a += 1;
+              players[playerId].threePa += 1;
+              totals.threePa += 1;
+            } else if (points === 2) {
+              players[playerId].twoPa += 1;
+              totals.twoPa += 1;
+            }
+
+            if (shot.result === "made") {
+              players[playerId].points += points;
+              totals.points += points;
+              players[playerId].fgm += 1;
+              totals.fgm += 1;
+
+              if (points === 3) {
+                players[playerId].fg3m += 1;
+                totals.fg3m += 1;
+                players[playerId].threePm += 1;
+                totals.threePm += 1;
+              } else if (points === 2) {
+                players[playerId].twoPm += 1;
+                totals.twoPm += 1;
+              }
+            }
           }
 
           if (payload.assistPlayerId) {
@@ -422,14 +569,25 @@ export class StatdashProjectionsService {
           break;
         }
         case "free_throw":
+          players[playerId].fta += 1;
+          totals.fta += 1;
           if (payload.result === "made") {
             players[playerId].points += 1;
             totals.points += 1;
+            players[playerId].ftm += 1;
+            totals.ftm += 1;
           }
           break;
         case "rebound":
           players[playerId].rebounds += 1;
           totals.rebounds += 1;
+          if (payload.type === "offensive") {
+            players[playerId].oreb += 1;
+            totals.oreb += 1;
+          } else {
+            players[playerId].dreb += 1;
+            totals.dreb += 1;
+          }
           break;
         case "foul":
           players[playerId].fouls += 1;
@@ -452,6 +610,10 @@ export class StatdashProjectionsService {
       }
     }
 
+    for (const p of Object.values(players)) {
+      p.eff = (p.points + p.rebounds + p.assists + p.steals + p.blocks) - (p.fga - p.fgm) - (p.fta - p.ftm) - p.turnovers;
+      totals.eff += p.eff;
+    }
     return {
       players,
       totals,
@@ -469,6 +631,21 @@ export class StatdashProjectionsService {
       steals: 0,
       fouls: 0,
       turnovers: 0,
+      fga: 0,
+      fgm: 0,
+      fg3a: 0,
+      fg3m: 0,
+      twoPa: 0,
+      twoPm: 0,
+      threePa: 0,
+      threePm: 0,
+      fta: 0,
+      ftm: 0,
+      oreb: 0,
+      dreb: 0,
+      plusMinus: 0,
+      eff: 0,
+      secondsPlayed: 0,
     };
   }
 
@@ -528,6 +705,21 @@ export class StatdashProjectionsService {
           steals: entry.steals,
           fouls: entry.fouls,
           turnovers: entry.turnovers,
+          fga: entry.fga,
+          fgm: entry.fgm,
+          fg3a: entry.fg3a,
+          fg3m: entry.fg3m,
+          twoPa: entry.twoPa,
+          twoPm: entry.twoPm,
+          threePa: entry.threePa,
+          threePm: entry.threePm,
+          fta: entry.fta,
+          ftm: entry.ftm,
+          oreb: entry.oreb,
+          dreb: entry.dreb,
+          plusMinus: entry.plusMinus,
+          eff: entry.eff,
+          secondsPlayed: entry.secondsPlayed,
         },
         create: {
           matchId,
@@ -540,6 +732,21 @@ export class StatdashProjectionsService {
           steals: entry.steals,
           fouls: entry.fouls,
           turnovers: entry.turnovers,
+          fga: entry.fga,
+          fgm: entry.fgm,
+          fg3a: entry.fg3a,
+          fg3m: entry.fg3m,
+          twoPa: entry.twoPa,
+          twoPm: entry.twoPm,
+          threePa: entry.threePa,
+          threePm: entry.threePm,
+          fta: entry.fta,
+          ftm: entry.ftm,
+          oreb: entry.oreb,
+          dreb: entry.dreb,
+          plusMinus: entry.plusMinus,
+          eff: entry.eff,
+          secondsPlayed: entry.secondsPlayed,
         },
       });
     }

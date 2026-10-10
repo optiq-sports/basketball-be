@@ -13,7 +13,11 @@ export class FoulCommandDto extends BaseCommandDto {
   @IsString()
   fouledPlayerId?: string;
 
-  @ApiProperty({ example: "player", enum: ["player", "bench", "coach"], required: false })
+  @ApiProperty({
+    example: "player",
+    enum: ["player", "bench", "coach"],
+    required: false,
+  })
   @IsOptional()
   @IsIn(["player", "bench", "coach"])
   foulerRole?: string;

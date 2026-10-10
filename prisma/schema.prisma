@@ -14,6 +14,8 @@ model User {
   role          Role         @default(STATISTICIAN) @map("role")
   emailVerified Boolean      @default(false) @map("email_verified")
   forcePasswordChange Boolean @default(false) @map("force_password_change")
+  passwordResetToken  String?      @unique @map("password_reset_token")
+  passwordResetExpires DateTime?   @map("password_reset_expires")
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   name          String?      @map("name")
@@ -23,6 +25,7 @@ model User {
   profile       UserProfile?
   matches       Match[]
   clientUsers   ClientUser[]
+  notifications Notification[]
 
   @@map("user")
 }
@@ -73,6 +76,9 @@ model Team {
   state           String?          @map("state")
   coach           String?          @map("coach")
   assistantCoach  String?          @map("assistant_coach")
+  arena           String?          @map("arena")
+  foundedYear     Int?             @map("founded_year")
+  contactEmail    String?          @map("contact_email")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   awayMatches     Match[]          @relation("AwayTeam")
@@ -144,6 +150,7 @@ model Tournament {
   umpire2          String?            @map("umpire_2")
   commissioner     String?            @map("commissioner")
   code             String             @unique @map("code")
+  format           TournamentFormat?  @map("format")
   clientId         String             @map("client_id")
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
@@ -188,6 +195,7 @@ model Match {
   overtimeHome   Int?          @map("overtime_home")
   overtimeAway   Int?          @map("overtime_away")
   venue          String?       @map("venue")
+  stage          MatchStage?   @map("stage")
   statisticianId String?       @map("statistician_id")
   clientId       String        @map("client_id")
   matchKey       String?       @unique @map("match_key")
@@ -234,7 +242,22 @@ model MatchStat {
   steals        Int      @default(0) @map("steals")
   fouls         Int      @default(0) @map("fouls")
   turnovers     Int      @default(0) @map("turnovers")
+  fga           Int      @default(0) @map("fga")
+  fgm           Int      @default(0) @map("fgm")
+  fg3a          Int      @default(0) @map("fg3a")
+  fg3m          Int      @default(0) @map("fg3m")
+  twoPa         Int      @default(0) @map("two_pa")
+  twoPm         Int      @default(0) @map("two_pm")
+  threePa       Int      @default(0) @map("three_pa")
+  threePm       Int      @default(0) @map("three_pm")
+  fta           Int      @default(0) @map("fta")
+  ftm           Int      @default(0) @map("ftm")
+  oreb          Int      @default(0) @map("oreb")
+  dreb          Int      @default(0) @map("dreb")
+  plusMinus     Int      @default(0) @map("plus_minus")
+  eff           Int      @default(0) @map("eff")
   minutesPlayed Int?     @map("minutes_played")
+  secondsPlayed Int      @default(0) @map("seconds_played")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   match         Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
@@ -372,6 +395,21 @@ enum MatchStatus {
   POSTPONED
 }
 
+enum MatchStage {
+  GROUP
+  ROUND_OF_16
+  QUARTER_FINAL
+  SEMI_FINAL
+  THIRD_PLACE
+  FINAL
+}
+
+enum TournamentFormat {
+  ROUND_ROBIN
+  KNOCKOUT
+  GROUP_THEN_KNOCKOUT
+}
+
 enum PlayerPosition {
   POINT_GUARD
   SHOOTING_GUARD
@@ -431,4 +469,21 @@ model ClientApiKey {
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("client_api_key")
+}
+
+model Notification {
+  id        String   @id @default(cuid()) @map("id")
+  userId    String   @map("user_id")
+  title     String   @map("title")
+  message   String   @map("message")
+  type      String   @map("type")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notification")
 }

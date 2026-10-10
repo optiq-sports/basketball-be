@@ -78,7 +78,7 @@ export class StatisticianResponseDto {
         awayTeam: { id: "team2", name: "Bulls" },
         scheduledDate: "2024-06-01T18:00:00Z",
         venue: "Staples Center",
-      }
+      },
     ],
     required: false,
     type: "array",
@@ -89,9 +89,9 @@ export class StatisticianResponseDto {
         scheduledDate: { type: "string", format: "date-time" },
         venue: { type: "string", nullable: true },
         homeTeam: { type: "object" },
-        awayTeam: { type: "object" }
-      }
-    }
+        awayTeam: { type: "object" },
+      },
+    },
   })
   gamesOfficiated?: any[];
 }

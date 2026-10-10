@@ -8,7 +8,7 @@ import {
   Min,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
-import { MatchStatus } from "@prisma/client";
+import { MatchStatus, MatchStage } from "@prisma/client";
 
 export class CreateMatchDto {
   @ApiProperty({ example: "tourney_123", description: "ID of the tournament" })
@@ -60,4 +60,14 @@ export class CreateMatchDto {
   @IsOptional()
   @IsString()
   statisticianId?: string;
+
+  @ApiProperty({
+    enum: MatchStage,
+    example: MatchStage.GROUP,
+    description: "Stage of the tournament",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(MatchStage)
+  stage?: MatchStage;
 }

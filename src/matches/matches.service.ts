@@ -10,15 +10,21 @@ import { MatchResponseDto } from "./dto/match-response.dto";
 import { MatchStatus, Prisma } from "@prisma/client";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 import { getTenantFilter } from "../common/filters/tenant.filter";
-import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import {
+  PageMetaDto,
+  PaginatedResponseDto,
+} from "../common/dto/paginated-response.dto";
 import { MatchFilterDto } from "./dto/match-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
 @Injectable()
 export class MatchesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-  async create(createMatchDto: CreateMatchDto, user: AuthenticatedUser): Promise<MatchResponseDto> {
+  async create(
+    createMatchDto: CreateMatchDto,
+    user: AuthenticatedUser,
+  ): Promise<MatchResponseDto> {
     // Verify tournament exists and belongs to the user's tenants
     const tournament = await this.prisma.tournament.findFirst({
       where: { id: createMatchDto.tournamentId, ...getTenantFilter(user) },
@@ -113,11 +119,19 @@ export class MatchesService {
     filterDto: MatchFilterDto,
     statisticianId?: string,
   ): Promise<PaginatedResponseDto<MatchResponseDto>> {
+    const {
+      tournamentId,
+      status,
+      page = 1,
+      limit = 10,
+      sortBy,
+      sortOrder,
+      search,
+      ...otherParams
+    } = filterDto || {};
 
-    const { tournamentId, status, page = 1, limit = 10, sortBy, sortOrder, search, ...otherParams } = filterDto || {};
-    
     const { skip, take, orderBy } = buildPrismaPagination(filterDto, {
-      defaultOrderBy: { scheduledDate: 'asc' }
+      defaultOrderBy: { scheduledDate: "asc" },
     });
 
     const where: any = { tournament: getTenantFilter(user) };
@@ -130,12 +144,18 @@ export class MatchesService {
     if (statisticianId) {
       where.statisticianId = statisticianId;
     }
+    if (search) {
+      where.OR = [
+        { homeTeam: { name: { contains: search, mode: "insensitive" } } },
+        { awayTeam: { name: { contains: search, mode: "insensitive" } } },
+      ];
+    }
 
     const [items, itemCount] = await Promise.all([
       this.prisma.match.findMany({
         where: {
           ...where,
-          ...otherParams
+          ...otherParams,
         },
         skip,
         take,
@@ -162,23 +182,29 @@ export class MatchesService {
               id: true,
               name: true,
               logo: true,
-            }
+            },
           },
         },
-        orderBy
+        orderBy,
       }),
       this.prisma.match.count({
         where: {
           ...where,
-          ...otherParams
+          ...otherParams,
         },
       }),
     ]);
 
-    return new PaginatedResponseDto(items, new PageMetaDto({ page, limit, itemCount }));
+    return new PaginatedResponseDto(
+      items,
+      new PageMetaDto({ page, limit, itemCount }),
+    );
   }
 
-  async findOne(id: string, user: AuthenticatedUser): Promise<MatchResponseDto> {
+  async findOne(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<MatchResponseDto> {
     const match = await this.prisma.match.findFirst({
       where: { id, tournament: getTenantFilter(user) },
       include: {

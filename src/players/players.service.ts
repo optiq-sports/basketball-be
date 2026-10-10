@@ -16,7 +16,10 @@ import {
   BulkCreatePlayersResponseDto,
   PlayerResponseDto,
 } from "./dto/player-response.dto";
-import { PageMetaDto, PaginatedResponseDto } from "../common/dto/paginated-response.dto";
+import {
+  PageMetaDto,
+  PaginatedResponseDto,
+} from "../common/dto/paginated-response.dto";
 import { PlayerFilterDto } from "./dto/player-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 import * as xlsx from "xlsx";
@@ -28,7 +31,7 @@ export class PlayersService {
   constructor(
     private prisma: PrismaService,
     private deduplicationService: PlayerDeduplicationService,
-  ) { }
+  ) {}
 
   /**
    * Create a standalone player (not assigned to any team)
@@ -265,8 +268,10 @@ export class PlayersService {
             },
           });
         } catch (error: any) {
-          if (error.code === 'P2002') {
-            throw new ConflictException(`Jersey number ${createPlayerDto.jerseyNumber} is already taken in this team`);
+          if (error.code === "P2002") {
+            throw new ConflictException(
+              `Jersey number ${createPlayerDto.jerseyNumber} is already taken in this team`,
+            );
           }
           throw error;
         }
@@ -445,8 +450,10 @@ export class PlayersService {
             },
           });
         } catch (error: any) {
-          if (error.code === 'P2002') {
-            throw new ConflictException(`Jersey number ${playerData.jerseyNumber} is already taken in this team`);
+          if (error.code === "P2002") {
+            throw new ConflictException(
+              `Jersey number ${playerData.jerseyNumber} is already taken in this team`,
+            );
           }
           throw error;
         }
@@ -471,12 +478,58 @@ export class PlayersService {
   async findAll(
     filterDto?: PlayerFilterDto,
   ): Promise<PaginatedResponseDto<PlayerResponseDto>> {
-    const { teamId, unassigned, page, limit, sortBy, sortOrder, search, ...otherParams } = filterDto || {};
-    
-    const { skip, take, orderBy, searchWhere } = buildPrismaPagination(filterDto, {
-      defaultOrderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-      searchFields: ['firstName', 'lastName']
+    const {
+      teamId,
+      unassigned,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      search,
+      ...otherParams
+    } = filterDto || {};
+
+    const {
+      skip,
+      take,
+      orderBy: defaultOrderBy,
+    } = buildPrismaPagination(filterDto, {
+      defaultOrderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
+
+    // Handle sorting manually if sortBy is provided and not the default 'createdAt'
+    // or if we want to support specific fields
+    let orderBy = defaultOrderBy;
+    if (sortBy && sortBy !== "createdAt") {
+      orderBy = { [sortBy]: sortOrder || "asc" };
+    } else {
+      orderBy = [{ lastName: "asc" }, { firstName: "asc" }];
+    }
+
+    let searchWhere: any = {};
+    if (search) {
+      const searchTerms = search.trim().split(/\s+/);
+      if (searchTerms.length === 1) {
+        searchWhere = {
+          OR: [
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
+          ],
+        };
+      } else if (searchTerms.length >= 2) {
+        searchWhere = {
+          AND: [
+            { firstName: { contains: searchTerms[0], mode: "insensitive" } },
+            {
+              lastName: {
+                contains: searchTerms.slice(1).join(" "),
+                mode: "insensitive",
+              },
+            },
+          ],
+        };
+      }
+    }
 
     let where: any = {};
 
@@ -500,7 +553,7 @@ export class PlayersService {
         where: {
           ...where,
           ...searchWhere,
-          ...otherParams
+          ...otherParams,
         },
         skip,
         take,
@@ -524,13 +577,18 @@ export class PlayersService {
         where: {
           ...where,
           ...searchWhere,
-          ...otherParams
-        }
-      })
+          ...otherParams,
+        },
+      }),
     ]);
 
-    const formattedPlayers = await Promise.all(items.map((p) => this.formatPlayerResponse(p)));
-    return new PaginatedResponseDto(formattedPlayers, new PageMetaDto({ page, limit, itemCount }));
+    const formattedPlayers = await Promise.all(
+      items.map((p) => this.formatPlayerResponse(p)),
+    );
+    return new PaginatedResponseDto(
+      formattedPlayers,
+      new PageMetaDto({ page, limit, itemCount }),
+    );
   }
 
   /**
@@ -633,8 +691,10 @@ export class PlayersService {
           data: { jerseyNumber },
         });
       } catch (error: any) {
-        if (error.code === 'P2002') {
-          throw new ConflictException(`Jersey number ${jerseyNumber} is already taken in this team`);
+        if (error.code === "P2002") {
+          throw new ConflictException(
+            `Jersey number ${jerseyNumber} is already taken in this team`,
+          );
         }
         throw error;
       }
@@ -646,7 +706,7 @@ export class PlayersService {
   /**
    * Remove player (soft delete by deactivating all team associations)
    */
-  async remove(id: string): Promise<void> {
+  async remove(id: string, teamId?: string): Promise<void> {
     const player = await this.prisma.player.findUnique({
       where: { id },
     });
@@ -655,19 +715,43 @@ export class PlayersService {
       throw new NotFoundException(`Player with ID ${id} not found`);
     }
 
-    // Deactivate all team associations
+    const whereClause: any = {
+      playerId: id,
+      isActive: true,
+    };
+    if (teamId) {
+      whereClause.teamId = teamId;
+    }
+
+    // Deactivate team associations
     await this.prisma.playerTeam.updateMany({
-      where: {
-        playerId: id,
-        isActive: true,
-      },
+      where: whereClause,
       data: {
         isActive: false,
         leftAt: new Date(),
       },
     });
 
-    this.logger.log(`Deactivated all team associations for player ${id}`);
+    this.logger.log(`Deactivated team associations for player ${id}`);
+  }
+
+  /**
+   * Hard delete player
+   */
+  async hardDelete(id: string): Promise<void> {
+    const player = await this.prisma.player.findUnique({
+      where: { id },
+    });
+
+    if (!player) {
+      throw new NotFoundException(`Player with ID ${id} not found`);
+    }
+
+    await this.prisma.player.delete({
+      where: { id },
+    });
+
+    this.logger.log(`Hard deleted player ${id}`);
   }
 
   /**
@@ -726,8 +810,10 @@ export class PlayersService {
           },
         });
       } catch (error: any) {
-        if (error.code === 'P2002') {
-          throw new ConflictException(`Jersey number ${jerseyNumber} is already taken in this team`);
+        if (error.code === "P2002") {
+          throw new ConflictException(
+            `Jersey number ${jerseyNumber} is already taken in this team`,
+          );
         }
         throw error;
       }
@@ -743,8 +829,10 @@ export class PlayersService {
           },
         });
       } catch (error: any) {
-        if (error.code === 'P2002') {
-          throw new ConflictException(`Jersey number ${jerseyNumber} is already taken in this team`);
+        if (error.code === "P2002") {
+          throw new ConflictException(
+            `Jersey number ${jerseyNumber} is already taken in this team`,
+          );
         }
         throw error;
       }
@@ -832,7 +920,8 @@ export class PlayersService {
         team: pt.team,
       })),
       recentMatches: player.matchStats?.map((stat) => {
-        const isHome = stat.match.homeTeamId === (primaryTeam?.teamId ?? stat.teamId);
+        const isHome =
+          stat.match.homeTeamId === (primaryTeam?.teamId ?? stat.teamId);
         const opponentTeam = isHome ? stat.match.awayTeam : stat.match.homeTeam;
         return {
           matchId: stat.match.id,
@@ -911,27 +1000,42 @@ export class PlayersService {
           continue;
         }
 
-        const nationalityVal = normalizedRow["country"] || normalizedRow["nationality"];
-        const jerseyVal = normalizedRow["jersey number"] || normalizedRow["jersey"] || normalizedRow["jerseynumber"];
+        const nationalityVal =
+          normalizedRow["country"] || normalizedRow["nationality"];
+        const jerseyVal =
+          normalizedRow["jersey number"] ||
+          normalizedRow["jersey"] ||
+          normalizedRow["jerseynumber"];
 
         const candidate = {
           firstName: String(firstName).trim(),
           lastName: String(lastName).trim(),
-          email: normalizedRow["email"] ? String(normalizedRow["email"]).trim() : undefined,
-          height: normalizedRow["height"] ? String(normalizedRow["height"]) : undefined,
-          phone: normalizedRow["phone"] ? String(normalizedRow["phone"]) : undefined,
+          email: normalizedRow["email"]
+            ? String(normalizedRow["email"]).trim()
+            : undefined,
+          height: normalizedRow["height"]
+            ? String(normalizedRow["height"])
+            : undefined,
+          phone: normalizedRow["phone"]
+            ? String(normalizedRow["phone"])
+            : undefined,
           dateOfBirth:
             normalizedRow["date of birth"] || normalizedRow["dob"]
               ? new Date(normalizedRow["date of birth"] || normalizedRow["dob"])
               : undefined,
-          nationality: nationalityVal ? String(nationalityVal).trim() : undefined,
-          jerseyNumber: jerseyVal !== undefined && jerseyVal !== null && jerseyVal !== ""
-            ? parseInt(String(jerseyVal))
+          nationality: nationalityVal
+            ? String(nationalityVal).trim()
             : undefined,
+          jerseyNumber:
+            jerseyVal !== undefined && jerseyVal !== null && jerseyVal !== ""
+              ? parseInt(String(jerseyVal))
+              : undefined,
           position: normalizedRow["position"]
             ? (normalizedRow["position"] as PlayerPosition)
             : undefined,
-          gender: normalizedRow["gender"] ? String(normalizedRow["gender"]).trim() : undefined,
+          gender: normalizedRow["gender"]
+            ? String(normalizedRow["gender"]).trim()
+            : undefined,
         };
 
         // 1. Deduplication Check
@@ -995,8 +1099,10 @@ export class PlayersService {
                     },
                   });
                 } catch (error: any) {
-                  if (error.code === 'P2002') {
-                    throw new ConflictException(`Jersey number ${candidate.jerseyNumber} is already taken in this team`);
+                  if (error.code === "P2002") {
+                    throw new ConflictException(
+                      `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
+                    );
                   }
                   throw error;
                 }
@@ -1052,8 +1158,10 @@ export class PlayersService {
                 },
               });
             } catch (error: any) {
-              if (error.code === 'P2002') {
-                throw new ConflictException(`Jersey number ${candidate.jerseyNumber} is already taken in this team`);
+              if (error.code === "P2002") {
+                throw new ConflictException(
+                  `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
+                );
               }
               throw error;
             }

@@ -39,7 +39,8 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.unsubscribe = this.redisService.subscribeSessionUpdates((payload) => {
       const envelope = payload as
-        { originNodeId?: string; update?: StatdashRealtimeUpdate } | undefined;
+        | { originNodeId?: string; update?: StatdashRealtimeUpdate }
+        | undefined;
       if (!envelope?.update) return;
       if (envelope.originNodeId === this.nodeId) return;
       this.emitUpdate(envelope.update);

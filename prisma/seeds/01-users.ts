@@ -55,6 +55,30 @@ export async function seedUsers(prisma: PrismaClient) {
     statisticians.push(stat);
   }
 
+  const testManager = await prisma.user.upsert({
+    where: { email: "test-client-manager@optiq.com" },
+    update: {},
+    create: {
+      email: "test-client-manager@optiq.com",
+      password,
+      role: "CLIENT",
+      emailVerified: true,
+      profile: { create: { fullName: "Test Manager" } }
+    }
+  });
+
+  const testViewer = await prisma.user.upsert({
+    where: { email: "test-client-viewer@optiq.com" },
+    update: {},
+    create: {
+      email: "test-client-viewer@optiq.com",
+      password,
+      role: "CLIENT",
+      emailVerified: true,
+      profile: { create: { fullName: "Test Viewer" } }
+    }
+  });
+
   // 3. Create 5-6 Clients
   const clients = [];
   const clientCount = 6;
@@ -83,10 +107,14 @@ export async function seedUsers(prisma: PrismaClient) {
             { userId: clientUser.id }, // The client user role
             { userId: admin.id }, // Assigned to the admin
             { userId: superAdmin.id },
+            { userId: testManager.id },
+            { userId: testViewer.id },
             ...statisticians.map(s => ({ userId: s.id }))
           ] : [
             { userId: clientUser.id },
-            { userId: admin.id }
+            { userId: admin.id },
+            { userId: testManager.id },
+            { userId: testViewer.id }
           ]
         }
       }
