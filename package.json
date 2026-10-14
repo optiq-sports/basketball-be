@@ -4,8 +4,9 @@
   "description": "A basketball platform backend with NestJS",
   "main": "dist/main.js",
   "scripts": {
-    "build": "prisma generate && prisma migrate deploy && nest build",
-    "build:app": "prisma generate && nest build",
+    "build": "pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm exec nest build",
+    "build:app": "pnpm exec prisma generate && pnpm exec nest build",
+    "vercel-build": "pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm exec nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "npm run build:app && node --enable-source-maps dist/main.js",
     "dev": "nest start --watch",
