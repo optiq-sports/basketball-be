@@ -162,10 +162,17 @@ export class StatdashProjectionsService {
       },
       totals: box.totals,
       advanced: {
-        possessions: box.totals.fga + 0.44 * box.totals.fta - box.totals.oreb + box.totals.turnovers,
-        trueShooting: (box.totals.fga + 0.44 * box.totals.fta) > 0 ? (box.totals.points / (2 * (box.totals.fga + 0.44 * box.totals.fta))) : 0,
+        possessions:
+          box.totals.fga +
+          0.44 * box.totals.fta -
+          box.totals.oreb +
+          box.totals.turnovers,
+        trueShooting:
+          box.totals.fga + 0.44 * box.totals.fta > 0
+            ? box.totals.points / (2 * (box.totals.fga + 0.44 * box.totals.fta))
+            : 0,
         offensiveRating: 0,
-        defensiveRating: 0
+        defensiveRating: 0,
       },
       totalEvents: box.totalEvents,
       generatedAt: new Date().toISOString(),
@@ -183,28 +190,28 @@ export class StatdashProjectionsService {
     await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
-      "timeline"
+      "timeline",
     );
     if (cached) return cached;
 
     const events = await this.getSessionEvents(sessionId);
     const resolvedEvents = this.resolveEvents(events);
-    
+
     // Select relevant fields to return for the timeline
-    const timeline = resolvedEvents.map(event => ({
+    const timeline = resolvedEvents.map((event) => ({
       id: event.id,
       sequence: event.sequence,
       eventType: event.eventType,
       period: event.period,
       clockSecondsRemaining: (event as any).clockSecondsRemaining,
-      payload: event.payload
+      payload: event.payload,
     }));
 
     await this.redisService.setProjectionCached(
       sessionId,
       "timeline",
       timeline,
-      60
+      60,
     );
 
     return timeline;
@@ -611,7 +618,15 @@ export class StatdashProjectionsService {
     }
 
     for (const p of Object.values(players)) {
-      p.eff = (p.points + p.rebounds + p.assists + p.steals + p.blocks) - (p.fga - p.fgm) - (p.fta - p.ftm) - p.turnovers;
+      p.eff =
+        p.points +
+        p.rebounds +
+        p.assists +
+        p.steals +
+        p.blocks -
+        (p.fga - p.fgm) -
+        (p.fta - p.ftm) -
+        p.turnovers;
       totals.eff += p.eff;
     }
     return {

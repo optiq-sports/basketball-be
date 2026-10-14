@@ -145,7 +145,9 @@ export class StatdashProjectionsController {
   }
 
   @Get("match/:sessionId/timeline")
-  @ApiOperation({ summary: "Get the play-by-play timeline for a match session" })
+  @ApiOperation({
+    summary: "Get the play-by-play timeline for a match session",
+  })
   @ApiResponse({
     status: 200,
     description: "Timeline retrieved successfully",
@@ -156,14 +158,14 @@ export class StatdashProjectionsController {
     "Unauthorized",
     "GET",
     "/api/statdash/projections/match/:sessionId/timeline",
-    "Invalid or missing access token"
+    "Invalid or missing access token",
   )
   @AppErrorResponse(
     404,
     "Not Found",
     "GET",
     "/api/statdash/projections/match/:sessionId/timeline",
-    "Session does not exist"
+    "Session does not exist",
   )
   getTimeline(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
     return this.statdashProjectionsService.getTimeline(sessionId, user);

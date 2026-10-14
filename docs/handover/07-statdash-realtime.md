@@ -118,7 +118,7 @@ stateDiagram-v2
 
 | Endpoint | Service method | Behavior |
 |----------|----------------|----------|
-| `POST .../resolve-match-key` | `resolveMatchKey` | Find match by ID or tournament code |
+| `POST .../resolve-match-key` | `resolveMatchKey` | Find match by ID or matchKey |
 | `POST .../bootstrap` | `bootstrap` | Load/create session + snapshot |
 | `POST .../:sessionId/start` | `startSession` | Set IN_PROGRESS |
 | `GET .../:sessionId/state` | `getState` | Same as bootstrap by sessionId |

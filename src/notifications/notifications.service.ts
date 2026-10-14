@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  async createNotification(userId: string, title: string, message: string, type: string) {
+  async createNotification(
+    userId: string,
+    title: string,
+    message: string,
+    type: string,
+  ) {
     return this.prisma.notification.create({
       data: {
         userId,
@@ -21,7 +26,7 @@ export class NotificationsService {
     const [data, total] = await Promise.all([
       this.prisma.notification.findMany({
         where: { userId },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
@@ -51,7 +56,7 @@ export class NotificationsService {
       where: { id, userId },
     });
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException("Notification not found");
     }
     return this.prisma.notification.update({
       where: { id },

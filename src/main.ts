@@ -7,11 +7,6 @@ import { WinstonModule } from "nest-winston";
 import helmet from "helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ClientApiModule } from "./client-api/client-api.module";
-import { QueueService } from "./common/queue/queue.service";
-import { createBullBoard } from "@bull-board/api";
-import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
-import { ExpressAdapter } from "@bull-board/express";
-import express from "express";
 
 function resolveCorsOrigin():
   | boolean
@@ -199,23 +194,6 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
 
   // Enable graceful shutdown
   app.enableShutdownHooks();
-
-  const queueService = app.get(QueueService);
-  const queues = queueService.getQueues();
-  if (queues.length > 0) {
-    const serverAdapter = new ExpressAdapter();
-    serverAdapter.setBasePath("/api/admin/queues");
-    createBullBoard({
-      queues: queues.map((q) => new BullMQAdapter(q)),
-      serverAdapter: serverAdapter,
-    });
-
-    // We need to get the underlying Express instance to add the router properly
-    const expressApp = app
-      .getHttpAdapter()
-      .getInstance() as express.Application;
-    expressApp.use("/api/admin/queues", serverAdapter.getRouter());
-  }
 
   const port = process.env.PORT || 3000;
 

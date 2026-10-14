@@ -233,7 +233,7 @@ Tournament configuration (divisions, quarter length, officials) and team enrollm
 ### Integrations
 
 - Matches scoped to tournament
-- StatDash `resolveMatchKey` can use tournament `code`
+- StatDash `resolveMatchKey` uses match ID or `matchKey` (tournament code fallback removed for security)
 
 ---
 

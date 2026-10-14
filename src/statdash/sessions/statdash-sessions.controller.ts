@@ -55,7 +55,7 @@ export class StatdashSessionsController {
     "Bad Request",
     "POST",
     "/api/statdash/sessions/resolve-match-key",
-    "Invalid or ambiguous match key",
+    "Invalid match key or tournament code not supported",
   )
   @AppErrorResponse(
     401,
