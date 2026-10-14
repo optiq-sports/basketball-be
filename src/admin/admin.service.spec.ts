@@ -3,7 +3,10 @@ import { AdminService } from "./admin.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../notifications/email.service";
 import { Role, UserStatus } from "@prisma/client";
-import { ConflictException, InternalServerErrorException } from "@nestjs/common";
+import {
+  ConflictException,
+  InternalServerErrorException,
+} from "@nestjs/common";
 
 describe("AdminService", () => {
   let service: AdminService;
@@ -24,7 +27,9 @@ describe("AdminService", () => {
               count: jest.fn(),
               update: jest.fn(),
             },
-            $transaction: jest.fn().mockImplementation(async (cb) => cb(prisma)),
+            $transaction: jest
+              .fn()
+              .mockImplementation(async (cb) => cb(prisma)),
           },
         },
         {
@@ -49,7 +54,9 @@ describe("AdminService", () => {
     const currentUser = { id: "user1", role: Role.SUPER_ADMIN };
 
     it("should throw ConflictException if user already exists", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "existing" });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "existing",
+      });
 
       await expect(
         service.create(currentUser, { email: "test@test.com" } as any),
@@ -65,7 +72,9 @@ describe("AdminService", () => {
       };
       (prisma.user.create as jest.Mock).mockResolvedValue(mockNewUser);
 
-      const result = await service.create(currentUser, { email: "test@test.com" } as any);
+      const result = await service.create(currentUser, {
+        email: "test@test.com",
+      } as any);
 
       expect(prisma.user.create).toHaveBeenCalled();
       expect(emailService.sendWelcomeEmail).toHaveBeenCalledWith(

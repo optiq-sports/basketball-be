@@ -23,6 +23,9 @@ describe("StatdashSessionsService", () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    tournament: {
+      findUnique: jest.fn(),
+    },
     gameSession: {
       findUnique: jest.fn(),
       upsert: jest.fn(),
@@ -119,14 +122,29 @@ describe("StatdashSessionsService", () => {
     });
   });
 
-  it("fails resolve when tournament key maps to multiple matches", async () => {
+  it("rejects tournament code as match key", async () => {
     prismaService.match.findFirst.mockResolvedValue(null);
-    prismaService.match.findMany.mockResolvedValue([
-      { id: "m1", status: MatchStatus.SCHEDULED, gameSessions: null },
-      { id: "m2", status: MatchStatus.SCHEDULED, gameSessions: null },
-    ]);
+    prismaService.tournament.findUnique.mockResolvedValue({
+      id: "tourney_1",
+      code: "TOURNAMENT_KEY",
+    });
 
     await expect(service.resolveMatchKey("TOURNAMENT_KEY")).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it("throws NotFoundException when match key is not found", async () => {
+    prismaService.match.findFirst.mockResolvedValue(null);
+    prismaService.tournament.findUnique.mockResolvedValue(null);
+
+    await expect(service.resolveMatchKey("UNKNOWN_KEY")).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it("throws BadRequestException when match key is blank", async () => {
+    await expect(service.resolveMatchKey("   ")).rejects.toThrow(
       BadRequestException,
     );
   });

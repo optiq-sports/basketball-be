@@ -55,7 +55,7 @@ export class StatdashSessionsService {
       ];
     }
 
-    let match = await this.prisma.match.findFirst({
+    const match = await this.prisma.match.findFirst({
       where: matchWhere,
       include: {
         gameSessions: true,
@@ -63,34 +63,18 @@ export class StatdashSessionsService {
     });
 
     if (!match) {
-      const tourneyMatchWhere: any = {
-        tournament: { code: normalizedMatchKey },
-      };
-      if (statisticianId) {
-        tourneyMatchWhere.OR = [
-          { statisticianId: statisticianId },
-          { statisticianId: null },
-        ];
-      }
-
-      const matchesByTournamentCode = await this.prisma.match.findMany({
-        where: tourneyMatchWhere,
-        include: {
-          gameSessions: true,
-        },
-        orderBy: [{ status: "desc" }, { scheduledDate: "desc" }],
+      // Reject public tournament codes if passed as matchKey
+      const tournament = await this.prisma.tournament.findUnique({
+        where: { code: normalizedMatchKey },
       });
-      if (matchesByTournamentCode.length > 1) {
+      if (tournament) {
         throw new BadRequestException({
-          code: "SD_SESSION_MATCH_KEY_AMBIGUOUS",
+          code: "SD_SESSION_TOURNAMENT_CODE_NOT_SUPPORTED",
           message:
-            "matchKey maps to multiple matches. Use explicit matchId as matchKey.",
+            "Tournament code cannot be used as a match key. Please use the specific match key or match ID.",
         });
       }
-      match = matchesByTournamentCode[0] ?? null;
-    }
 
-    if (!match) {
       throw new NotFoundException({
         code: "SD_SESSION_MATCH_NOT_FOUND",
         message: "No match found for supplied matchKey",

@@ -202,7 +202,7 @@ Roles: SUPER_ADMIN, ADMIN, STATISTICIAN.
 
 | Method | Path | Body | Purpose |
 |--------|------|------|---------|
-| POST | `/statdash/sessions/resolve-match-key` | `ResolveMatchKeyDto` | Resolve match by ID or tournament code |
+| POST | `/statdash/sessions/resolve-match-key` | `ResolveMatchKeyDto` | Resolve match by ID or matchKey |
 | POST | `/statdash/sessions/bootstrap` | `BootstrapSessionDto` | Create/load session snapshot |
 | POST | `/statdash/sessions/:sessionId/start` | — | PENDING → IN_PROGRESS |
 | GET | `/statdash/sessions/:sessionId/state` | — | Full state snapshot |

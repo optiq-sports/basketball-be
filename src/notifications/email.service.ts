@@ -39,7 +39,8 @@ export class EmailService {
     try {
       const template = getWelcomeEmailTemplate(role, generatedPassword);
       const info = await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Optiq Sports" <noreply@optiqsports.com>',
+        from:
+          process.env.SMTP_FROM || '"Optiq Sports" <noreply@optiqsports.com>',
         to,
         ...template,
       });
@@ -62,7 +63,8 @@ export class EmailService {
       const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password?token=${token}`;
       const template = getPasswordResetEmailTemplate(resetUrl);
       const info = await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Optiq Sports" <noreply@optiqsports.com>',
+        from:
+          process.env.SMTP_FROM || '"Optiq Sports" <noreply@optiqsports.com>',
         to,
         ...template,
       });
