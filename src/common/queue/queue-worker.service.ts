@@ -86,6 +86,7 @@ export class QueueWorkerService implements OnModuleDestroy {
       this.logger.error(
         `Failed to rebuild projections for session ${sessionId}: ${error}`,
       );
+      throw error;
     }
   }
 
@@ -104,6 +105,7 @@ export class QueueWorkerService implements OnModuleDestroy {
       this.logger.error(
         `Failed to rebuild projections for session ${sessionId}: ${error}`,
       );
+      throw error;
     }
   }
 
@@ -132,6 +134,7 @@ export class QueueWorkerService implements OnModuleDestroy {
       this.logger.error(
         `Failed to sync match stats for session ${sessionId}: ${error}`,
       );
+      throw error;
     }
   }
 }

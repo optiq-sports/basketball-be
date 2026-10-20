@@ -15,9 +15,15 @@ import {
   PaginatedResponseDto,
 } from "../common/dto/paginated-response.dto";
 
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
+
 @Injectable()
 export class StatisticianService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogsService: AuditLogsService,
+  ) {}
 
   async create(createStatisticianDto: CreateStatisticianDto) {
     const existingUser = await this.prisma.user.findUnique({
@@ -298,11 +304,28 @@ export class StatisticianService {
     });
   }
 
-  remove(id: string) {
-    return this.prisma.user.update({
-      where: { id },
-      data: { status: UserStatus.INACTIVE },
-      omit: { password: true },
+  async remove(id: string, actorUser?: AuthenticatedUser) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("Statistician not found");
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id },
+        data: { status: UserStatus.INACTIVE },
+        omit: { password: true },
+      });
+
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: actorUser?.id || "system",
+        actorRole: actorUser?.role || "ADMIN",
+        action: "DELETE",
+        entityType: "statistician",
+        entityId: id,
+        before: user,
+        after: updated,
+      });
+
+      return updated;
     });
   }
 }

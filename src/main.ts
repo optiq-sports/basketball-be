@@ -7,16 +7,17 @@ import { WinstonModule } from "nest-winston";
 import helmet from "helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ClientApiModule } from "./client-api/client-api.module";
+import type { Request, Response, NextFunction } from "express";
 
-function resolveCorsOrigin():
-  | boolean
-  | ((
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => void) {
+function resolveCorsOrigin(): (
+  origin: string | undefined,
+  callback: (err: Error | null, allow?: boolean) => void,
+) => void {
   const raw = process.env.CORS_ORIGINS?.trim();
   if (!raw) {
-    return true;
+    return (_origin, callback) => {
+      callback(null, true);
+    };
   }
   const allowed = new Set(
     raw
@@ -77,6 +78,14 @@ async function bootstrap() {
       "Authorization",
       "Accept",
       "X-Requested-With",
+      "x-api-key",
+      "X-Api-Key",
+      "x-embed-token",
+      "X-Embed-Token",
+      "x-overlay-token",
+      "X-Overlay-Token",
+      "x-token",
+      "X-Token",
     ],
   });
 
@@ -88,6 +97,16 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Rewrite root /overlay/* and /broadcast/* to /api/... so browser sources and operators can connect cleanly
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.url.startsWith("/overlay/") || req.url === "/overlay") {
+      req.url = `/api${req.url}`;
+    } else if (req.url.startsWith("/broadcast/") || req.url === "/broadcast") {
+      req.url = `/api${req.url}`;
+    }
+    next();
+  });
 
   // Global prefix
   app.setGlobalPrefix("api");
@@ -170,9 +189,29 @@ All secured endpoints require a valid JWT (JSON Web Token) passed in the \`Autho
         type: "apiKey",
         in: "header",
         name: "x-api-key",
-        description: "Enter your API Key",
+        description: "Enter your full API Key",
       },
       "x-api-key",
+    )
+    .addApiKey(
+      {
+        type: "apiKey",
+        in: "header",
+        name: "x-embed-token",
+        description:
+          "Enter your read-only Embed Token (or ?embedToken=... query parameter)",
+      },
+      "x-embed-token",
+    )
+    .addApiKey(
+      {
+        type: "apiKey",
+        in: "header",
+        name: "x-overlay-token",
+        description:
+          "Enter your match-scoped Overlay Token (or ?overlayToken=... query parameter)",
+      },
+      "x-overlay-token",
     )
     .build();
 

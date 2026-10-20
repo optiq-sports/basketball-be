@@ -4,6 +4,19 @@ import { firstNames, lastNames, teamNames, colors, positions, randomItem, random
 export async function seedTeamsAndPlayers(prisma: PrismaClient) {
   console.log("Seeding teams and players...");
 
+  // Clean up any legacy players with 1970 epoch dates of birth
+  await prisma.player.updateMany({
+    where: {
+      dateOfBirth: {
+        gte: new Date("1970-01-01T00:00:00.000Z"),
+        lt: new Date("1971-01-01T00:00:00.000Z"),
+      },
+    },
+    data: {
+      dateOfBirth: new Date("1998-06-15T00:00:00.000Z"),
+    },
+  });
+
   // 1. Create 100 Players
   const players = [];
   for (let i = 0; i < 100; i++) {
@@ -16,7 +29,7 @@ export async function seedTeamsAndPlayers(prisma: PrismaClient) {
         email: `${fName.toLowerCase()}.${lName.toLowerCase()}${i}@optiqsport.com`,
         position: randomItem([...positions]),
         height: `${randomInt(5, 7)}'${randomInt(0, 11)}"`,
-        dateOfBirth: new Date(randomInt(1990, 2005), randomInt(0, 11), randomInt(1, 28)),
+        dateOfBirth: new Date(Date.UTC(randomInt(1990, 2005), randomInt(0, 11), randomInt(1, 28))),
       }
     });
     players.push(player);

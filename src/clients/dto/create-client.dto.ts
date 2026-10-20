@@ -12,6 +12,23 @@ export class CreateClientDto {
   @IsOptional()
   websiteUrl?: string;
 
+  @ApiPropertyOptional({
+    example: "onesporttv",
+    description: "Unique subdomain slug for client",
+  })
+  @IsString()
+  @IsOptional()
+  slug?: string;
+
+  @ApiPropertyOptional({
+    example: "broadcast",
+    description: "Client type: 'standard' or 'broadcast'",
+    default: "standard",
+  })
+  @IsString()
+  @IsOptional()
+  clientType?: string;
+
   @ApiPropertyOptional({ example: "https://optiqsports.com/logo.png" })
   @IsString()
   @IsOptional()

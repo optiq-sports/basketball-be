@@ -1,13 +1,16 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import { GameSession, GameSessionStatus } from "@prisma/client";
 import { StatdashSessionsRepository } from "./statdash-sessions.repository";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../common/redis/redis.service";
+import { StatdashProjectionsService } from "../projections/statdash-projections.service";
 
 @Injectable()
 export class StatdashSessionsService {
@@ -15,6 +18,7 @@ export class StatdashSessionsService {
     private readonly statdashSessionsRepository: StatdashSessionsRepository,
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   async createSessionSeed(input: {
@@ -41,22 +45,11 @@ export class StatdashSessionsService {
       });
     }
 
-    // Prefer explicit match id keying to avoid ambiguous tournament-level lookups,
-    // but also support looking up by matchKey.
-    const matchWhere: any = {
-      OR: [{ id: normalizedMatchKey }, { matchKey: normalizedMatchKey }],
-    };
-
-    if (statisticianId) {
-      matchWhere.AND = [
-        {
-          OR: [{ statisticianId: statisticianId }, { statisticianId: null }],
-        },
-      ];
-    }
-
+    // Look up match by id or matchKey first without narrowing by statistician
     const match = await this.prisma.match.findFirst({
-      where: matchWhere,
+      where: {
+        OR: [{ id: normalizedMatchKey }, { matchKey: normalizedMatchKey }],
+      },
       include: {
         gameSessions: true,
       },
@@ -78,6 +71,18 @@ export class StatdashSessionsService {
       throw new NotFoundException({
         code: "SD_SESSION_MATCH_NOT_FOUND",
         message: "No match found for supplied matchKey",
+      });
+    }
+
+    if (
+      statisticianId &&
+      match.statisticianId !== null &&
+      match.statisticianId !== statisticianId
+    ) {
+      throw new ForbiddenException({
+        code: "SD_SESSION_MATCH_NOT_ASSIGNED",
+        message:
+          "This match is assigned to another statistician. You do not have permission to access it.",
       });
     }
 
@@ -126,28 +131,33 @@ export class StatdashSessionsService {
       session.match?.statisticianId !== null &&
       session.match?.statisticianId !== statisticianId
     ) {
-      throw new NotFoundException({
-        code: "SD_SESSION_NOT_FOUND",
-        message: "Session does not exist",
+      throw new ForbiddenException({
+        code: "SD_SESSION_MATCH_NOT_ASSIGNED",
+        message:
+          "This match is assigned to another statistician. You do not have permission to access it.",
       });
     }
 
     if (!session && input.matchId) {
-      const matchWhere: any = { id: input.matchId };
-      if (statisticianId) {
-        matchWhere.OR = [
-          { statisticianId: statisticianId },
-          { statisticianId: null },
-        ];
-      }
-
-      const match = await this.prisma.match.findFirst({
-        where: matchWhere,
+      const match = await this.prisma.match.findUnique({
+        where: { id: input.matchId },
       });
       if (!match) {
         throw new NotFoundException({
           code: "SD_SESSION_MATCH_NOT_FOUND",
           message: "Match does not exist",
+        });
+      }
+
+      if (
+        statisticianId &&
+        match.statisticianId !== null &&
+        match.statisticianId !== statisticianId
+      ) {
+        throw new ForbiddenException({
+          code: "SD_SESSION_MATCH_NOT_ASSIGNED",
+          message:
+            "This match is assigned to another statistician. You do not have permission to access it.",
         });
       }
 
@@ -359,6 +369,17 @@ export class StatdashSessionsService {
       }),
     ]);
     await this.redisService.invalidateSessionSnapshotCache(sessionId);
+    try {
+      const projectionsService = this.moduleRef.get(
+        StatdashProjectionsService,
+        { strict: false },
+      );
+      if (projectionsService) {
+        await projectionsService.rebuildAndPersist(sessionId);
+      }
+    } catch {
+      // Rebuild failure shouldn't abort completeSession, but projections/stats are synced
+    }
     return updatedSession;
   }
 
@@ -426,6 +447,8 @@ export class StatdashSessionsService {
       status: session.status,
       quarter: session.quarter,
       clockSecondsRemaining: session.clockSecondsRemaining,
+      clockRunning: session.clockRunning ?? false,
+      clockUpdatedAt: session.clockUpdatedAt ?? session.updatedAt,
       score: {
         home: session.homeScore,
         away: session.awayScore,

@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ProjectionTotalsDto {
   @ApiProperty({ example: 25 })
@@ -71,6 +71,21 @@ export class ProjectionTotalsDto {
 export class PlayerProjectionDto extends ProjectionTotalsDto {
   @ApiProperty({ example: "player_123" })
   playerId: string;
+
+  @ApiPropertyOptional({ example: "team_1", nullable: true })
+  teamId?: string | null;
+
+  @ApiPropertyOptional({ example: "LeBron James", nullable: true })
+  name?: string | null;
+
+  @ApiPropertyOptional({ example: 23, nullable: true })
+  jerseyNumber?: number | null;
+
+  @ApiPropertyOptional({
+    example: "https://example.com/photo.jpg",
+    nullable: true,
+  })
+  photo?: string | null;
 }
 
 export class BoxScoreResponseDto {
@@ -80,6 +95,10 @@ export class BoxScoreResponseDto {
     example: {
       player_123: {
         playerId: "player_123",
+        teamId: "team_1",
+        name: "LeBron James",
+        jerseyNumber: 23,
+        photo: "https://example.com/photo.jpg",
         points: 25,
         rebounds: 10,
         assists: 5,
@@ -94,6 +113,13 @@ export class BoxScoreResponseDto {
 
   @ApiProperty({ type: ProjectionTotalsDto })
   totals: ProjectionTotalsDto;
+
+  @ApiPropertyOptional({
+    type: "object",
+    additionalProperties: { $ref: "#/components/schemas/ProjectionTotalsDto" },
+    description: "Per-team totals keyed by teamId and side ('home', 'away')",
+  })
+  teamTotals?: Record<string, ProjectionTotalsDto>;
 
   @ApiProperty({ example: 150 })
   totalEvents: number;
@@ -203,6 +229,21 @@ export class TimelineEventDto {
   @ApiProperty({ example: 600 })
   clockSecondsRemaining: number;
 
+  @ApiProperty({ example: "team_1", nullable: true, required: false })
+  teamId?: string | null;
+
+  @ApiProperty({ example: "player_1", nullable: true, required: false })
+  playerId?: string | null;
+
+  @ApiProperty({ example: "made 2-point jumpshot" })
+  description: string;
+
+  @ApiProperty({ example: 2 })
+  homeScore: number;
+
+  @ApiProperty({ example: 0 })
+  awayScore: number;
+
   @ApiProperty({ type: Object })
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
 }

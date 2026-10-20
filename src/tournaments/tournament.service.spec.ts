@@ -4,10 +4,10 @@ import { TournamentsService } from "./tournaments.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { AuthenticatedUser } from "src/common/interfaces/user.interface";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
 
 describe("TournamentsService", () => {
   let service: TournamentsService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     tournament: {
@@ -29,6 +29,16 @@ describe("TournamentsService", () => {
     client: {
       findUnique: jest.fn(),
     },
+    $transaction: jest
+      .fn()
+      .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb(mockPrismaService),
+      ),
+  };
+
+  const mockAuditLogsService = {
+    recordLog: jest.fn().mockResolvedValue({ id: "audit-1" }),
+    findAll: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -39,11 +49,14 @@ describe("TournamentsService", () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
+        },
       ],
     }).compile();
 
     service = module.get<TournamentsService>(TournamentsService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -121,8 +134,72 @@ describe("TournamentsService", () => {
   describe("findAll", () => {
     it("should return all tournaments", async () => {
       mockPrismaService.tournament.findMany.mockResolvedValue([{ id: "t1" }]);
+      mockPrismaService.tournament.count.mockResolvedValue(1);
       const result = await service.findAll(mockUser);
       expect(result.items).toEqual([{ id: "t1" }]);
+    });
+
+    it("should build pagination and query without spreading arbitrary filters into where", async () => {
+      mockPrismaService.tournament.findMany.mockResolvedValue([{ id: "t1" }]);
+      mockPrismaService.tournament.count.mockResolvedValue(1);
+
+      await service.findAll(mockUser, {
+        page: 1,
+        limit: 10,
+        sortBy: "name",
+        sortOrder: "asc",
+        search: "Championship",
+      });
+
+      expect(mockPrismaService.tournament.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { name: { contains: "Championship", mode: "insensitive" } },
+              { venue: { contains: "Championship", mode: "insensitive" } },
+            ],
+          },
+          orderBy: { name: "asc" },
+          skip: 0,
+          take: 10,
+        }),
+      );
+
+      expect(mockPrismaService.tournament.count).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { name: { contains: "Championship", mode: "insensitive" } },
+            { venue: { contains: "Championship", mode: "insensitive" } },
+          ],
+        },
+      });
+    });
+
+    it("should include tenant filter for non-SUPER_ADMIN users", async () => {
+      const adminUser: AuthenticatedUser = {
+        ...mockUser,
+        role: Role.ADMIN,
+      };
+      mockPrismaService.tournament.findMany.mockResolvedValue([{ id: "t1" }]);
+      mockPrismaService.tournament.count.mockResolvedValue(1);
+
+      await service.findAll(adminUser, {
+        page: 1,
+        limit: 10,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+
+      expect(mockPrismaService.tournament.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            clientId: { in: ["client1"] },
+          },
+          orderBy: { name: "asc" },
+          skip: 0,
+          take: 10,
+        }),
+      );
     });
   });
 

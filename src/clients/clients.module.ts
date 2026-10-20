@@ -4,8 +4,10 @@ import { ClientsService } from "./clients.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 
+import { OverlayModule } from "../overlay/overlay.module";
+
 @Module({
-  imports: [PrismaModule, NotificationsModule],
+  imports: [PrismaModule, NotificationsModule, OverlayModule],
   controllers: [ClientsController],
   providers: [ClientsService],
 })

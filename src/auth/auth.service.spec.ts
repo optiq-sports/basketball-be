@@ -73,7 +73,45 @@ describe("AuthService", () => {
   });
 
   describe("login", () => {
-    it("should return access token on successful login", async () => {
+    it("should return access token on successful login with clientIds and forcePasswordChange", async () => {
+      const loginDto = {
+        email: "test@example.com",
+        password: "password123",
+      };
+
+      const mockUser = {
+        id: "user1",
+        email: "test@example.com",
+        password: "hashedPassword",
+        role: "ADMIN",
+        status: "ACTIVE",
+        forcePasswordChange: true,
+        clientUsers: [{ clientId: "client-123" }],
+        profile: { fullName: "Test Admin" },
+      };
+
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      mockJwtService.sign.mockReturnValue("token123");
+      mockPrismaService.session.create.mockResolvedValue({});
+
+      const result = await service.login(loginDto);
+
+      expect(result).toHaveProperty("access_token");
+      expect(result).toHaveProperty("user");
+      expect(result.user).toEqual({
+        id: "user1",
+        email: "test@example.com",
+        name: "Test Admin",
+        role: "ADMIN",
+        profile: { fullName: "Test Admin" },
+        clientIds: ["client-123"],
+        forcePasswordChange: true,
+      });
+      expect(mockJwtService.sign).toHaveBeenCalled();
+    });
+
+    it("should default clientIds to empty array and forcePasswordChange to false if omitted", async () => {
       const loginDto = {
         email: "test@example.com",
         password: "password123",
@@ -94,9 +132,8 @@ describe("AuthService", () => {
 
       const result = await service.login(loginDto);
 
-      expect(result).toHaveProperty("access_token");
-      expect(result).toHaveProperty("user");
-      expect(mockJwtService.sign).toHaveBeenCalled();
+      expect(result.user.clientIds).toEqual([]);
+      expect(result.user.forcePasswordChange).toBe(false);
     });
 
     it("should throw UnauthorizedException on invalid credentials", async () => {
@@ -222,6 +259,9 @@ describe("AuthService", () => {
           email: "test@example.com",
           name: null,
           role: Role.ADMIN,
+          profile: null,
+          clientIds: [],
+          forcePasswordChange: false,
         },
       });
       expect(mockPrismaService.$transaction).toHaveBeenCalled();

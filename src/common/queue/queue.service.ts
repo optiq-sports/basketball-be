@@ -4,9 +4,7 @@ import IORedis from "ioredis";
 
 type QueuePayload = Record<string, unknown>;
 type QueueName =
-  | "statdash-projections"
-  | "statdash-recompute"
-  | "statdash-matchstat-sync";
+  "statdash-projections" | "statdash-recompute" | "statdash-matchstat-sync";
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {
@@ -27,19 +25,30 @@ export class QueueService implements OnModuleDestroy {
     this.connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
     this.projectionQueue = new Queue("statdash-projections", {
       connection: this.connection,
-      defaultJobOptions: { attempts: 3, removeOnComplete: true },
+      defaultJobOptions: {
+        attempts: 3,
+        removeOnComplete: { count: 100, age: 86400 },
+      },
     });
     this.recomputeQueue = new Queue("statdash-recompute", {
       connection: this.connection,
-      defaultJobOptions: { attempts: 3, removeOnComplete: true },
+      defaultJobOptions: {
+        attempts: 3,
+        removeOnComplete: { count: 100, age: 86400 },
+      },
     });
     this.matchStatSyncQueue = new Queue("statdash-matchstat-sync", {
       connection: this.connection,
-      defaultJobOptions: { attempts: 3, removeOnComplete: true },
+      defaultJobOptions: {
+        attempts: 3,
+        removeOnComplete: { count: 100, age: 86400 },
+      },
     });
     this.deadLetterQueue = new Queue("statdash-dlq", {
       connection: this.connection,
-      defaultJobOptions: { removeOnComplete: true },
+      defaultJobOptions: {
+        removeOnComplete: { count: 100, age: 86400 },
+      },
     });
   }
 
@@ -147,10 +156,11 @@ export class QueueService implements OnModuleDestroy {
         queues: {},
       };
     }
-    const [projection, recompute, matchStat] = await Promise.all([
+    const [projection, recompute, matchStat, dlq] = await Promise.all([
       this.projectionQueue?.getJobCounts(),
       this.recomputeQueue?.getJobCounts(),
       this.matchStatSyncQueue?.getJobCounts(),
+      this.deadLetterQueue?.getJobCounts(),
     ]);
     return {
       enabled: true,
@@ -158,6 +168,7 @@ export class QueueService implements OnModuleDestroy {
         "statdash-projections": projection ?? {},
         "statdash-recompute": recompute ?? {},
         "statdash-matchstat-sync": matchStat ?? {},
+        "statdash-dlq": dlq ?? {},
       },
     };
   }
@@ -185,7 +196,7 @@ export class QueueService implements OnModuleDestroy {
   }
 
   async requeueDeadLetterJobs(limit = 25) {
-    if (!this.deadLetterQueue) return { requeued: 0 };
+    if (!this.deadLetterQueue) return { enabled: false, requeued: 0 };
     const jobs = await this.deadLetterQueue.getJobs(
       ["waiting", "failed"],
       0,
@@ -207,16 +218,65 @@ export class QueueService implements OnModuleDestroy {
       await job.remove();
       requeued += 1;
     }
-    return { requeued };
+    return { enabled: true, requeued };
+  }
+
+  async getDeadLetterJobs(limit = 25, offset = 0) {
+    if (!this.deadLetterQueue) {
+      return {
+        enabled: false,
+        total: 0,
+        jobs: [],
+      };
+    }
+    const [total, jobs] = await Promise.all([
+      this.deadLetterQueue.count(),
+      this.deadLetterQueue.getJobs(
+        ["waiting", "failed", "completed"],
+        offset,
+        offset + limit - 1,
+      ),
+    ]);
+    return {
+      enabled: true,
+      total,
+      jobs: jobs.map((job) => {
+        const payloadData = (job.data ?? {}) as Record<string, unknown>;
+        const innerData = (payloadData.data ?? {}) as Record<string, unknown>;
+        return {
+          id: job.id ?? "unknown",
+          name: job.name,
+          queueName: (payloadData.queueName as string | undefined) ?? "unknown",
+          sessionId:
+            (innerData.sessionId as string | undefined) ??
+            (payloadData.sessionId as string | undefined),
+          timestamp: job.timestamp,
+          failedReason:
+            job.failedReason ||
+            (payloadData.failedReason as string | undefined) ||
+            "unknown",
+          attemptsMade: job.attemptsMade,
+          data: payloadData,
+        };
+      }),
+    };
   }
 
   async warmSessionCaches(sessionId: string) {
+    if (!this.connection) {
+      return {
+        enabled: false,
+        warmed: false,
+        sessionId,
+      };
+    }
     await Promise.all([
       this.enqueueProjectionRebuild(sessionId, "warm_cache", "warm"),
       this.enqueueReplayBackfill(sessionId, undefined, "warm"),
       this.enqueueMatchStatSync(sessionId, "warm"),
     ]);
     return {
+      enabled: true,
       warmed: true,
       sessionId,
     };
@@ -242,7 +302,7 @@ export class QueueService implements OnModuleDestroy {
         type: "exponential",
         delay: 1000,
       },
-      removeOnComplete: true,
+      removeOnComplete: { count: 100, age: 86400 },
       removeOnFail: false,
       ...options,
     };

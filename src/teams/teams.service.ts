@@ -7,7 +7,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateTeamDto } from "./dto/create-team.dto";
 import { UpdateTeamDto } from "./dto/update-team.dto";
-import { Prisma, Team } from "@prisma/client";
+import { Team } from "@prisma/client";
 import {
   PageMetaDto,
   PaginatedResponseDto,
@@ -15,11 +15,17 @@ import {
 import { TeamFilterDto } from "./dto/team-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
+
 @Injectable()
 export class TeamsService {
   private readonly logger = new Logger(TeamsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogsService: AuditLogsService,
+  ) {}
 
   async create(createTeamDto: CreateTeamDto): Promise<Team> {
     this.logger.log(
@@ -45,21 +51,13 @@ export class TeamsService {
   async findAll(
     filterDto?: TeamFilterDto,
   ): Promise<PaginatedResponseDto<Team>> {
-    const {
-      tournamentId,
-      page,
-      limit,
-      sortBy,
-      sortOrder,
-      search,
-      ...otherParams
-    } = filterDto || {};
+    const { page, limit, tournamentId } = filterDto || {};
 
     const { skip, take, orderBy, searchWhere } = buildPrismaPagination(
       filterDto,
       {
         defaultOrderBy: [{ name: "asc" }],
-        searchFields: ["name"],
+        searchFields: ["name", "code", "country", "state"],
       },
     );
 
@@ -68,7 +66,6 @@ export class TeamsService {
         where: {
           ...(tournamentId && { tournamentTeams: { some: { tournamentId } } }),
           ...searchWhere,
-          ...otherParams,
         },
         include: {
           playerTeams: {
@@ -94,7 +91,6 @@ export class TeamsService {
         where: {
           ...(tournamentId && { tournamentTeams: { some: { tournamentId } } }),
           ...searchWhere,
-          ...otherParams,
         },
       }),
     ]);
@@ -174,10 +170,20 @@ export class TeamsService {
     });
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, actorUser?: AuthenticatedUser): Promise<void> {
     const team = await this.findOne(id);
-    await this.prisma.team.delete({
-      where: { id },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.team.delete({
+        where: { id },
+      });
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: actorUser?.id || "system",
+        actorRole: actorUser?.role || "ADMIN",
+        action: "DELETE",
+        entityType: "team",
+        entityId: id,
+        before: team,
+      });
     });
     this.logger.log(`Deleted team: ${team.name} (${team.code})`);
   }

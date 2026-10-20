@@ -16,6 +16,9 @@ export class RedisService implements OnModuleDestroy {
   private readonly redisClient?: Redis;
   private readonly redisSubscriber?: Redis;
   private readonly updateHandlers = new Set<(payload: unknown) => void>();
+  private readonly overlayUpdateHandlers = new Set<
+    (payload: unknown) => void
+  >();
 
   constructor() {
     const redisUrl = process.env.REDIS_URL;
@@ -50,12 +53,21 @@ export class RedisService implements OnModuleDestroy {
     this.redisSubscriber
       .connect()
       .then(async () => {
-        await this.redisSubscriber?.subscribe(this.realtimeUpdatesChannel());
-        this.redisSubscriber?.on("message", (_channel, message) => {
+        await this.redisSubscriber?.subscribe(
+          this.realtimeUpdatesChannel(),
+          this.overlayUpdatesChannel(),
+        );
+        this.redisSubscriber?.on("message", (channel, message) => {
           try {
             const payload = JSON.parse(message);
-            for (const handler of this.updateHandlers) {
-              handler(payload);
+            if (channel === this.overlayUpdatesChannel()) {
+              for (const handler of this.overlayUpdateHandlers) {
+                handler(payload);
+              }
+            } else {
+              for (const handler of this.updateHandlers) {
+                handler(payload);
+              }
             }
           } catch {
             // Ignore malformed payloads from pub/sub channel
@@ -91,6 +103,22 @@ export class RedisService implements OnModuleDestroy {
     this.updateHandlers.add(handler);
     return () => {
       this.updateHandlers.delete(handler);
+    };
+  }
+
+  async publishOverlayUpdate(payload: unknown) {
+    if (this.redisClient?.status === "ready") {
+      await this.redisClient.publish(
+        this.overlayUpdatesChannel(),
+        JSON.stringify(payload),
+      );
+    }
+  }
+
+  subscribeOverlayUpdates(handler: (payload: unknown) => void) {
+    this.overlayUpdateHandlers.add(handler);
+    return () => {
+      this.overlayUpdateHandlers.delete(handler);
     };
   }
 
@@ -294,6 +322,10 @@ export class RedisService implements OnModuleDestroy {
 
   private realtimeUpdatesChannel() {
     return "statdash:realtime:updates";
+  }
+
+  private overlayUpdatesChannel() {
+    return "overlay:realtime:updates";
   }
 
   async checkHealth(): Promise<boolean> {

@@ -38,6 +38,8 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "@prisma/client";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
 
 @ApiTags("Players")
 @ApiBearerAuth()
@@ -406,13 +408,66 @@ export class PlayersController {
   }
 
   /**
-   * Remove player (deactivates all team associations)
+   * Release player (deactivates team associations)
+   */
+  @Post(":id/release")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Release a player from active team associations" })
+  @ApiQuery({
+    name: "teamId",
+    required: false,
+    description:
+      "Optional team ID to release player from. If omitted, releases from all active teams.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Player released successfully",
+    type: PlayerResponseDto,
+  })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "POST",
+    "/api/players/:id/release",
+    "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "POST",
+    "/api/players/:id/release",
+    "Requires ADMIN role",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "POST",
+    "/api/players/:id/release",
+    "Player not found",
+  )
+  release(@Param("id") id: string, @Query("teamId") teamId?: string) {
+    return this.playersService.release(id, teamId);
+  }
+
+  /**
+   * Remove player (alias for release - deactivates all team associations)
    */
   @Delete(":id")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "Delete a player (deactivates associations)" })
-  @ApiResponse({ status: 200, description: "Player removed successfully" })
+  @ApiOperation({ summary: "Release a player (alias for /release)" })
+  @ApiQuery({
+    name: "teamId",
+    required: false,
+    description:
+      "Optional team ID to release player from. If omitted, releases from all active teams.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Player released successfully",
+    type: PlayerResponseDto,
+  })
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -435,16 +490,61 @@ export class PlayersController {
     "Player not found",
   )
   remove(@Param("id") id: string, @Query("teamId") teamId?: string) {
-    return this.playersService.remove(id, teamId);
+    return this.playersService.release(id, teamId);
   }
 
   /**
-   * Hard delete player
+   * Permanently delete player (fails if match stats or player records exist)
+   */
+  @Delete(":id/permanent")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: "Permanently delete a player (fails if match history exists)",
+  })
+  @ApiResponse({ status: 200, description: "Player permanently deleted" })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "DELETE",
+    "/api/players/:id/permanent",
+    "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "DELETE",
+    "/api/players/:id/permanent",
+    "Requires ADMIN role",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "DELETE",
+    "/api/players/:id/permanent",
+    "Player not found",
+  )
+  @AppErrorResponse(
+    409,
+    "Conflict",
+    "DELETE",
+    "/api/players/:id/permanent",
+    "Cannot delete player with recorded match history",
+  )
+  permanentDelete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+  ) {
+    return this.playersService.permanentDelete(id, user);
+  }
+
+  /**
+   * Hard delete player (alias for /permanent)
    */
   @Delete(":id/hard")
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "Hard delete a player" })
+  @ApiOperation({ summary: "Hard delete a player (alias for /permanent)" })
   @ApiResponse({ status: 200, description: "Player permanently deleted" })
   @AppErrorResponse(
     401,
@@ -467,8 +567,15 @@ export class PlayersController {
     "/api/players/:id/hard",
     "Player not found",
   )
-  hardDelete(@Param("id") id: string) {
-    return this.playersService.hardDelete(id);
+  @AppErrorResponse(
+    409,
+    "Conflict",
+    "DELETE",
+    "/api/players/:id/hard",
+    "Cannot delete player with recorded match history",
+  )
+  hardDelete(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.playersService.permanentDelete(id, user);
   }
 
   /**

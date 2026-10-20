@@ -28,6 +28,7 @@ import {
   StatdashSessionDto,
   StatdashSessionSnapshotDto,
 } from "./dto/statdash-session-responses.dto";
+import { AuthenticatedUser } from "../../common/interfaces/user.interface";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 
 @ApiTags("Statdash Sessions")
@@ -65,13 +66,23 @@ export class StatdashSessionsController {
     "Invalid or missing access token",
   )
   @AppErrorResponse(
+    403,
+    "Forbidden",
+    "POST",
+    "/api/statdash/sessions/resolve-match-key",
+    "This match is assigned to another statistician",
+  )
+  @AppErrorResponse(
     404,
     "Not Found",
     "POST",
     "/api/statdash/sessions/resolve-match-key",
     "No match found for supplied match key",
   )
-  resolveMatchKey(@Body() dto: ResolveMatchKeyDto, @CurrentUser() user: any) {
+  resolveMatchKey(
+    @Body() dto: ResolveMatchKeyDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const statisticianId =
       user.role === Role.STATISTICIAN ? user.id : undefined;
     return this.statdashSessionsService.resolveMatchKey(
@@ -103,13 +114,23 @@ export class StatdashSessionsController {
     "Invalid or missing access token",
   )
   @AppErrorResponse(
+    403,
+    "Forbidden",
+    "POST",
+    "/api/statdash/sessions/bootstrap",
+    "This match is assigned to another statistician",
+  )
+  @AppErrorResponse(
     404,
     "Not Found",
     "POST",
     "/api/statdash/sessions/bootstrap",
     "Match or Session does not exist",
   )
-  bootstrap(@Body() dto: BootstrapSessionDto, @CurrentUser() user: any) {
+  bootstrap(
+    @Body() dto: BootstrapSessionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const statisticianId =
       user.role === Role.STATISTICIAN ? user.id : undefined;
     return this.statdashSessionsService.bootstrap(dto, statisticianId);

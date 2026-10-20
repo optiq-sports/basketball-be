@@ -200,7 +200,7 @@ export class AdminController {
     "/api/admin/:id",
     "Admin not found",
   )
-  remove(@CurrentUser() user: any, @Param("id") id: string) {
+  remove(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.adminService.remove(user, id);
   }
 }

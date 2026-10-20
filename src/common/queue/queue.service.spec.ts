@@ -47,10 +47,17 @@ describe("QueueService", () => {
       lag: {},
     });
     await expect(service.requeueDeadLetterJobs()).resolves.toEqual({
+      enabled: false,
       requeued: 0,
     });
+    await expect(service.getDeadLetterJobs()).resolves.toEqual({
+      enabled: false,
+      total: 0,
+      jobs: [],
+    });
     await expect(service.warmSessionCaches("session_1")).resolves.toEqual({
-      warmed: true,
+      enabled: false,
+      warmed: false,
       sessionId: "session_1",
     });
   });

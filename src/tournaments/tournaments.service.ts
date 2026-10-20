@@ -8,11 +8,10 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateTournamentDto } from "./dto/create-tournament.dto";
 import { UpdateTournamentDto } from "./dto/update-tournament.dto";
 import { AddTeamToTournamentDto } from "./dto/add-team-to-tournament.dto";
-import { Prisma, Tournament } from "@prisma/client";
 import * as crypto from "crypto";
 import { TournamentResponseDto } from "./dto/tournament-response.dto";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
-import { PaginationQueryDto } from "../common/dto/pagination-query.dto";
+import { TournamentFilterDto } from "./dto/tournament-filter.dto";
 import {
   PageMetaDto,
   PaginatedResponseDto,
@@ -20,9 +19,14 @@ import {
 import { getTenantFilter } from "../common/filters/tenant.filter";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+
 @Injectable()
 export class TournamentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogsService: AuditLogsService,
+  ) {}
 
   private generateTournamentCode(): string {
     return crypto.randomBytes(6).toString("hex").toUpperCase();
@@ -109,15 +113,14 @@ export class TournamentsService {
 
   async findAll(
     user: AuthenticatedUser,
-    paginationDto?: PaginationQueryDto,
+    paginationDto?: TournamentFilterDto,
   ): Promise<PaginatedResponseDto<TournamentResponseDto>> {
-    const { page, limit, sortBy, sortOrder, search, ...otherParams } =
-      paginationDto || {};
+    const { page, limit } = paginationDto || {};
     const { skip, take, orderBy, searchWhere } = buildPrismaPagination(
       paginationDto,
       {
         defaultOrderBy: { createdAt: "desc" },
-        searchFields: ["name"],
+        searchFields: ["name", "venue"],
       },
     );
     const [data, itemCount] = await Promise.all([
@@ -125,7 +128,6 @@ export class TournamentsService {
         where: {
           ...getTenantFilter(user),
           ...searchWhere,
-          ...otherParams,
         },
         include: {
           teams: {
@@ -161,7 +163,6 @@ export class TournamentsService {
         where: {
           ...getTenantFilter(user),
           ...searchWhere,
-          ...otherParams,
         },
       }),
     ]);
@@ -362,9 +363,20 @@ export class TournamentsService {
   }
 
   async remove(id: string, user: AuthenticatedUser): Promise<void> {
-    await this.findOne(id, user);
-    await this.prisma.tournament.delete({
-      where: { id },
+    const tournament = await this.findOne(id, user);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tournament.delete({
+        where: { id },
+      });
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: user.id,
+        actorRole: user.role,
+        clientId: user.clientIds?.[0] || null,
+        action: "DELETE",
+        entityType: "tournament",
+        entityId: id,
+        before: tournament,
+      });
     });
   }
 }

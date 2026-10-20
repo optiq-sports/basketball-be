@@ -22,6 +22,20 @@ export class UserProfileDto {
     description: "User role",
   })
   role: Role;
+
+  @ApiProperty({
+    example: ["cmuv056p50000c9proo4a12nu"],
+    description: "Associated client IDs for the user",
+    type: [String],
+  })
+  clientIds: string[];
+
+  @ApiProperty({
+    example: false,
+    description: "Whether the user must change password upon next login",
+  })
+  forcePasswordChange: boolean;
+
   @ApiProperty({
     type: "object",
     properties: {

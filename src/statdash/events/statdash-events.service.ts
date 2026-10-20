@@ -29,6 +29,9 @@ type CommandResult = {
     home: number;
     away: number;
   };
+  clockSecondsRemaining?: number;
+  clockRunning?: boolean;
+  clockUpdatedAt?: Date;
   emittedEvents: Array<{
     id: string;
     sequence: number;
@@ -44,6 +47,9 @@ type CorrectionOrReversalResult = {
     home: number;
     away: number;
   };
+  clockSecondsRemaining?: number;
+  clockRunning?: boolean;
+  clockUpdatedAt?: Date;
   correctedEventId?: string;
   reversedEventId?: string;
 };
@@ -271,21 +277,48 @@ export class StatdashEventsService {
           const batchSize = ruleResult.emittedEvents.length;
           for (let i = 0; i < batchSize; i += 1) {
             const draft = ruleResult.emittedEvents[i];
+            const eventPeriod =
+              typeof command.payload.period === "number"
+                ? command.payload.period
+                : typeof (draft.payload as Record<string, unknown> | undefined)
+                      ?.period === "number"
+                  ? ((draft.payload as Record<string, unknown>)
+                      .period as number)
+                  : (session.quarter ?? 1);
+
+            const eventClockSecondsRemaining =
+              typeof command.payload.clockSecondsRemaining === "number"
+                ? command.payload.clockSecondsRemaining
+                : typeof (draft.payload as Record<string, unknown> | undefined)
+                      ?.clockSecondsRemaining === "number"
+                  ? ((draft.payload as Record<string, unknown>)
+                      .clockSecondsRemaining as number)
+                  : (session.clockSecondsRemaining ?? 600);
+
+            const eventPayload: Record<string, unknown> = {
+              ...(draft.payload as Record<string, unknown>),
+              period:
+                typeof (draft.payload as Record<string, unknown> | undefined)
+                  ?.period === "number"
+                  ? (draft.payload as Record<string, unknown>).period
+                  : eventPeriod,
+              clockSecondsRemaining:
+                typeof (draft.payload as Record<string, unknown> | undefined)
+                  ?.clockSecondsRemaining === "number"
+                  ? (draft.payload as Record<string, unknown>)
+                      .clockSecondsRemaining
+                  : eventClockSecondsRemaining,
+            };
+
             const event = await tx.gameEvent.create({
               data: {
                 sessionId: session.id,
                 sequence: nextSequence,
                 eventType: draft.eventType,
-                payload: draft.payload as Prisma.InputJsonValue,
+                payload: eventPayload as Prisma.InputJsonValue,
                 actorUserId,
-                period:
-                  typeof command.payload.period === "number"
-                    ? command.payload.period
-                    : null,
-                clockSecondsRemaining:
-                  typeof command.payload.clockSecondsRemaining === "number"
-                    ? command.payload.clockSecondsRemaining
-                    : null,
+                period: eventPeriod,
+                clockSecondsRemaining: eventClockSecondsRemaining,
                 expectedVersion: command.expectedVersion,
                 resultingVersion: command.expectedVersion + i + 1,
                 parentEventId: command.parentEventId,
@@ -309,6 +342,10 @@ export class StatdashEventsService {
               clockSecondsRemaining:
                 ruleResult.sessionUpdates?.clockSecondsRemaining !== undefined
                   ? ruleResult.sessionUpdates.clockSecondsRemaining
+                  : undefined,
+              clockRunning:
+                ruleResult.sessionUpdates?.clockRunning !== undefined
+                  ? ruleResult.sessionUpdates.clockRunning
                   : undefined,
               possessionTeamId:
                 ruleResult.sessionUpdates?.possessionTeamId !== undefined
@@ -339,6 +376,9 @@ export class StatdashEventsService {
               home: updatedSession.homeScore,
               away: updatedSession.awayScore,
             },
+            clockRunning: updatedSession.clockRunning,
+            clockUpdatedAt: updatedSession.clockUpdatedAt,
+            clockSecondsRemaining: updatedSession.clockSecondsRemaining,
             emittedEvents: emittedEvents.map((event) => ({
               id: event.id,
               sequence: event.sequence,
@@ -385,6 +425,9 @@ export class StatdashEventsService {
             state: {
               version: response.version,
               score: response.score,
+              clockRunning: response.clockRunning,
+              clockUpdatedAt: response.clockUpdatedAt,
+              clockSecondsRemaining: response.clockSecondsRemaining,
             },
             deltaEvents: response.emittedEvents,
           });
@@ -490,6 +533,8 @@ export class StatdashEventsService {
               },
             } as Prisma.InputJsonValue,
             actorUserId,
+            period: targetEvent.period ?? 1,
+            clockSecondsRemaining: targetEvent.clockSecondsRemaining ?? 600,
             expectedVersion: targetEvent.resultingVersion,
             resultingVersion: targetEvent.resultingVersion + 1,
           },
@@ -652,6 +697,8 @@ export class StatdashEventsService {
             },
           } as Prisma.InputJsonValue,
           actorUserId,
+          period: targetEvent.period ?? 1,
+          clockSecondsRemaining: targetEvent.clockSecondsRemaining ?? 600,
           expectedVersion: targetEvent.resultingVersion,
           resultingVersion: targetEvent.resultingVersion + 1,
         });
@@ -678,6 +725,11 @@ export class StatdashEventsService {
               },
             } as Prisma.InputJsonValue,
             actorUserId,
+            period: child.period ?? targetEvent.period ?? 1,
+            clockSecondsRemaining:
+              child.clockSecondsRemaining ??
+              targetEvent.clockSecondsRemaining ??
+              600,
             expectedVersion: child.resultingVersion,
             resultingVersion: child.resultingVersion + 1,
           });

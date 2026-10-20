@@ -1,14 +1,22 @@
 import { PaginationQueryDto } from "../dto/pagination-query.dto";
 
 export interface PaginationOptions {
-  defaultOrderBy?: any;
+  defaultOrderBy?:
+    Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
   searchFields?: string[];
 }
 
+export interface PrismaPaginationResult {
+  skip: number;
+  take: number;
+  orderBy: Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+  searchWhere: Record<string, unknown>;
+}
+
 export function buildPrismaPagination(
-  dto: PaginationQueryDto,
+  dto?: PaginationQueryDto,
   options?: PaginationOptions,
-) {
+): PrismaPaginationResult {
   const { page = 1, limit = 10, sortBy, sortOrder, search } = dto || {};
 
   const skip = (Number(page) - 1) * Number(limit);
@@ -25,7 +33,7 @@ export function buildPrismaPagination(
   }
 
   // 2. Build Search (Where)
-  const searchWhere: any = {};
+  const searchWhere: Record<string, unknown> = {};
   if (search && options?.searchFields?.length) {
     if (options.searchFields.length === 1) {
       searchWhere[options.searchFields[0]] = {

@@ -46,6 +46,13 @@ export class QueueHealthResponseDto {
         failed: 0,
         delayed: 0,
       },
+      "statdash-dlq": {
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 76,
+        delayed: 0,
+      },
     },
   })
   queues: Record<string, JobCountsDto>;
@@ -77,14 +84,65 @@ export class QueueLagResponseDto {
 }
 
 export class RequeueDeadLetterResponseDto {
+  @ApiProperty({ example: true })
+  enabled: boolean;
+
   @ApiProperty({ example: 10 })
   requeued: number;
 }
 
 export class WarmSessionResponseDto {
   @ApiProperty({ example: true })
+  enabled: boolean;
+
+  @ApiProperty({ example: true })
   warmed: boolean;
 
   @ApiProperty({ example: "session_123" })
   sessionId: string;
+}
+
+export class DeadLetterJobDto {
+  @ApiProperty({ example: "123" })
+  id: string;
+
+  @ApiProperty({ example: "dlq.recovery" })
+  name: string;
+
+  @ApiProperty({ example: "statdash-matchstat-sync", required: false })
+  queueName?: string;
+
+  @ApiProperty({ example: "session_123", required: false })
+  sessionId?: string;
+
+  @ApiProperty({ example: 1729000000000 })
+  timestamp: number;
+
+  @ApiProperty({ example: "Connection refused" })
+  failedReason: string;
+
+  @ApiProperty({ example: 1 })
+  attemptsMade: number;
+
+  @ApiProperty({
+    example: {
+      queueName: "statdash-matchstat-sync",
+      jobName: "matchstat.sync",
+      data: { sessionId: "session_1" },
+      failedReason: "Connection refused",
+      failedAt: "2026-10-18T10:00:00.000Z",
+    },
+  })
+  data: Record<string, unknown>;
+}
+
+export class DeadLetterResponseDto {
+  @ApiProperty({ example: true })
+  enabled: boolean;
+
+  @ApiProperty({ example: 42 })
+  total: number;
+
+  @ApiProperty({ type: [DeadLetterJobDto] })
+  jobs: DeadLetterJobDto[];
 }

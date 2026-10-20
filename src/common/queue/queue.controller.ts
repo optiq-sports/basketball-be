@@ -12,10 +12,12 @@ import {
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../decorators/api-errors.decorator";
 import {
+  GetDeadLetterQueryDto,
   RequeueDeadLetterQueryDto,
   WarmSessionQueryDto,
 } from "./dto/queue-requests.dto";
 import {
+  DeadLetterResponseDto,
   QueueHealthResponseDto,
   QueueLagResponseDto,
   RequeueDeadLetterResponseDto,
@@ -66,6 +68,24 @@ export class QueueController {
     return this.queueService.getQueueLagMetrics();
   }
 
+  @Get("dead-letter")
+  @ApiOperation({ summary: "Get failed jobs stored in the Dead Letter Queue" })
+  @ApiResponse({
+    status: 200,
+    description: "Dead letter jobs retrieved",
+    type: DeadLetterResponseDto,
+  })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/ops/queues/dead-letter",
+    "Invalid or missing access token",
+  )
+  getDeadLetterJobs(@Query() query: GetDeadLetterQueryDto) {
+    return this.queueService.getDeadLetterJobs(query.limit, query.offset);
+  }
+
   @Post("dead-letter/requeue")
   @ApiOperation({ summary: "Requeue failed jobs from the Dead Letter Queue" })
   @ApiResponse({
@@ -81,10 +101,8 @@ export class QueueController {
     "Invalid or missing access token",
   )
   requeueDeadLetterJobs(@Query() query: RequeueDeadLetterQueryDto) {
-    const parsedLimit = Number(query.limit ?? "25");
-    return this.queueService.requeueDeadLetterJobs(
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 25,
-    );
+    const limit = query?.limit !== undefined ? Number(query.limit) : 25;
+    return this.queueService.requeueDeadLetterJobs(limit);
   }
 
   @Post("warm/session")

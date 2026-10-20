@@ -5,7 +5,12 @@ import {
   UseGuards,
   Get,
   Request,
+  Req,
+  Res,
+  UnauthorizedException,
 } from "@nestjs/common";
+import type { Response, Request as ExpressRequest } from "express";
+import { extractCookie } from "./strategies/jwt.strategy";
 import { Role } from "@prisma/client";
 import { AuthService } from "./auth.service";
 import { LoginDto, LogOutDto } from "./dto/login.dto";
@@ -90,6 +95,53 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  private setAuthCookies(
+    res?: Response,
+    accessToken?: string,
+    refreshToken?: string,
+  ) {
+    if (
+      !res ||
+      typeof res.cookie !== "function" ||
+      !accessToken ||
+      !refreshToken
+    ) {
+      return;
+    }
+    const isProduction = process.env.NODE_ENV === "production";
+    res.cookie("access_token", accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+    });
+    res.cookie("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/api/auth",
+    });
+  }
+
+  private clearAuthCookies(res?: Response) {
+    if (!res || typeof res.clearCookie !== "function") {
+      return;
+    }
+    const isProduction = process.env.NODE_ENV === "production";
+    res.clearCookie("access_token", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+    });
+    res.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/api/auth",
+    });
+  }
+
   @UseGuards(LocalAuthGuard)
   @Post("login")
   @ApiOperation({ summary: "Login user" })
@@ -125,8 +177,13 @@ export class AuthController {
     description: "User logged in successfully",
     type: AuthResponseDto,
   })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.login(loginDto);
+    this.setAuthCookies(res, result.access_token, result.refresh_token);
+    return result;
   }
 
   @Post("refresh")
@@ -164,8 +221,17 @@ export class AuthController {
   })
   async refresh(
     @Body() refreshTokenDto: RefreshTokenDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    return this.authService.refresh(refreshTokenDto.refresh_token);
+    const token =
+      refreshTokenDto?.refresh_token || extractCookie(req, "refresh_token");
+    if (!token) {
+      throw new UnauthorizedException("Refresh token is required");
+    }
+    const result = await this.authService.refresh(token);
+    this.setAuthCookies(res, result.access_token, result.refresh_token);
+    return result;
   }
 
   @Post("logout")
@@ -203,8 +269,17 @@ export class AuthController {
   })
   async logout(
     @Body() refreshTokenDto: RefreshTokenDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<{ success: boolean }> {
-    return this.authService.logout(refreshTokenDto.refresh_token);
+    const token =
+      refreshTokenDto?.refresh_token || extractCookie(req, "refresh_token");
+    let result = { success: true };
+    if (token) {
+      result = await this.authService.logout(token);
+    }
+    this.clearAuthCookies(res);
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -224,7 +299,7 @@ export class AuthController {
     description: "User profile fetched successfully",
     type: UserProfileDto,
   })
-  getProfile(@Request() req) {
+  getProfile(@Request() req: { user: UserProfileDto }): UserProfileDto {
     return req.user;
   }
 

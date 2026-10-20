@@ -71,6 +71,32 @@ export function applyCommandRules(
     };
   }
 
+  // Extract clock running updates
+  if (typeof payload.clockRunning === "boolean") {
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      clockRunning: payload.clockRunning,
+    };
+  } else if (typeof payload.isRunning === "boolean") {
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      clockRunning: payload.isRunning,
+    };
+  } else if (commandType === "timeout" || commandType === "dead_ball") {
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      clockRunning: false,
+    };
+  } else if (
+    commandType === "jump_ball" ||
+    (commandType === "clock" && payload.isRunning === true)
+  ) {
+    result.sessionUpdates = {
+      ...result.sessionUpdates,
+      clockRunning: true,
+    };
+  }
+
   // Apply substitution Lineup swapping
   if (commandType === "substitution") {
     const p = payload as Record<string, unknown>;

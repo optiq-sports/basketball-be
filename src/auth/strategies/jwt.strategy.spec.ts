@@ -29,12 +29,22 @@ describe("jwtFromBearerOrQuery", () => {
     expect(jwtFromBearerOrQuery(req)).toBe("eyJ.one.two");
   });
 
-  it("parses access_token from url when originalUrl is missing query", () => {
+  it("reads access_token from Cookie header when Authorization header is absent", () => {
+    const req = {
+      headers: {
+        cookie: "other=123; access_token=cookie-access-token; foo=bar",
+      },
+      query: {},
+    } as unknown as Request;
+    expect(jwtFromBearerOrQuery(req)).toBe("cookie-access-token");
+  });
+
+  it("reads access_token from req.cookies object when available", () => {
     const req = {
       headers: {},
+      cookies: { access_token: "req-cookie-token" },
       query: {},
-      url: "/api/x?access_token=from-url-only",
     } as unknown as Request;
-    expect(jwtFromBearerOrQuery(req)).toBe("from-url-only");
+    expect(jwtFromBearerOrQuery(req)).toBe("req-cookie-token");
   });
 });

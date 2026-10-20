@@ -13,9 +13,27 @@ import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AuthResponseDto } from "./dto/auth-response.dto";
-import { Role } from "@prisma/client";
+import { Role, User, UserProfile, ClientUser } from "@prisma/client";
 import { EmailService } from "../notifications/email.service";
+import { JwtPayload } from "./strategies/jwt.strategy";
+
+export type ValidatedUser = Omit<
+  User & { profile: UserProfile | null; clientUsers: ClientUser[] },
+  "password"
+>;
+
+export interface AuthUserData {
+  id: string;
+  email: string | null;
+  role: Role;
+  name?: string | null;
+  profile?: UserProfile | null;
+  clientUsers?: { clientId: string }[];
+  clientIds?: string[];
+  forcePasswordChange?: boolean;
+}
 
 @Injectable()
 export class AuthService {
@@ -26,7 +44,10 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<any> {
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<ValidatedUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { profile: true, clientUsers: true },
@@ -46,12 +67,12 @@ export class AuthService {
   }
 
   private async generateAuthResponse(
-    user: any,
+    user: AuthUserData,
     oldSessionId?: string,
   ): Promise<AuthResponseDto> {
-    const payload = {
+    const payload: JwtPayload = {
       sub: user.id,
-      email: user.email,
+      email: user.email ?? "",
       role: user.role,
     };
 
@@ -83,6 +104,12 @@ export class AuthService {
       await this.prisma.session.create({ data: sessionData });
     }
 
+    const clientIds = user.clientIds
+      ? user.clientIds
+      : user.clientUsers
+        ? user.clientUsers.map((c) => c.clientId)
+        : [];
+
     return {
       access_token: accessToken,
       expires_in: ms(expiresInStr as StringValue),
@@ -91,9 +118,12 @@ export class AuthService {
       token_type: "Bearer",
       user: {
         id: user.id,
-        email: user.email,
+        email: user.email ?? "",
         name: user.profile?.fullName || user.name || null,
         role: user.role,
+        profile: user.profile ?? null,
+        clientIds,
+        forcePasswordChange: Boolean(user.forcePasswordChange),
       },
     };
   }
@@ -123,7 +153,7 @@ export class AuthService {
         password: hashedPassword,
         role: registerDto.role || Role.STATISTICIAN,
       },
-      include: { profile: true },
+      include: { profile: true, clientUsers: true },
     });
 
     return this.generateAuthResponse(user);
@@ -142,7 +172,7 @@ export class AuthService {
       where: { refreshToken },
       include: {
         user: {
-          include: { profile: true },
+          include: { profile: true, clientUsers: true },
         },
       },
     });
@@ -151,9 +181,9 @@ export class AuthService {
       throw new UnauthorizedException("Invalid refresh token or inactive user");
     }
 
-    let payload: any;
+    let payload: JwtPayload;
     try {
-      payload = this.jwtService.verify(refreshToken);
+      payload = this.jwtService.verify<JwtPayload>(refreshToken);
     } catch {
       // If token expired or invalid, delete session
       await this.prisma.session.delete({ where: { id: session.id } });
@@ -183,7 +213,7 @@ export class AuthService {
 
   async changePassword(
     userId: string,
-    changePasswordDto: any,
+    changePasswordDto: ChangePasswordDto,
   ): Promise<{ success: boolean }> {
     const { oldPassword, newPassword } = changePasswordDto;
 
