@@ -38,7 +38,7 @@ export async function seedUsers(prisma: PrismaClient) {
 
   // 2. Create 3 Statisticians
   const statisticians = [];
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 1; i++) {
     const stat = await prisma.user.upsert({
       where: { email: `stat${i}@optiqsport.com` },
       update: {},
@@ -81,7 +81,7 @@ export async function seedUsers(prisma: PrismaClient) {
 
   // 3. Create 5-6 Clients
   const clients = [];
-  const clientCount = 6;
+  const clientCount = 1;
 
   for (let i = 1; i <= clientCount; i++) {
     const clientUser = await prisma.user.upsert({

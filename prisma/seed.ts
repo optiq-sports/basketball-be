@@ -16,10 +16,10 @@ async function main() {
   const { clients, statisticians } = await seedUsers(prisma);
 
   // 3. Seed Teams & Players
-  const { teams } = await seedTeamsAndPlayers(prisma);
+  // const { teams } = await seedTeamsAndPlayers(prisma);
 
   // 4. Seed Tournaments & Matches
-  await seedTournamentsAndMatches(prisma, clients, teams, statisticians);
+  // await seedTournamentsAndMatches(prisma, clients, teams, statisticians);
 
   console.log("✅ All seeding completed successfully!");
 }
