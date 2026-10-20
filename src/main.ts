@@ -30,7 +30,7 @@ function resolveCorsOrigin(): (
       callback(null, true);
       return;
     }
-    callback(null, allowed.has(origin));
+    callback(null, allowed.has(origin) || origin === "app://statdash");
   };
 }
 

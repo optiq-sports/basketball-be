@@ -88,6 +88,8 @@ export class TournamentsController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN, Role.CLIENT)
   @ApiOperation({ summary: "Get all tournaments" })
   @ApiPaginatedResponse(TournamentResponseDto)
   @AppErrorResponse(
@@ -97,6 +99,13 @@ export class TournamentsController {
     "/api/tournaments",
     "Invalid or missing access token",
   )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "GET",
+    "/api/tournaments",
+    "Requires ADMIN, STATISTICIAN or CLIENT role",
+  )
   findAll(
     @CurrentUser() user: AuthenticatedUser,
     @Query() filterDto?: TournamentFilterDto,
@@ -105,6 +114,8 @@ export class TournamentsController {
   }
 
   @Get("code/:code")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN, Role.CLIENT)
   @ApiOperation({ summary: "Get tournament by unique code" })
   @ApiResponse({
     status: 200,
@@ -119,6 +130,13 @@ export class TournamentsController {
     "Invalid or missing access token",
   )
   @AppErrorResponse(
+    403,
+    "Forbidden",
+    "GET",
+    "/api/tournaments/code/:code",
+    "Requires ADMIN, STATISTICIAN or CLIENT role",
+  )
+  @AppErrorResponse(
     404,
     "Not Found",
     "GET",
@@ -130,6 +148,8 @@ export class TournamentsController {
   }
 
   @Get(":id")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.STATISTICIAN, Role.CLIENT)
   @ApiOperation({ summary: "Get tournament by ID" })
   @ApiResponse({
     status: 200,
@@ -142,6 +162,13 @@ export class TournamentsController {
     "GET",
     "/api/tournaments/:id",
     "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "GET",
+    "/api/tournaments/:id",
+    "Requires ADMIN, STATISTICIAN or CLIENT role",
   )
   @AppErrorResponse(
     404,

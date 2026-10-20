@@ -27,7 +27,7 @@ import {
 @ApiBearerAuth()
 @Controller("statdash/projections")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.STATISTICIAN, Role.CLIENT)
+@Roles(Role.ADMIN, Role.STATISTICIAN, Role.CLIENT, Role.BROADCASTER)
 export class StatdashProjectionsController {
   constructor(
     private readonly statdashProjectionsService: StatdashProjectionsService,
@@ -55,7 +55,10 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/box-score",
     "Session does not exist",
   )
-  getBoxScore(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
+  getBoxScore(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.statdashProjectionsService.getBoxScore(sessionId, user);
   }
 
@@ -82,7 +85,7 @@ export class StatdashProjectionsController {
   )
   getShotChart(
     @Param("sessionId") sessionId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.statdashProjectionsService.getShotChart(sessionId, user);
   }
@@ -111,7 +114,7 @@ export class StatdashProjectionsController {
   getPlayerGameProjection(
     @Param("playerId") playerId: string,
     @Param("sessionId") sessionId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.statdashProjectionsService.getPlayerGameProjection(
       sessionId,
@@ -141,7 +144,10 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/summary",
     "Session does not exist",
   )
-  getSummary(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
+  getSummary(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.statdashProjectionsService.getMatchSummary(sessionId, user);
   }
 
@@ -199,7 +205,7 @@ export class StatdashProjectionsController {
   )
   async rebuild(
     @Param("sessionId") sessionId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     await this.queueService.enqueueReplayBackfill(sessionId);
     return this.statdashProjectionsService.rebuildAndPersist(sessionId, user);

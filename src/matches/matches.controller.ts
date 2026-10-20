@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Patch,
   Param,
@@ -13,6 +14,7 @@ import { MatchesService } from "./matches.service";
 import { CreateMatchDto } from "./dto/create-match.dto";
 import { UpdateMatchDto } from "./dto/update-match.dto";
 import { MatchResponseDto } from "./dto/match-response.dto";
+import { AssignBroadcastersDto } from "./dto/assign-broadcasters.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -27,6 +29,7 @@ import {
 } from "@nestjs/swagger";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
 import { ApiPaginatedResponse } from "../common/decorators/api-paginated-response.decorator";
 import { MatchFilterDto } from "./dto/match-filter.dto";
 
@@ -89,7 +92,10 @@ export class MatchesController {
     "/api/matches",
     "Invalid or missing access token",
   )
-  findAll(@CurrentUser() user: any, @Query() filterDto: MatchFilterDto) {
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() filterDto: MatchFilterDto,
+  ) {
     const statisticianId =
       user.role === Role.STATISTICIAN ? user.id : undefined;
     return this.matchesService.findAll(user, filterDto, statisticianId);
@@ -116,8 +122,58 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  findOne(@Param("id") id: string, @CurrentUser() user: any) {
+  findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.matchesService.findOne(id, user);
+  }
+
+  @Put(":id/broadcasters")
+  @UseGuards(RolesGuard)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @ApiOperation({ summary: "Assign broadcasters to a match" })
+  @ApiBody({ type: AssignBroadcastersDto })
+  @ApiResponse({
+    status: 200,
+    description: "Broadcasters successfully assigned to match",
+    type: MatchResponseDto,
+  })
+  @AppErrorResponse(
+    400,
+    "Bad Request",
+    "PUT",
+    "/api/matches/:id/broadcasters",
+    "Invalid input data",
+  )
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "PUT",
+    "/api/matches/:id/broadcasters",
+    "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "PUT",
+    "/api/matches/:id/broadcasters",
+    "Requires SUPER_ADMIN or ADMIN role",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "PUT",
+    "/api/matches/:id/broadcasters",
+    "Match not found",
+  )
+  assignBroadcasters(
+    @Param("id") id: string,
+    @Body() assignBroadcastersDto: AssignBroadcastersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.matchesService.assignBroadcasters(
+      id,
+      assignBroadcastersDto.broadcasterIds,
+      user,
+    );
   }
 
   @Patch(":id")

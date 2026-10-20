@@ -11,6 +11,7 @@ import {
 import { MessageEvent } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../common/redis/redis.service";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import {
   UpsertOverlaySceneDto,
   PatchOverlaySceneDto,
@@ -25,6 +26,7 @@ import { Prisma } from "@prisma/client";
 
 export interface OverlayBroadcastUpdate {
   matchId: string;
+  broadcasterId?: string | null;
   state: OverlaySceneResponseDto;
   originNodeId?: string;
 }
@@ -39,6 +41,7 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   onModuleInit() {
@@ -106,6 +109,7 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
   async validateOverlayToken(token: string): Promise<{
     clientId: string;
     matchId: string;
+    broadcasterId: string | null;
   }> {
     if (!token || typeof token !== "string") {
       throw new UnauthorizedException("Invalid overlay token");
@@ -149,25 +153,40 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
     return {
       clientId: overlayToken.clientId,
       matchId: overlayToken.matchId,
+      broadcasterId: overlayToken.broadcasterId,
     };
   }
 
   /**
-   * Get overlay scene state for a given client and match.
+   * Get overlay scene state for a given client and match (optionally scoped to broadcaster).
    * If no row exists yet, returns the default blank state.
    */
   async getSceneState(
     clientId: string,
     matchId: string,
+    broadcasterId?: string | null,
   ): Promise<OverlaySceneResponseDto> {
-    const scene = await this.prisma.overlayScene.findUnique({
-      where: {
-        clientId_matchId: {
-          clientId,
+    let scene = null;
+
+    if (broadcasterId) {
+      scene = await this.prisma.overlayScene.findFirst({
+        where: {
           matchId,
+          broadcasterId,
         },
-      },
-    });
+        orderBy: { updatedAt: "desc" },
+      });
+    }
+
+    if (!scene) {
+      scene = await this.prisma.overlayScene.findFirst({
+        where: {
+          matchId,
+          ...(clientId ? { clientId } : {}),
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+    }
 
     if (!scene) {
       return {
@@ -194,8 +213,9 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
    * Get overlay scene state by URL token
    */
   async getSceneByToken(token: string): Promise<OverlaySceneResponseDto> {
-    const { clientId, matchId } = await this.validateOverlayToken(token);
-    return this.getSceneState(clientId, matchId);
+    const { clientId, matchId, broadcasterId } =
+      await this.validateOverlayToken(token);
+    return this.getSceneState(clientId, matchId, broadcasterId);
   }
 
   /**
@@ -226,54 +246,74 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Upsert an overlay scene state from dashboard
+   * Core method to save (upsert) overlay scene state for a match & broadcaster
    */
-  async upsertScene(
-    clientId: string,
-    userId: string,
-    dto: UpsertOverlaySceneDto,
-  ): Promise<OverlaySceneResponseDto> {
-    if (dto.payload !== undefined) {
-      this.validatePayload(dto.payload);
+  async saveSceneState(params: {
+    clientId: string;
+    matchId: string;
+    broadcasterId?: string | null;
+    userId?: string;
+    activeScene?: OverlaySceneType | string;
+    payload?: Record<string, unknown>;
+    visible?: boolean;
+    scorebugVisible?: boolean;
+    autoDismissAt?: Date | null;
+  }): Promise<OverlaySceneResponseDto> {
+    if (params.payload !== undefined) {
+      this.validatePayload(params.payload);
     }
-    if (dto.activeScene !== undefined) {
-      this.validateScene(dto.activeScene);
+    if (params.activeScene !== undefined) {
+      this.validateScene(params.activeScene);
     }
 
-    const payloadToSave = dto.payload ?? { v: 1 };
-
-    const scene = await this.prisma.overlayScene.upsert({
+    const existing = await this.prisma.overlayScene.findFirst({
       where: {
-        clientId_matchId: {
-          clientId,
-          matchId: dto.matchId,
-        },
+        matchId: params.matchId,
+        ...(params.broadcasterId
+          ? { broadcasterId: params.broadcasterId }
+          : {}),
       },
-      create: {
-        clientId,
-        matchId: dto.matchId,
-        activeScene: dto.activeScene ?? "blank",
-        payload: payloadToSave as Prisma.InputJsonValue,
-        visible: dto.visible ?? false,
-        scorebugVisible: dto.scorebugVisible ?? true,
-        autoDismissAt: dto.autoDismissAt ?? null,
-        updatedByUserId: userId,
-      },
-      update: {
-        ...(dto.activeScene !== undefined && { activeScene: dto.activeScene }),
-        ...(dto.payload !== undefined && {
-          payload: dto.payload as Prisma.InputJsonValue,
-        }),
-        ...(dto.visible !== undefined && { visible: dto.visible }),
-        ...(dto.scorebugVisible !== undefined && {
-          scorebugVisible: dto.scorebugVisible,
-        }),
-        ...(dto.autoDismissAt !== undefined && {
-          autoDismissAt: dto.autoDismissAt,
-        }),
-        updatedByUserId: userId,
-      },
+      orderBy: { updatedAt: "desc" },
     });
+
+    let scene;
+    if (existing) {
+      scene = await this.prisma.overlayScene.update({
+        where: { id: existing.id },
+        data: {
+          ...(params.activeScene !== undefined && {
+            activeScene: params.activeScene,
+          }),
+          ...(params.payload !== undefined && {
+            payload: params.payload as Prisma.InputJsonValue,
+          }),
+          ...(params.visible !== undefined && { visible: params.visible }),
+          ...(params.scorebugVisible !== undefined && {
+            scorebugVisible: params.scorebugVisible,
+          }),
+          ...(params.autoDismissAt !== undefined && {
+            autoDismissAt: params.autoDismissAt,
+          }),
+          ...(params.userId && { updatedByUserId: params.userId }),
+        },
+      });
+    } else {
+      scene = await this.prisma.overlayScene.create({
+        data: {
+          clientId: params.clientId,
+          matchId: params.matchId,
+          broadcasterId: params.broadcasterId ?? null,
+          activeScene: params.activeScene ?? "blank",
+          payload: ((params.payload as Prisma.InputJsonValue) ?? {
+            v: 1,
+          }) as Prisma.InputJsonValue,
+          visible: params.visible ?? false,
+          scorebugVisible: params.scorebugVisible ?? true,
+          autoDismissAt: params.autoDismissAt ?? null,
+          updatedByUserId: params.userId,
+        },
+      });
+    }
 
     const response: OverlaySceneResponseDto = {
       activeScene: scene.activeScene,
@@ -284,8 +324,28 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
       updatedAt: scene.updatedAt,
     };
 
-    this.broadcastUpdate(dto.matchId, response);
+    this.broadcastUpdate(params.matchId, response, params.broadcasterId);
     return response;
+  }
+
+  /**
+   * Upsert an overlay scene state from dashboard
+   */
+  async upsertScene(
+    clientId: string,
+    userId: string,
+    dto: UpsertOverlaySceneDto,
+  ): Promise<OverlaySceneResponseDto> {
+    return this.saveSceneState({
+      clientId,
+      matchId: dto.matchId,
+      userId,
+      activeScene: dto.activeScene,
+      payload: dto.payload,
+      visible: dto.visible,
+      scorebugVisible: dto.scorebugVisible,
+      autoDismissAt: dto.autoDismissAt,
+    });
   }
 
   /**
@@ -297,59 +357,16 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
     matchId: string,
     dto: PatchOverlaySceneDto,
   ): Promise<OverlaySceneResponseDto> {
-    if (dto.payload !== undefined) {
-      this.validatePayload(dto.payload);
-    }
-    if (dto.activeScene !== undefined) {
-      this.validateScene(dto.activeScene);
-    }
-
-    const scene = await this.prisma.overlayScene.upsert({
-      where: {
-        clientId_matchId: {
-          clientId,
-          matchId,
-        },
-      },
-      create: {
-        clientId,
-        matchId,
-        activeScene: dto.activeScene ?? "blank",
-        payload: ((dto.payload as Prisma.InputJsonValue) ?? {
-          v: 1,
-        }) as Prisma.InputJsonValue,
-        visible: dto.visible ?? false,
-        scorebugVisible: dto.scorebugVisible ?? true,
-        autoDismissAt: dto.autoDismissAt ?? null,
-        updatedByUserId: userId,
-      },
-      update: {
-        ...(dto.activeScene !== undefined && { activeScene: dto.activeScene }),
-        ...(dto.payload !== undefined && {
-          payload: dto.payload as Prisma.InputJsonValue,
-        }),
-        ...(dto.visible !== undefined && { visible: dto.visible }),
-        ...(dto.scorebugVisible !== undefined && {
-          scorebugVisible: dto.scorebugVisible,
-        }),
-        ...(dto.autoDismissAt !== undefined && {
-          autoDismissAt: dto.autoDismissAt,
-        }),
-        updatedByUserId: userId,
-      },
+    return this.saveSceneState({
+      clientId,
+      matchId,
+      userId,
+      activeScene: dto.activeScene,
+      payload: dto.payload,
+      visible: dto.visible,
+      scorebugVisible: dto.scorebugVisible,
+      autoDismissAt: dto.autoDismissAt,
     });
-
-    const response: OverlaySceneResponseDto = {
-      activeScene: scene.activeScene,
-      visible: scene.visible,
-      scorebugVisible: scene.scorebugVisible,
-      autoDismissAt: scene.autoDismissAt,
-      payload: (scene.payload as Record<string, unknown>) ?? { v: 1 },
-      updatedAt: scene.updatedAt,
-    };
-
-    this.broadcastUpdate(matchId, response);
-    return response;
   }
 
   /**
@@ -381,24 +398,168 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Issue or reissue an overlay token for a match and broadcaster
+   */
+  async issueOverlayToken(params: {
+    clientId: string;
+    matchId: string;
+    broadcasterId?: string | null;
+    actorUserId: string;
+    actorRole: string;
+    expiresInHours?: number;
+  }): Promise<{
+    token: string;
+    tokenPrefix: string;
+    expiresAt: Date;
+    outputUrl: string;
+  }> {
+    const expiresInHours = Math.min(
+      Math.max(params.expiresInHours ?? 24, 1),
+      168,
+    );
+    const expiresAt = new Date(Date.now() + expiresInHours * 3600 * 1000);
+    const rawKey = crypto.randomBytes(32).toString("hex");
+    const token = `ovl_${rawKey}`;
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const tokenPrefix = `ovl_${rawKey.slice(0, 8)}...`;
+
+    await this.prisma.$transaction(async (tx) => {
+      // Reissue: invalidate previous active overlay tokens for this match & broadcaster
+      await tx.clientOverlayToken.updateMany({
+        where: {
+          matchId: params.matchId,
+          ...(params.broadcasterId
+            ? { broadcasterId: params.broadcasterId }
+            : {}),
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          revokedAt: new Date(),
+        },
+      });
+
+      const created = await tx.clientOverlayToken.create({
+        data: {
+          clientId: params.clientId,
+          matchId: params.matchId,
+          broadcasterId: params.broadcasterId ?? null,
+          tokenHash,
+          tokenPrefix,
+          expiresAt,
+          isActive: true,
+        },
+      });
+
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: params.actorUserId,
+        actorRole: params.actorRole,
+        clientId: params.clientId,
+        action: "CREATE_OVERLAY_TOKEN",
+        entityType: "client_overlay_token",
+        entityId: created.id,
+        after: {
+          id: created.id,
+          matchId: created.matchId,
+          broadcasterId: created.broadcasterId,
+          expiresAt: created.expiresAt,
+        },
+      });
+    });
+
+    const baseUrl =
+      process.env.OVERLAY_BASE_URL ||
+      "https://broadcast.optiqsports.com/overlay";
+    const outputUrl = `${baseUrl.replace(/\/$/, "")}/${token}`;
+
+    return {
+      token,
+      tokenPrefix,
+      expiresAt,
+      outputUrl,
+    };
+  }
+
+  /**
+   * Revoke overlay token(s) for a match and broadcaster
+   */
+  async revokeOverlayToken(params: {
+    clientId: string;
+    matchId: string;
+    broadcasterId?: string | null;
+    actorUserId: string;
+    actorRole: string;
+  }): Promise<{ success: boolean; message: string }> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.clientOverlayToken.updateMany({
+        where: {
+          matchId: params.matchId,
+          ...(params.broadcasterId
+            ? { broadcasterId: params.broadcasterId }
+            : {}),
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          revokedAt: new Date(),
+        },
+      });
+
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: params.actorUserId,
+        actorRole: params.actorRole,
+        clientId: params.clientId,
+        action: "REVOKE_OVERLAY_TOKEN",
+        entityType: "client_overlay_token",
+        entityId: `${params.matchId}_${params.broadcasterId ?? "all"}`,
+        after: {
+          matchId: params.matchId,
+          broadcasterId: params.broadcasterId,
+          revokedAt: new Date(),
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: "Overlay link revoked successfully",
+    };
+  }
+
+  /**
    * Subscribe to real-time SSE stream using URL token
    */
   async getStream(
     token: string,
     heartbeatIntervalMs = 15000,
   ): Promise<Observable<MessageEvent>> {
-    const { clientId, matchId } = await this.validateOverlayToken(token);
+    const { clientId, matchId, broadcasterId } =
+      await this.validateOverlayToken(token);
 
     // Initial replay of current state
-    const currentState = await this.getSceneState(clientId, matchId);
+    const currentState = await this.getSceneState(
+      clientId,
+      matchId,
+      broadcasterId,
+    );
     const initial$ = of<MessageEvent>({
       type: "overlay",
       data: currentState,
     });
 
-    // Live updates for this match
+    // Live updates for this match and broadcaster
     const live$ = this.updates$.pipe(
-      filter((update) => update.matchId === matchId),
+      filter((update) => {
+        if (update.matchId !== matchId) return false;
+        if (
+          broadcasterId &&
+          update.broadcasterId &&
+          update.broadcasterId !== broadcasterId
+        ) {
+          return false;
+        }
+        return true;
+      }),
       map((update): MessageEvent => ({
         type: "overlay",
         data: update.state,
@@ -416,9 +577,14 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
   /**
    * Broadcast state update locally and to Redis pub/sub
    */
-  private broadcastUpdate(matchId: string, state: OverlaySceneResponseDto) {
+  private broadcastUpdate(
+    matchId: string,
+    state: OverlaySceneResponseDto,
+    broadcasterId?: string | null,
+  ) {
     const update: OverlayBroadcastUpdate = {
       matchId,
+      broadcasterId,
       state,
       originNodeId: this.nodeId,
     };

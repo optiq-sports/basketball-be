@@ -137,16 +137,26 @@ export class MatchesService {
       defaultOrderBy: { scheduledDate: "asc" },
     });
 
-    const tenantFilter = getTenantFilter(user);
-    const where: Prisma.MatchWhereInput =
-      user.role === Role.SUPER_ADMIN
-        ? {}
-        : {
-            OR: [
-              { clientId: { in: user.clientIds || [] } },
-              { tournament: tenantFilter },
-            ],
-          };
+    let where: Prisma.MatchWhereInput;
+    if (user.role === Role.SUPER_ADMIN) {
+      where = {};
+    } else if (user.role === Role.BROADCASTER) {
+      where = {
+        broadcasters: {
+          some: {
+            userId: user.id,
+          },
+        },
+      };
+    } else {
+      const tenantFilter = getTenantFilter(user);
+      where = {
+        OR: [
+          { clientId: { in: user.clientIds || [] } },
+          { tournament: tenantFilter },
+        ],
+      };
+    }
     if (tournamentId) {
       where.tournamentId = tournamentId;
     }
@@ -184,6 +194,17 @@ export class MatchesService {
           homeTeam: true,
           awayTeam: true,
           statistician: true,
+          broadcasters: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
           stats: {
             include: {
               player: {
@@ -231,23 +252,45 @@ export class MatchesService {
     id: string,
     user: AuthenticatedUser,
   ): Promise<MatchResponseDto> {
-    const tenantFilter = getTenantFilter(user);
-    const where: Prisma.MatchWhereInput =
-      user.role === Role.SUPER_ADMIN
-        ? { id }
-        : {
-            id,
-            OR: [
-              { clientId: { in: user.clientIds || [] } },
-              { tournament: tenantFilter },
-            ],
-          };
+    let where: Prisma.MatchWhereInput;
+    if (user.role === Role.SUPER_ADMIN) {
+      where = { id };
+    } else if (user.role === Role.BROADCASTER) {
+      where = {
+        id,
+        broadcasters: {
+          some: {
+            userId: user.id,
+          },
+        },
+      };
+    } else {
+      const tenantFilter = getTenantFilter(user);
+      where = {
+        id,
+        OR: [
+          { clientId: { in: user.clientIds || [] } },
+          { tournament: tenantFilter },
+        ],
+      };
+    }
 
     const match = await this.prisma.match.findFirst({
       where,
       include: {
         tournament: true,
         statistician: true,
+        broadcasters: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
         gameSessions: {
           select: {
             id: true,
@@ -430,5 +473,60 @@ export class MatchesService {
         before: match,
       });
     });
+  }
+
+  async assignBroadcasters(
+    id: string,
+    broadcasterIds: string[],
+    user: AuthenticatedUser,
+  ): Promise<MatchResponseDto> {
+    const existingMatch = await this.findOne(id, user);
+    if (!existingMatch) {
+      throw new NotFoundException("Match not found");
+    }
+
+    if (broadcasterIds.length > 0) {
+      const validBroadcasters = await this.prisma.user.findMany({
+        where: {
+          id: { in: broadcasterIds },
+          role: Role.BROADCASTER,
+        },
+        select: { id: true },
+      });
+
+      if (validBroadcasters.length !== broadcasterIds.length) {
+        throw new BadRequestException(
+          "One or more broadcaster IDs are invalid or not broadcasters",
+        );
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.matchBroadcaster.deleteMany({
+        where: { matchId: id },
+      });
+
+      if (broadcasterIds.length > 0) {
+        await tx.matchBroadcaster.createMany({
+          data: broadcasterIds.map((userId) => ({
+            matchId: id,
+            userId,
+            assignedByUserId: user.id,
+          })),
+        });
+      }
+
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: user.id,
+        actorRole: user.role,
+        action: "UPDATE",
+        entityType: "match_broadcasters",
+        entityId: id,
+        before: { broadcasters: existingMatch.broadcasters },
+        after: { broadcasterIds },
+      });
+    });
+
+    return this.findOne(id, user);
   }
 }

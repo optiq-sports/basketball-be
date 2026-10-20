@@ -30,6 +30,13 @@ describe("MatchesService", () => {
     tournamentTeam: {
       findUnique: jest.fn(),
     },
+    user: {
+      findMany: jest.fn(),
+    },
+    matchBroadcaster: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
     $transaction: jest
       .fn()
       .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
@@ -250,6 +257,131 @@ describe("MatchesService", () => {
       expect(mockPrismaService.match.delete).toHaveBeenCalledWith({
         where: { id: "m1" },
       });
+    });
+  });
+
+  describe("broadcaster scoping and assignments", () => {
+    const mockBroadcasterUser: AuthenticatedUser = {
+      id: "broadcaster-1",
+      email: "broadcaster@example.com",
+      name: "Broadcaster User",
+      role: Role.BROADCASTER,
+    };
+
+    it("should filter matches to assigned ones for Role.BROADCASTER in findAll", async () => {
+      mockPrismaService.match.findMany.mockResolvedValueOnce([
+        { id: "m-assigned" },
+      ]);
+      mockPrismaService.match.count.mockResolvedValueOnce(1);
+
+      const result = await service.findAll(mockBroadcasterUser, {});
+
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            broadcasters: {
+              some: {
+                userId: "broadcaster-1",
+              },
+            },
+          }),
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
+    it("should filter findOne to assigned match for Role.BROADCASTER", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-assigned",
+        homeTeam: { playerTeams: [] },
+        awayTeam: { playerTeams: [] },
+      });
+
+      const result = await service.findOne("m-assigned", mockBroadcasterUser);
+
+      expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: "m-assigned",
+            broadcasters: {
+              some: {
+                userId: "broadcaster-1",
+              },
+            },
+          },
+        }),
+      );
+      expect(result.id).toBe("m-assigned");
+    });
+
+    it("should throw NotFoundException in findOne if match not assigned to broadcaster", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.findOne("m-unassigned", mockBroadcasterUser),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should assign broadcasters to a match and record audit log", async () => {
+      mockPrismaService.match.findFirst
+        .mockResolvedValueOnce({
+          id: "m-1",
+          broadcasters: [],
+        })
+        .mockResolvedValueOnce({
+          id: "m-1",
+          broadcasters: [
+            { id: "mb-1", matchId: "m-1", userId: "b-1" },
+            { id: "mb-2", matchId: "m-1", userId: "b-2" },
+          ],
+        });
+
+      mockPrismaService.user.findMany.mockResolvedValueOnce([
+        { id: "b-1" },
+        { id: "b-2" },
+      ]);
+
+      const result = await service.assignBroadcasters(
+        "m-1",
+        ["b-1", "b-2"],
+        mockUser,
+      );
+
+      expect(
+        mockPrismaService.matchBroadcaster.deleteMany,
+      ).toHaveBeenCalledWith({
+        where: { matchId: "m-1" },
+      });
+      expect(
+        mockPrismaService.matchBroadcaster.createMany,
+      ).toHaveBeenCalledWith({
+        data: [
+          { matchId: "m-1", userId: "b-1", assignedByUserId: mockUser.id },
+          { matchId: "m-1", userId: "b-2", assignedByUserId: mockUser.id },
+        ],
+      });
+      expect(mockAuditLogsService.recordLog).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: "UPDATE",
+          entityType: "match_broadcasters",
+          entityId: "m-1",
+        }),
+      );
+      expect(result.id).toBe("m-1");
+    });
+
+    it("should throw BadRequestException if one or more broadcaster IDs are invalid", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-1",
+        broadcasters: [],
+      });
+
+      mockPrismaService.user.findMany.mockResolvedValueOnce([{ id: "b-1" }]); // b-2 missing or not BROADCASTER
+
+      await expect(
+        service.assignBroadcasters("m-1", ["b-1", "b-2"], mockUser),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

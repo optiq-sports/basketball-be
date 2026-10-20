@@ -538,4 +538,49 @@ describe("StatdashProjectionsService", () => {
     expect(boxScore.totals.points).toBe(5);
     expect(boxScore.totals.rebounds).toBe(1);
   });
+
+  describe("broadcaster session access in projections", () => {
+    it("should allow getBoxScore when broadcaster is assigned to the match", async () => {
+      prisma.gameSession.findUnique.mockResolvedValueOnce({
+        id: "sess_1",
+        match: {
+          clientId: "client_1",
+          broadcasters: [{ userId: "b_1" }],
+        },
+      });
+
+      redisService.getProjectionCached.mockResolvedValueOnce({
+        totals: { points: 10 },
+      });
+
+      const user = {
+        id: "b_1",
+        email: "b@test.com",
+        name: "Broadcaster",
+        role: "BROADCASTER" as any,
+      };
+
+      const result = await service.getBoxScore("sess_1", user);
+      expect(result).toEqual({ totals: { points: 10 } });
+    });
+
+    it("should throw NotFoundException when broadcaster is not assigned to the match", async () => {
+      prisma.gameSession.findUnique.mockResolvedValueOnce({
+        id: "sess_1",
+        match: {
+          clientId: "client_1",
+          broadcasters: [{ userId: "other_broadcaster" }],
+        },
+      });
+
+      const user = {
+        id: "b_1",
+        email: "b@test.com",
+        name: "Broadcaster",
+        role: "BROADCASTER" as any,
+      };
+
+      await expect(service.getBoxScore("sess_1", user)).rejects.toThrow();
+    });
+  });
 });
