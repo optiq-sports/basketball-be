@@ -28,6 +28,8 @@ import {
   TeamResponseDto,
   TeamWithPlayersResponseDto,
 } from "./dto/team-response.dto";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -239,7 +241,7 @@ export class TeamsController {
     "/api/teams/:id",
     "Team not found",
   )
-  remove(@Param("id") id: string) {
-    return this.teamsService.remove(id);
+  remove(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.teamsService.remove(id, user);
   }
 }

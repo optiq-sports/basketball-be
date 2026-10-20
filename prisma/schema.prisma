@@ -26,6 +26,7 @@ model User {
   matches       Match[]
   clientUsers   ClientUser[]
   notifications Notification[]
+  overlayScenes OverlayScene[]
 
   @@map("user")
 }
@@ -209,6 +210,8 @@ model Match {
   client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   matchPlayers   MatchPlayer[]
   stats          MatchStat[]
+  overlayTokens  ClientOverlayToken[]
+  overlayScenes  OverlayScene[]
 
   @@map("match")
 }
@@ -274,6 +277,8 @@ model GameSession {
   status                GameSessionStatus   @default(PENDING) @map("status")
   quarter               Int                 @default(1) @map("quarter")
   clockSecondsRemaining Int                 @default(600) @map("clock_seconds_remaining")
+  clockRunning          Boolean             @default(false) @map("clock_running")
+  clockUpdatedAt        DateTime            @default(now()) @updatedAt @map("clock_updated_at")
   homeScore             Int                 @default(0) @map("home_score")
   awayScore             Int                 @default(0) @map("away_score")
   possessionTeamId      String?             @map("possession_team_id")
@@ -429,6 +434,8 @@ enum GameSessionStatus {
 model Client {
   id          String   @id @default(cuid()) @map("id")
   name        String   @map("name")
+  slug        String?  @unique @map("slug")
+  clientType  String   @default("standard") @map("client_type")
   websiteUrl  String?  @map("website_url")
   logo        String?  @map("logo")
   isActive    Boolean  @default(true) @map("is_active")
@@ -437,9 +444,12 @@ model Client {
 
   // Relations
   clientUsers   ClientUser[]
-  apiKeys     ClientApiKey[]
-  tournaments Tournament[]
-  matches     Match[]
+  apiKeys       ClientApiKey[]
+  embedTokens   ClientEmbedToken[]
+  overlayTokens ClientOverlayToken[]
+  tournaments   Tournament[]
+  matches       Match[]
+  overlayScenes OverlayScene[]
 
   @@map("client")
 }
@@ -459,16 +469,57 @@ model ClientUser {
 }
 
 model ClientApiKey {
-  id        String   @id @default(cuid()) @map("id")
-  clientId  String   @map("client_id")
-  keyHash   String   @unique @map("key_hash") // Hashed API key
-  name      String   @map("name")             // e.g., "Production Website"
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(cuid()) @map("id")
+  clientId  String    @map("client_id")
+  keyHash   String    @unique @map("key_hash") // Hashed API key
+  name      String    @map("name")             // e.g., "Production Website"
+  scopes    String[]  @default([]) @map("scopes")
+  createdAt DateTime  @default(now()) @map("created_at")
   lastUsed  DateTime? @map("last_used")
 
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("client_api_key")
+}
+
+model ClientEmbedToken {
+  id             String    @id @default(cuid()) @map("id")
+  clientId       String    @map("client_id")
+  name           String    @map("name")
+  tokenHash      String    @unique @map("token_hash")
+  tokenPrefix    String    @map("token_prefix")
+  allowedOrigins String[]  @map("allowed_origins")
+  isActive       Boolean   @default(true) @map("is_active")
+  revokedAt      DateTime? @map("revoked_at")
+  lastUsedAt     DateTime? @map("last_used_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("client_embed_token")
+}
+
+model ClientOverlayToken {
+  id          String    @id @default(cuid()) @map("id")
+  clientId    String    @map("client_id")
+  matchId     String    @map("match_id")
+  tokenHash   String    @unique @map("token_hash")
+  tokenPrefix String    @map("token_prefix")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  isActive    Boolean   @default(true) @map("is_active")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([matchId])
+  @@map("client_overlay_token")
 }
 
 model Notification {
@@ -487,3 +538,46 @@ model Notification {
   @@index([userId, createdAt])
   @@map("notification")
 }
+
+model AuditLog {
+  id          String   @id @default(cuid()) @map("id")
+  actorUserId String   @map("actor_user_id")
+  actorRole   String   @map("actor_role")
+  clientId    String?  @map("client_id")
+  action      String   @map("action")
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  before      Json?    @map("before")
+  after       Json?    @map("after")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([clientId, createdAt])
+  @@index([entityType, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_log")
+}
+
+model OverlayScene {
+  id              String    @id @default(cuid()) @map("id")
+  clientId        String    @map("client_id")
+  matchId         String    @map("match_id")
+  activeScene     String    @default("blank") @map("active_scene")
+  payload         Json      @default("{}") @map("payload")
+  visible         Boolean   @default(false) @map("visible")
+  scorebugVisible Boolean   @default(true) @map("scorebug_visible")
+  autoDismissAt   DateTime? @map("auto_dismiss_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  updatedByUserId String?   @map("updated_by_user_id")
+
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  match           Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  updatedByUser   User?     @relation(fields: [updatedByUserId], references: [id])
+
+  @@unique([clientId, matchId])
+  @@index([clientId])
+  @@index([matchId])
+  @@map("overlay_scene")
+}
+
+

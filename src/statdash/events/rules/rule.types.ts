@@ -15,6 +15,7 @@ export type RuleResult = {
   sessionUpdates?: {
     quarter?: number;
     clockSecondsRemaining?: number;
+    clockRunning?: boolean;
     possessionTeamId?: string | null;
     jumpBallWinnerTeamId?: string;
   };

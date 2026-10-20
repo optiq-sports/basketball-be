@@ -4,6 +4,7 @@ import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
+import { AuthenticatedUser } from "../../common/interfaces/user.interface";
 import { QueueService } from "../../common/queue/queue.service";
 import { StatdashProjectionsService } from "./statdash-projections.service";
 import {
@@ -167,7 +168,10 @@ export class StatdashProjectionsController {
     "/api/statdash/projections/match/:sessionId/timeline",
     "Session does not exist",
   )
-  getTimeline(@Param("sessionId") sessionId: string, @CurrentUser() user: any) {
+  getTimeline(
+    @Param("sessionId") sessionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.statdashProjectionsService.getTimeline(sessionId, user);
   }
 

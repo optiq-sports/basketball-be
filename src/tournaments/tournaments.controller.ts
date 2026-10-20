@@ -11,6 +11,7 @@ import {
   UploadedFile,
   BadRequestException,
   Inject,
+  Query,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -28,11 +29,9 @@ import { CreateTournamentDto } from "./dto/create-tournament.dto";
 import { UpdateTournamentDto } from "./dto/update-tournament.dto";
 import { AddTeamToTournamentDto } from "./dto/add-team-to-tournament.dto";
 import { TournamentResponseDto } from "./dto/tournament-response.dto";
+import { TournamentFilterDto } from "./dto/tournament-filter.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
-import { PaginationQueryDto } from "../common/dto/pagination-query.dto";
-import { Query } from "@nestjs/common";
-import { PaginatedResponseDto } from "../common/dto/paginated-response.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -100,9 +99,9 @@ export class TournamentsController {
   )
   findAll(
     @CurrentUser() user: AuthenticatedUser,
-    @Query() paginationDto?: PaginationQueryDto,
+    @Query() filterDto?: TournamentFilterDto,
   ) {
-    return this.tournamentsService.findAll(user, paginationDto);
+    return this.tournamentsService.findAll(user, filterDto);
   }
 
   @Get("code/:code")

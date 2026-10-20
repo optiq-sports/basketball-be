@@ -277,6 +277,61 @@ describe("StatdashEventsService", () => {
     });
   });
 
+  it("defaults period and clockSecondsRemaining from session when omitted in payload (e.g. jump ball)", async () => {
+    redisService.getIdempotencyResultCached.mockResolvedValue(null);
+    tx.gameSession.findUnique.mockResolvedValue({
+      id: "session_1",
+      matchId: "match_1",
+      version: 0,
+      quarter: 1,
+      clockSecondsRemaining: 600,
+      homeScore: 0,
+      awayScore: 0,
+      match: { homeTeamId: "home", awayTeamId: "away" },
+    });
+    tx.idempotencyRecord.findUnique.mockResolvedValue(null);
+    tx.lineupState.findFirst.mockResolvedValue(null);
+    tx.gameEvent.aggregate.mockResolvedValue({ _max: { sequence: 0 } });
+    tx.gameEvent.create.mockResolvedValue({
+      id: "ge_jump",
+      sequence: 1,
+      eventType: "jump_ball",
+      period: 1,
+      clockSecondsRemaining: 600,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    tx.gameEvent.findMany.mockResolvedValue([]);
+    tx.gameSession.update.mockResolvedValue({
+      id: "session_1",
+      version: 1,
+      homeScore: 0,
+      awayScore: 0,
+    });
+    tx.idempotencyRecord.create.mockResolvedValue({});
+
+    await service.handleCommand(
+      {
+        sessionId: "session_1",
+        commandType: "jump_ball",
+        payload: {
+          winningTeamId: "home",
+        },
+        expectedVersion: 0,
+        idempotencyKey: "idem_jump_ball",
+      },
+      "actor_1",
+    );
+
+    expect(tx.gameEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          period: 1,
+          clockSecondsRemaining: 600,
+        }),
+      }),
+    );
+  });
+
   it("creates correction event and recomputes state", async () => {
     redisService.getIdempotencyResultCached.mockResolvedValue(null);
     tx.gameEvent.findUnique.mockResolvedValue({

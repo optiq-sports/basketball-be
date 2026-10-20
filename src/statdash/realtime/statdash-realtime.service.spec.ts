@@ -99,4 +99,20 @@ describe("StatdashRealtimeService", () => {
       deltaEvents: [{ eventType: "shot", sequence: 3 }],
     });
   });
+
+  it("emits SSE comment ping heartbeat on idle connection", async () => {
+    const service = new StatdashRealtimeService({
+      subscribeSessionUpdates: jest.fn().mockReturnValue(() => {}),
+      publishSessionUpdate: jest.fn(),
+    } as unknown as RedisService);
+    service.onModuleInit();
+
+    // Use a short heartbeat interval (10ms) to verify heartbeat emission without real 15s wait
+    const heartbeatPromise = firstValueFrom(
+      service.streamBySession("session_idle", undefined, 10).pipe(take(1)),
+    );
+
+    const event = await heartbeatPromise;
+    expect(event).toEqual({ comment: "ping" });
+  });
 });

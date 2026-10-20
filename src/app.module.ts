@@ -22,6 +22,9 @@ import { HealthModule } from "./health/health.module";
 import { ClientApiModule } from "./client-api/client-api.module";
 import { ClientsModule } from "./clients/clients.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { AuditLogsModule } from "./audit-logs/audit-logs.module";
+import { OverlayModule } from "./overlay/overlay.module";
+import { BroadcastModule } from "./broadcast/broadcast.module";
 
 @Module({
   imports: [
@@ -62,6 +65,9 @@ import { NotificationsModule } from "./notifications/notifications.module";
     ClientsModule,
     ClientApiModule,
     NotificationsModule,
+    AuditLogsModule,
+    OverlayModule,
+    BroadcastModule,
   ],
   providers: [
     {

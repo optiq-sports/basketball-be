@@ -2,6 +2,7 @@ import { applyFoulRules } from "./foul.rules";
 import { applyFreeThrowRules } from "./free-throw.rules";
 import { applyShotRules } from "./shot.rules";
 import { applyTurnoverRules } from "./turnover.rules";
+import { applyCommandRules } from "./statdash-rule-engine";
 
 const context = {
   session: {
@@ -100,5 +101,39 @@ describe("Statdash rules", () => {
     expect(valid.emittedEvents.map((item) => item.eventType)).toEqual([
       "turnover",
     ]);
+  });
+
+  describe("clockRunning flag", () => {
+    it("sets clockRunning to false on timeout and dead_ball", () => {
+      const timeoutRes = applyCommandRules(
+        "timeout",
+        { teamId: "home_team", timeoutType: "full" },
+        context,
+      );
+      expect(timeoutRes.sessionUpdates?.clockRunning).toBe(false);
+
+      const deadBallRes = applyCommandRules(
+        "dead_ball",
+        { teamId: "home_team", reason: "out_of_bounds" },
+        context,
+      );
+      expect(deadBallRes.sessionUpdates?.clockRunning).toBe(false);
+    });
+
+    it("sets clockRunning to true on jump_ball or when play resumes", () => {
+      const jumpBallRes = applyCommandRules(
+        "jump_ball",
+        { teamId: "home_team" },
+        context,
+      );
+      expect(jumpBallRes.sessionUpdates?.clockRunning).toBe(true);
+
+      const clockResumeRes = applyCommandRules(
+        "clock",
+        { teamId: "home_team", isRunning: true, clockSecondsRemaining: 400 },
+        context,
+      );
+      expect(clockResumeRes.sessionUpdates?.clockRunning).toBe(true);
+    });
   });
 });

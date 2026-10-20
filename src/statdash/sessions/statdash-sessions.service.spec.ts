@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
 import { GameSessionStatus, MatchStatus } from "@prisma/client";
@@ -141,6 +142,49 @@ describe("StatdashSessionsService", () => {
     await expect(service.resolveMatchKey("UNKNOWN_KEY")).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it("throws ForbiddenException when match is assigned to another statistician", async () => {
+    prismaService.match.findFirst.mockResolvedValue({
+      id: "match_1",
+      statisticianId: "other_stat_id",
+      status: MatchStatus.SCHEDULED,
+      gameSessions: null,
+    });
+
+    await expect(
+      service.resolveMatchKey("MATCH_KEY", "current_stat_id"),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("allows access when match is assigned to the current statistician", async () => {
+    prismaService.match.findFirst.mockResolvedValue({
+      id: "match_1",
+      statisticianId: "current_stat_id",
+      status: MatchStatus.SCHEDULED,
+      gameSessions: null,
+    });
+
+    const result = await service.resolveMatchKey(
+      "MATCH_KEY",
+      "current_stat_id",
+    );
+    expect(result.matchId).toBe("match_1");
+  });
+
+  it("allows access when match is unassigned (statisticianId is null)", async () => {
+    prismaService.match.findFirst.mockResolvedValue({
+      id: "match_1",
+      statisticianId: null,
+      status: MatchStatus.SCHEDULED,
+      gameSessions: null,
+    });
+
+    const result = await service.resolveMatchKey(
+      "MATCH_KEY",
+      "current_stat_id",
+    );
+    expect(result.matchId).toBe("match_1");
   });
 
   it("throws BadRequestException when match key is blank", async () => {

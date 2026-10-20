@@ -5,13 +5,36 @@ import type { Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 
+export function extractCookie(req: Request, name: string): string | null {
+  const reqWithCookies = req as Request & { cookies?: Record<string, string> };
+  if (
+    reqWithCookies.cookies &&
+    typeof reqWithCookies.cookies[name] === "string"
+  ) {
+    return reqWithCookies.cookies[name];
+  }
+  const cookieHeader = req.headers?.cookie;
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(";");
+  for (const c of cookies) {
+    const parts = c.trim().split("=");
+    if (parts.length >= 2 && parts[0] === name) {
+      return decodeURIComponent(parts.slice(1).join("="));
+    }
+  }
+  return null;
+}
+
 /**
- * SSE/EventSource cannot send Authorization headers; clients pass `access_token` as a query param.
+ * Checks Bearer header first, then httpOnly cookie, then query param for SSE/EventSource.
  * Some hosts/proxies omit `req.query` for long URLs — also parse `originalUrl` / `url`.
  */
 export function jwtFromBearerOrQuery(req: Request): string | null {
   const bearer = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
   if (bearer) return bearer;
+
+  const cookieToken = extractCookie(req, "access_token");
+  if (cookieToken) return cookieToken;
 
   const raw = req.query?.access_token;
   const fromQuery = Array.isArray(raw) ? raw[0] : raw;
@@ -74,11 +97,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: user.id,
       email: user.email,
-      name: user.name,
+      name: user.profile?.fullName || user.name || null,
       role: user.role,
       profile: user.profile,
       clientIds: user.clientUsers
-        ? user.clientUsers.map((cu: any) => cu.clientId)
+        ? user.clientUsers.map((cu: { clientId: string }) => cu.clientId)
         : [],
       forcePasswordChange: user.forcePasswordChange,
     };

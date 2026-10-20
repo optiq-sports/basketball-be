@@ -24,6 +24,9 @@ import { PlayerFilterDto } from "./dto/player-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 import * as xlsx from "xlsx";
 
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import { AuthenticatedUser } from "../common/interfaces/user.interface";
+
 @Injectable()
 export class PlayersService {
   private readonly logger = new Logger(PlayersService.name);
@@ -31,6 +34,7 @@ export class PlayersService {
   constructor(
     private prisma: PrismaService,
     private deduplicationService: PlayerDeduplicationService,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   /**
@@ -481,12 +485,12 @@ export class PlayersService {
     const {
       teamId,
       unassigned,
+      position,
       page,
       limit,
       sortBy,
       sortOrder,
       search,
-      ...otherParams
     } = filterDto || {};
 
     const {
@@ -497,16 +501,7 @@ export class PlayersService {
       defaultOrderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
 
-    // Handle sorting manually if sortBy is provided and not the default 'createdAt'
-    // or if we want to support specific fields
-    let orderBy = defaultOrderBy;
-    if (sortBy && sortBy !== "createdAt") {
-      orderBy = { [sortBy]: sortOrder || "asc" };
-    } else {
-      orderBy = [{ lastName: "asc" }, { firstName: "asc" }];
-    }
-
-    let searchWhere: any = {};
+    let searchWhere: Prisma.PlayerWhereInput = {};
     if (search) {
       const searchTerms = search.trim().split(/\s+/);
       if (searchTerms.length === 1) {
@@ -531,21 +526,97 @@ export class PlayersService {
       }
     }
 
-    let where: any = {};
+    const where: Prisma.PlayerWhereInput = {};
+
+    if (position) {
+      where.position = position;
+    }
 
     if (teamId) {
-      where = {
-        playerTeams: {
-          some: { teamId, isActive: true },
-        },
+      where.playerTeams = {
+        some: { teamId, isActive: true },
       };
     } else if (unassigned) {
       // Players with NO active team assignments
-      where = {
-        playerTeams: {
-          none: { isActive: true },
+      where.playerTeams = {
+        none: { isActive: true },
+      };
+    }
+
+    // Explicit branch for sorting by jerseyNumber or teamName via playerTeams junction
+    if ((sortBy === "jerseyNumber" || sortBy === "teamName") && !unassigned) {
+      const dir: Prisma.SortOrder = sortOrder === "desc" ? "desc" : "asc";
+      const ptOrderBy: Prisma.PlayerTeamOrderByWithRelationInput =
+        sortBy === "jerseyNumber"
+          ? { jerseyNumber: dir }
+          : { team: { name: dir } };
+
+      const ptWhere: Prisma.PlayerTeamWhereInput = {
+        isActive: true,
+        ...(teamId ? { teamId } : {}),
+        player: {
+          ...where,
+          ...searchWhere,
         },
       };
+
+      const [playerTeams, itemCount] = await Promise.all([
+        this.prisma.playerTeam.findMany({
+          where: ptWhere,
+          skip,
+          take,
+          include: {
+            player: {
+              include: {
+                playerTeams: {
+                  where: teamId
+                    ? { teamId, isActive: true }
+                    : { isActive: true },
+                  include: {
+                    team: {
+                      select: {
+                        id: true,
+                        name: true,
+                        code: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: ptOrderBy,
+        }),
+        this.prisma.playerTeam.count({
+          where: ptWhere,
+        }),
+      ]);
+
+      const formattedPlayers = await Promise.all(
+        playerTeams.map((pt) => this.formatPlayerResponse(pt.player, teamId)),
+      );
+
+      return new PaginatedResponseDto(
+        formattedPlayers,
+        new PageMetaDto({ page, limit, itemCount }),
+      );
+    }
+
+    // Handle sorting manually if sortBy is provided
+    let orderBy:
+      | Prisma.PlayerOrderByWithRelationInput
+      | Prisma.PlayerOrderByWithRelationInput[] = defaultOrderBy;
+    if (sortBy) {
+      if (sortBy === "lastName") {
+        orderBy = [
+          { lastName: sortOrder || "asc" },
+          { firstName: sortOrder || "asc" },
+        ];
+      } else if (sortBy !== "jerseyNumber" && sortBy !== "teamName") {
+        orderBy = { [sortBy]: sortOrder || "asc" };
+      }
+    } else {
+      orderBy = [{ lastName: "asc" }, { firstName: "asc" }];
     }
 
     const [items, itemCount] = await Promise.all([
@@ -553,7 +624,6 @@ export class PlayersService {
         where: {
           ...where,
           ...searchWhere,
-          ...otherParams,
         },
         skip,
         take,
@@ -577,13 +647,12 @@ export class PlayersService {
         where: {
           ...where,
           ...searchWhere,
-          ...otherParams,
         },
       }),
     ]);
 
     const formattedPlayers = await Promise.all(
-      items.map((p) => this.formatPlayerResponse(p)),
+      items.map((p) => this.formatPlayerResponse(p, teamId)),
     );
     return new PaginatedResponseDto(
       formattedPlayers,
@@ -704,9 +773,9 @@ export class PlayersService {
   }
 
   /**
-   * Remove player (soft delete by deactivating all team associations)
+   * Release player (soft delete by deactivating active team associations)
    */
-  async remove(id: string, teamId?: string): Promise<void> {
+  async release(id: string, teamId?: string): Promise<PlayerResponseDto> {
     const player = await this.prisma.player.findUnique({
       where: { id },
     });
@@ -715,13 +784,11 @@ export class PlayersService {
       throw new NotFoundException(`Player with ID ${id} not found`);
     }
 
-    const whereClause: any = {
+    const whereClause: Prisma.PlayerTeamWhereInput = {
       playerId: id,
       isActive: true,
+      ...(teamId ? { teamId } : {}),
     };
-    if (teamId) {
-      whereClause.teamId = teamId;
-    }
 
     // Deactivate team associations
     await this.prisma.playerTeam.updateMany({
@@ -732,26 +799,86 @@ export class PlayersService {
       },
     });
 
-    this.logger.log(`Deactivated team associations for player ${id}`);
+    this.logger.log(`Released player ${id} (deactivated team associations)`);
+
+    return this.findOne(id);
   }
 
   /**
-   * Hard delete player
+   * Remove player (alias for release)
    */
-  async hardDelete(id: string): Promise<void> {
+  async remove(id: string, teamId?: string): Promise<PlayerResponseDto> {
+    return this.release(id, teamId);
+  }
+
+  /**
+   * Hard delete player only if no matchStat and no matchPlayer history exists.
+   * Throws 409 Conflict if history exists.
+   * Throws 404 Not Found if player does not exist.
+   */
+  async permanentDelete(
+    id: string,
+    actorUser?: AuthenticatedUser,
+  ): Promise<{ success: boolean; message: string; id: string }> {
     const player = await this.prisma.player.findUnique({
       where: { id },
+      include: {
+        _count: {
+          select: {
+            matchStats: true,
+            matchPlayers: true,
+          },
+        },
+      },
     });
 
     if (!player) {
       throw new NotFoundException(`Player with ID ${id} not found`);
     }
 
-    await this.prisma.player.delete({
-      where: { id },
+    const matchStatsCount = player._count.matchStats;
+    const matchPlayersCount = player._count.matchPlayers;
+
+    if (matchStatsCount > 0 || matchPlayersCount > 0) {
+      throw new ConflictException(
+        `Cannot delete player with recorded match history: ${matchStatsCount} match stat(s) and ${matchPlayersCount} match appearance(s) found.`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.playerTeam.deleteMany({
+        where: { playerId: id },
+      });
+      await tx.player.delete({
+        where: { id },
+      });
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: actorUser?.id || "system",
+        actorRole: actorUser?.role || "ADMIN",
+        action: "DELETE",
+        entityType: "player",
+        entityId: id,
+        before: player,
+      });
     });
 
-    this.logger.log(`Hard deleted player ${id}`);
+    this.logger.log(`Permanently deleted player ${id}`);
+
+    return {
+      success: true,
+      message: `Player ${id} permanently deleted`,
+      id,
+    };
+  }
+
+  /**
+   * Hard delete player (alias for permanentDelete)
+   */
+  async hardDelete(
+    id: string,
+    actorUser?: AuthenticatedUser,
+  ): Promise<{ success: boolean; message: string; id: string }> {
+    return this.permanentDelete(id, actorUser);
   }
 
   /**

@@ -17,7 +17,17 @@ import {
   ApiResponse,
   ApiQuery,
 } from "@nestjs/swagger";
-import { ClientMatchDto, ClientShotChartEventDto } from "./dto/client-api.dto";
+import {
+  ClientMatchDto,
+  ClientShotChartEventDto,
+  ClientTeamDto,
+  ClientTeamDetailDto,
+  ClientTournamentDto,
+  ClientTournamentDetailDto,
+  ClientStandingDto,
+  ClientLeaderDto,
+  ClientLeadersQueryDto,
+} from "./dto/client-api.dto";
 import { BoxScoreResponseDto } from "../statdash/projections/dto/statdash-projection-responses.dto";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
 import { from, Observable } from "rxjs";
@@ -25,10 +35,10 @@ import { switchMap } from "rxjs/operators";
 import { MessageEvent } from "@nestjs/common";
 import type { AppRequest } from "../common/interfaces/app.interface";
 
-@ApiTags("External Client API")
+@ApiTags("External Client API v1")
 @ApiSecurity("x-api-key")
 @UseGuards(ApiKeyGuard)
-@Controller("client")
+@Controller("v1/client")
 export class ClientApiController {
   constructor(private readonly clientApiService: ClientApiService) {}
 
@@ -53,6 +63,194 @@ export class ClientApiController {
     return userClientIds[0];
   }
 
+  // ---------------------------------------------------------------------------
+  // Teams
+  // ---------------------------------------------------------------------------
+
+  @Get("teams")
+  @ApiOperation({ summary: "List all teams for the client" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: [ClientTeamDto] })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/teams",
+    "Invalid or missing API key",
+  )
+  getTeams(@Req() req: AppRequest, @Query("clientId") clientId?: string) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTeams(authorizedClientId);
+  }
+
+  @Get("teams/:teamId")
+  @ApiOperation({ summary: "Get details and roster for a specific team" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: ClientTeamDetailDto })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/teams/:teamId",
+    "Invalid or missing API key",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/v1/client/teams/:teamId",
+    "Team not found",
+  )
+  getTeamDetails(
+    @Req() req: AppRequest,
+    @Param("teamId") teamId: string,
+    @Query("clientId") clientId?: string,
+  ) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTeamDetails(authorizedClientId, teamId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tournaments
+  // ---------------------------------------------------------------------------
+
+  @Get("tournaments")
+  @ApiOperation({ summary: "List all tournaments for the client" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: [ClientTournamentDto] })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/tournaments",
+    "Invalid or missing API key",
+  )
+  getTournaments(@Req() req: AppRequest, @Query("clientId") clientId?: string) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTournaments(authorizedClientId);
+  }
+
+  @Get("tournaments/:tournamentId")
+  @ApiOperation({ summary: "Get details for a specific tournament" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: ClientTournamentDetailDto })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/tournaments/:tournamentId",
+    "Invalid or missing API key",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/v1/client/tournaments/:tournamentId",
+    "Tournament not found",
+  )
+  getTournamentDetails(
+    @Req() req: AppRequest,
+    @Param("tournamentId") tournamentId: string,
+    @Query("clientId") clientId?: string,
+  ) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTournamentDetails(
+      authorizedClientId,
+      tournamentId,
+    );
+  }
+
+  @Get("tournaments/:tournamentId/standings")
+  @ApiOperation({ summary: "Get standings/table for a specific tournament" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: [ClientStandingDto] })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/tournaments/:tournamentId/standings",
+    "Invalid or missing API key",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/v1/client/tournaments/:tournamentId/standings",
+    "Tournament not found",
+  )
+  getTournamentStandings(
+    @Req() req: AppRequest,
+    @Param("tournamentId") tournamentId: string,
+    @Query("clientId") clientId?: string,
+  ) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTournamentStandings(
+      authorizedClientId,
+      tournamentId,
+    );
+  }
+
+  @Get("tournaments/:tournamentId/leaders")
+  @ApiOperation({ summary: "Get league leaders for a specific tournament" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: [ClientLeaderDto] })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/tournaments/:tournamentId/leaders",
+    "Invalid or missing API key",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/v1/client/tournaments/:tournamentId/leaders",
+    "Tournament not found",
+  )
+  getTournamentLeaders(
+    @Req() req: AppRequest,
+    @Param("tournamentId") tournamentId: string,
+    @Query() query: ClientLeadersQueryDto,
+    @Query("clientId") clientId?: string,
+  ) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTournamentLeaders(
+      authorizedClientId,
+      tournamentId,
+      query.category,
+      query.limit,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Matches
+  // ---------------------------------------------------------------------------
+
   @Get("matches")
   @ApiOperation({ summary: "List all matches for the client" })
   @ApiQuery({
@@ -65,7 +263,7 @@ export class ClientApiController {
     401,
     "Unauthorized",
     "GET",
-    "/client/matches",
+    "/api/v1/client/matches",
     "Invalid or missing API key",
   )
   getMatches(@Req() req: AppRequest, @Query("clientId") clientId?: string) {
@@ -80,19 +278,19 @@ export class ClientApiController {
     required: false,
     description: "Optional client ID. Defaults to assigned client.",
   })
-  @ApiResponse({ status: 200, type: ClientMatchDto }) // Returning full details roughly matching ClientMatchDto for now
+  @ApiResponse({ status: 200, type: ClientMatchDto })
   @AppErrorResponse(
     401,
     "Unauthorized",
     "GET",
-    "/client/matches/:matchId",
+    "/api/v1/client/matches/:matchId",
     "Invalid or missing API key",
   )
   @AppErrorResponse(
     404,
     "Not Found",
     "GET",
-    "/client/matches/:matchId",
+    "/api/v1/client/matches/:matchId",
     "Match not found",
   )
   getMatchDetails(
@@ -116,14 +314,14 @@ export class ClientApiController {
     401,
     "Unauthorized",
     "GET",
-    "/client/matches/:matchId/box-score",
+    "/api/v1/client/matches/:matchId/box-score",
     "Invalid or missing API key",
   )
   @AppErrorResponse(
     404,
     "Not Found",
     "GET",
-    "/client/matches/:matchId/box-score",
+    "/api/v1/client/matches/:matchId/box-score",
     "Match session not found",
   )
   getBoxScore(
@@ -149,14 +347,14 @@ export class ClientApiController {
     401,
     "Unauthorized",
     "GET",
-    "/client/matches/:matchId/shot-chart",
+    "/api/v1/client/matches/:matchId/shot-chart",
     "Invalid or missing API key",
   )
   @AppErrorResponse(
     404,
     "Not Found",
     "GET",
-    "/client/matches/:matchId/shot-chart",
+    "/api/v1/client/matches/:matchId/shot-chart",
     "Match session not found",
   )
   getShotChart(
@@ -165,7 +363,11 @@ export class ClientApiController {
     @Query("clientId") clientId?: string,
   ) {
     const authorizedClientId = this.getAuthorizedClientId(req, clientId);
-    return this.clientApiService.getShotChart(authorizedClientId, matchId);
+    return this.clientApiService.getShotChart(
+      authorizedClientId,
+      matchId,
+      req.user?.scopes,
+    );
   }
 
   @Sse("matches/:matchId/stream")
@@ -186,14 +388,14 @@ export class ClientApiController {
     401,
     "Unauthorized",
     "GET",
-    "/client/matches/:matchId/stream",
+    "/api/v1/client/matches/:matchId/stream",
     "Invalid or missing API key",
   )
   @AppErrorResponse(
     404,
     "Not Found",
     "GET",
-    "/client/matches/:matchId/stream",
+    "/api/v1/client/matches/:matchId/stream",
     "Match session not found",
   )
   streamMatch(
@@ -215,6 +417,7 @@ export class ClientApiController {
       authorizedClientId,
       matchId,
       Number.isFinite(parsedSinceVersion) ? parsedSinceVersion : undefined,
+      req.user?.scopes,
     );
 
     return from(streamPromise).pipe(switchMap((stream) => stream));

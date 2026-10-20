@@ -10,6 +10,9 @@ import {
   Min,
 } from "class-validator";
 
+export const BASE_SORT_FIELDS = ["createdAt", "updatedAt"] as const;
+export type BaseSortField = (typeof BASE_SORT_FIELDS)[number];
+
 export class PaginationQueryDto {
   @ApiPropertyOptional({
     description: "Page number",
@@ -50,9 +53,11 @@ export class PaginationQueryDto {
     description: "Field to sort by",
     example: "createdAt",
     default: "createdAt",
+    enum: BASE_SORT_FIELDS,
   })
   @IsString()
   @IsOptional()
+  @IsIn(BASE_SORT_FIELDS)
   sortBy?: string = "createdAt";
 
   @ApiPropertyOptional({

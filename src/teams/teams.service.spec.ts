@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { TeamsService } from "./teams.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConflictException, NotFoundException } from "@nestjs/common";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
 
 describe("TeamsService", () => {
   let service: TeamsService;
@@ -21,6 +22,16 @@ describe("TeamsService", () => {
       updateMany: jest.fn(),
       update: jest.fn(),
     },
+    $transaction: jest
+      .fn()
+      .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb(mockPrismaService),
+      ),
+  };
+
+  const mockAuditLogsService = {
+    recordLog: jest.fn().mockResolvedValue({ id: "audit-1" }),
+    findAll: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -30,6 +41,10 @@ describe("TeamsService", () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
         },
       ],
     }).compile();
@@ -69,6 +84,30 @@ describe("TeamsService", () => {
       mockPrismaService.team.findMany.mockResolvedValue([{ id: "t1" }]);
       const result = await service.findAll();
       expect(result.items).toEqual([{ id: "t1" }]);
+    });
+
+    it("should search teams by code, country, state, or name", async () => {
+      mockPrismaService.team.findMany.mockResolvedValue([
+        { id: "t1", name: "Los Angeles Lakers", code: "LAL" },
+      ]);
+      mockPrismaService.team.count.mockResolvedValue(1);
+
+      const result = await service.findAll({ search: "LAL" });
+      expect(result.items).toEqual([
+        { id: "t1", name: "Los Angeles Lakers", code: "LAL" },
+      ]);
+      expect(mockPrismaService.team.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { name: { contains: "LAL", mode: "insensitive" } },
+              { code: { contains: "LAL", mode: "insensitive" } },
+              { country: { contains: "LAL", mode: "insensitive" } },
+              { state: { contains: "LAL", mode: "insensitive" } },
+            ],
+          }),
+        }),
+      );
     });
   });
 

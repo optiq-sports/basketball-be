@@ -7,7 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateMatchDto } from "./dto/create-match.dto";
 import { UpdateMatchDto } from "./dto/update-match.dto";
 import { MatchResponseDto } from "./dto/match-response.dto";
-import { MatchStatus, Prisma } from "@prisma/client";
+import { MatchStatus, Prisma, Role } from "@prisma/client";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 import { getTenantFilter } from "../common/filters/tenant.filter";
 import {
@@ -17,9 +17,14 @@ import {
 import { MatchFilterDto } from "./dto/match-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
+
 @Injectable()
 export class MatchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogsService: AuditLogsService,
+  ) {}
 
   async create(
     createMatchDto: CreateMatchDto,
@@ -122,41 +127,56 @@ export class MatchesService {
     const {
       tournamentId,
       status,
+      stage,
       page = 1,
       limit = 10,
-      sortBy,
-      sortOrder,
       search,
-      ...otherParams
     } = filterDto || {};
 
     const { skip, take, orderBy } = buildPrismaPagination(filterDto, {
       defaultOrderBy: { scheduledDate: "asc" },
     });
 
-    const where: any = { tournament: getTenantFilter(user) };
+    const tenantFilter = getTenantFilter(user);
+    const where: Prisma.MatchWhereInput =
+      user.role === Role.SUPER_ADMIN
+        ? {}
+        : {
+            OR: [
+              { clientId: { in: user.clientIds || [] } },
+              { tournament: tenantFilter },
+            ],
+          };
     if (tournamentId) {
       where.tournamentId = tournamentId;
     }
     if (status) {
       where.status = status;
     }
+    if (stage) {
+      where.stage = stage;
+    }
+    const andConditions: Prisma.MatchWhereInput[] = [];
     if (statisticianId) {
-      where.statisticianId = statisticianId;
+      andConditions.push({
+        OR: [{ statisticianId }, { statisticianId: null }],
+      });
     }
     if (search) {
-      where.OR = [
-        { homeTeam: { name: { contains: search, mode: "insensitive" } } },
-        { awayTeam: { name: { contains: search, mode: "insensitive" } } },
-      ];
+      andConditions.push({
+        OR: [
+          { homeTeam: { name: { contains: search, mode: "insensitive" } } },
+          { awayTeam: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      });
+    }
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [items, itemCount] = await Promise.all([
       this.prisma.match.findMany({
-        where: {
-          ...where,
-          ...otherParams,
-        },
+        where,
         skip,
         take,
         include: {
@@ -184,14 +204,20 @@ export class MatchesService {
               logo: true,
             },
           },
+          gameSessions: {
+            select: {
+              id: true,
+              status: true,
+              homeScore: true,
+              awayScore: true,
+              quarter: true,
+            },
+          },
         },
         orderBy,
       }),
       this.prisma.match.count({
-        where: {
-          ...where,
-          ...otherParams,
-        },
+        where,
       }),
     ]);
 
@@ -205,13 +231,31 @@ export class MatchesService {
     id: string,
     user: AuthenticatedUser,
   ): Promise<MatchResponseDto> {
+    const tenantFilter = getTenantFilter(user);
+    const where: Prisma.MatchWhereInput =
+      user.role === Role.SUPER_ADMIN
+        ? { id }
+        : {
+            id,
+            OR: [
+              { clientId: { in: user.clientIds || [] } },
+              { tournament: tenantFilter },
+            ],
+          };
+
     const match = await this.prisma.match.findFirst({
-      where: { id, tournament: getTenantFilter(user) },
+      where,
       include: {
         tournament: true,
         statistician: true,
         gameSessions: {
-          select: { id: true, status: true },
+          select: {
+            id: true,
+            status: true,
+            homeScore: true,
+            awayScore: true,
+            quarter: true,
+          },
         },
         homeTeam: {
           include: {
@@ -316,27 +360,75 @@ export class MatchesService {
       updateData.awayScore = awayScore;
     }
 
-    return this.prisma.match.update({
-      where: { id },
-      data: updateData,
-      include: {
-        tournament: true,
-        homeTeam: true,
-        awayTeam: true,
-        statistician: true,
-        stats: {
-          include: {
-            player: true,
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.match.update({
+        where: { id },
+        data: updateData,
+        include: {
+          tournament: true,
+          homeTeam: true,
+          awayTeam: true,
+          statistician: true,
+          stats: {
+            include: {
+              player: true,
+            },
           },
         },
-      },
+      });
+
+      if (
+        updateData.homeScore !== undefined ||
+        updateData.awayScore !== undefined ||
+        updateData.status !== undefined
+      ) {
+        await this.auditLogsService.recordLog(tx, {
+          actorUserId: user.id,
+          actorRole: user.role,
+          clientId:
+            (match as unknown as { tournament?: { clientId?: string } })
+              .tournament?.clientId ||
+            user.clientIds?.[0] ||
+            null,
+          action: "UPDATE_RESULT",
+          entityType: "match",
+          entityId: id,
+          before: {
+            homeScore: match.homeScore,
+            awayScore: match.awayScore,
+            status: match.status,
+          },
+          after: {
+            homeScore: updated.homeScore,
+            awayScore: updated.awayScore,
+            status: updated.status,
+          },
+        });
+      }
+
+      return updated;
     });
   }
 
   async remove(id: string, user: AuthenticatedUser): Promise<void> {
     const match = await this.findOne(id, user);
-    await this.prisma.match.delete({
-      where: { id },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.match.delete({
+        where: { id },
+      });
+      await this.auditLogsService.recordLog(tx, {
+        actorUserId: user.id,
+        actorRole: user.role,
+        clientId:
+          (match as unknown as { tournament?: { clientId?: string } })
+            .tournament?.clientId ||
+          user.clientIds?.[0] ||
+          null,
+        action: "DELETE",
+        entityType: "match",
+        entityId: id,
+        before: match,
+      });
     });
   }
 }

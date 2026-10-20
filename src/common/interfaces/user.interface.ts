@@ -1,6 +1,6 @@
-import { Role, UserProfile } from "@prisma/client";
+import { Role, type UserProfile } from "@prisma/client";
 
-export interface AuthenticatedUser {
+export class AuthenticatedUser {
   id: string;
   email: string;
   name: string;
@@ -8,4 +8,5 @@ export interface AuthenticatedUser {
   clientIds?: string[];
   profile?: UserProfile | null;
   forcePasswordChange?: boolean;
+  scopes?: string[];
 }

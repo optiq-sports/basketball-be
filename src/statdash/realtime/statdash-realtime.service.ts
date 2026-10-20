@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { MessageEvent } from "@nestjs/common";
-import { Observable, concat, from, Subject } from "rxjs";
+import { Observable, concat, from, Subject, interval, merge } from "rxjs";
 import { filter, map } from "rxjs/operators";
 import { RedisService } from "../../common/redis/redis.service";
 
@@ -14,6 +14,9 @@ type StatdashRealtimeUpdate = {
       home: number;
       away: number;
     };
+    clockSecondsRemaining?: number;
+    clockRunning?: boolean;
+    clockUpdatedAt?: Date | string;
   };
   deltaEvents: Array<{
     id?: string;
@@ -39,8 +42,7 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.unsubscribe = this.redisService.subscribeSessionUpdates((payload) => {
       const envelope = payload as
-        | { originNodeId?: string; update?: StatdashRealtimeUpdate }
-        | undefined;
+        { originNodeId?: string; update?: StatdashRealtimeUpdate } | undefined;
       if (!envelope?.update) return;
       if (envelope.originNodeId === this.nodeId) return;
       this.emitUpdate(envelope.update);
@@ -54,6 +56,7 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
   streamBySession(
     sessionId: string,
     sinceVersion?: number,
+    heartbeatIntervalMs: number = 15000,
   ): Observable<MessageEvent> {
     const replay = (this.historyBySession.get(sessionId) ?? []).filter(
       (update) =>
@@ -61,14 +64,26 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
           ? update.state.version > sinceVersion
           : true,
     );
-    const live = this.updates$.pipe(
+    const live$ = this.updates$.pipe(
       filter((update) => update.sessionId === sessionId),
-      map((update) => ({ type: "statdash-update", data: update })),
+      map((update): MessageEvent => ({
+        type: "statdash-update",
+        data: update,
+      })),
     );
     const replay$ = from(replay).pipe(
-      map((update) => ({ type: "statdash-update", data: update })),
+      map((update): MessageEvent => ({
+        type: "statdash-update",
+        data: update,
+      })),
     );
-    return concat(replay$, live);
+
+    // Heartbeat every 15s emitting an SSE comment frame (: ping\n\n) to keep idle streams alive
+    const heartbeat$ = interval(heartbeatIntervalMs).pipe(
+      map((): MessageEvent => ({ comment: "ping" })),
+    );
+
+    return merge(concat(replay$, live$), heartbeat$);
   }
 
   publish(update: StatdashRealtimeUpdate) {

@@ -291,7 +291,7 @@ export class StatisticianController {
     "/api/statistician/:id",
     "Statistician not found",
   )
-  remove(@Param("id") id: string) {
-    return this.statisticianService.remove(id);
+  remove(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.statisticianService.remove(id, user);
   }
 }

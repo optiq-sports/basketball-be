@@ -1,6 +1,23 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { MatchStatus, MatchStage } from "@prisma/client";
 
+export class GameSessionSummaryDto {
+  @ApiProperty({ example: "session_1" })
+  id: string;
+
+  @ApiProperty({ example: "COMPLETED" })
+  status: string;
+
+  @ApiProperty({ example: 34, required: false })
+  homeScore?: number;
+
+  @ApiProperty({ example: 35, required: false })
+  awayScore?: number;
+
+  @ApiProperty({ example: 4, required: false })
+  quarter?: number;
+}
+
 export class MatchResponseDto {
   @ApiProperty({ example: "match_123" })
   id: string;
@@ -69,16 +86,9 @@ export class MatchResponseDto {
   updatedAt: Date;
 
   @ApiProperty({
-    example: [{ id: "session_1", status: "LIVE" }],
+    type: GameSessionSummaryDto,
     required: false,
-    type: "array",
-    items: {
-      type: "object",
-      properties: {
-        id: { type: "string" },
-        status: { type: "string" },
-      },
-    },
+    nullable: true,
   })
-  gameSessions?: any;
+  gameSessions?: GameSessionSummaryDto | null;
 }

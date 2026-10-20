@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 
 export const getTenantFilter = (
   user: AuthenticatedUser,
-): { clientId?: any } => {
+): { clientId?: { in: string[] } } => {
   if (!user || user.role === Role.SUPER_ADMIN) {
     return {};
   }

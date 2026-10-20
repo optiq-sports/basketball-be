@@ -12,13 +12,15 @@ export class EmailService {
 
   constructor() {
     if (!process.env.SMTP_HOST) {
+      if (process.env.NODE_ENV !== "test") {
+        throw new Error(
+          "SMTP_HOST environment variable is required for email delivery.",
+        );
+      }
       this.logger.warn(
         "SMTP_HOST environment variable is required for email delivery.",
       );
       return;
-      // throw new Error(
-      //   "SMTP_HOST environment variable is required for email delivery.",
-      // );
     }
 
     this.transporter = nodemailer.createTransport({
@@ -37,6 +39,12 @@ export class EmailService {
     role: string,
   ): Promise<boolean> {
     try {
+      if (!this.transporter) {
+        this.logger.error(
+          `Cannot send welcome email to ${to}: SMTP transporter not configured`,
+        );
+        return false;
+      }
       const template = getWelcomeEmailTemplate(role, generatedPassword);
       const info = await this.transporter.sendMail({
         from:

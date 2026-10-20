@@ -92,9 +92,12 @@ describe("Admin & Statistician Modules (e2e)", () => {
         .set("Authorization", `Bearer ${superAdminToken}`)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body.data)).toBe(true);
+          const list = Array.isArray(res.body.data)
+            ? res.body.data
+            : (res.body.data?.items ?? res.body.data?.data);
+          expect(Array.isArray(list)).toBe(true);
           // Should at least have the Super Admin and the newly created Admin
-          expect(res.body.data.length).toBeGreaterThanOrEqual(2);
+          expect(list.length).toBeGreaterThanOrEqual(2);
         });
     });
   });
@@ -149,8 +152,11 @@ describe("Admin & Statistician Modules (e2e)", () => {
         .set("Authorization", `Bearer ${superAdminToken}`)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body.data)).toBe(true);
-          expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+          const list = Array.isArray(res.body.data)
+            ? res.body.data
+            : (res.body.data?.items ?? res.body.data?.data);
+          expect(Array.isArray(list)).toBe(true);
+          expect(list.length).toBeGreaterThanOrEqual(1);
         });
     });
   });

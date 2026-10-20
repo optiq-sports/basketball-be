@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { MatchStatus, Role } from "@prisma/client";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { AuthenticatedUser } from "src/common/interfaces/user.interface";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
 
 describe("MatchesService", () => {
   let service: MatchesService;
@@ -29,6 +30,16 @@ describe("MatchesService", () => {
     tournamentTeam: {
       findUnique: jest.fn(),
     },
+    $transaction: jest
+      .fn()
+      .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb(mockPrismaService),
+      ),
+  };
+
+  const mockAuditLogsService = {
+    recordLog: jest.fn().mockResolvedValue({ id: "audit-1" }),
+    findAll: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -38,6 +49,10 @@ describe("MatchesService", () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
         },
       ],
     }).compile();
@@ -139,6 +154,33 @@ describe("MatchesService", () => {
         }),
       );
     });
+
+    it("should scope matches to client when called by CLIENT user", async () => {
+      const clientUser: AuthenticatedUser = {
+        id: "client_user_1",
+        email: "operator@broadcast.tv",
+        name: "Broadcast Operator",
+        role: Role.CLIENT,
+        clientIds: ["broadcast_client_1"],
+      };
+      mockPrismaService.match.findMany.mockResolvedValue([
+        { id: "m_broadcast" },
+      ]);
+      mockPrismaService.match.count.mockResolvedValue(1);
+
+      const result = await service.findAll(clientUser, {});
+      expect(result.items).toEqual([{ id: "m_broadcast" }]);
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { clientId: { in: ["broadcast_client_1"] } },
+              { tournament: { clientId: { in: ["broadcast_client_1"] } } },
+            ],
+          }),
+        }),
+      );
+    });
   });
 
   describe("findOne", () => {
@@ -153,6 +195,33 @@ describe("MatchesService", () => {
       mockPrismaService.match.findFirst.mockResolvedValue({ id: "m1" });
       const result = await service.findOne("m1", mockUser);
       expect(result).toEqual({ id: "m1", gameSessions: [] });
+    });
+
+    it("should enforce client tenant scoping for CLIENT user in findOne", async () => {
+      const clientUser: AuthenticatedUser = {
+        id: "client_user_1",
+        email: "operator@broadcast.tv",
+        name: "Broadcast Operator",
+        role: Role.CLIENT,
+        clientIds: ["broadcast_client_1"],
+      };
+      mockPrismaService.match.findFirst.mockResolvedValue({
+        id: "m_broadcast",
+      });
+
+      const result = await service.findOne("m_broadcast", clientUser);
+      expect(result).toEqual({ id: "m_broadcast", gameSessions: [] });
+      expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: "m_broadcast",
+            OR: [
+              { clientId: { in: ["broadcast_client_1"] } },
+              { tournament: { clientId: { in: ["broadcast_client_1"] } } },
+            ],
+          },
+        }),
+      );
     });
   });
 
