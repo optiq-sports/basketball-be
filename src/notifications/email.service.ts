@@ -12,13 +12,13 @@ export class EmailService {
 
   constructor() {
     if (!process.env.SMTP_HOST) {
-      if (process.env.NODE_ENV !== "test") {
+      if (process.env.REQUIRE_SMTP === "true") {
         throw new Error(
           "SMTP_HOST environment variable is required for email delivery.",
         );
       }
       this.logger.warn(
-        "SMTP_HOST environment variable is required for email delivery.",
+        "SMTP_HOST environment variable is not configured. Email delivery will be disabled.",
       );
       return;
     }
@@ -31,6 +31,39 @@ export class EmailService {
         pass: process.env.SMTP_PASS,
       },
     });
+  }
+
+  private getFrontendBaseUrl(role?: string): string {
+    const roleUpper = role ? role.toUpperCase() : undefined;
+    if (roleUpper === "CLIENT") {
+      return (
+        process.env.PORTAL_URL ||
+        process.env.FRONTEND_URL ||
+        "http://localhost:3000"
+      );
+    }
+    if (roleUpper === "BROADCASTER") {
+      return (
+        process.env.BROADCAST_URL ||
+        process.env.FRONTEND_URL ||
+        "http://localhost:3000"
+      );
+    }
+    if (roleUpper === "STATISTICIAN") {
+      return (
+        process.env.STATDASH_URL ||
+        process.env.FRONTEND_URL ||
+        "http://localhost:3000"
+      );
+    }
+    if (roleUpper === "ADMIN" || roleUpper === "SUPER_ADMIN") {
+      return (
+        process.env.ADMIN_URL ||
+        process.env.FRONTEND_URL ||
+        "http://localhost:3000"
+      );
+    }
+    return process.env.FRONTEND_URL || "http://localhost:3000";
   }
 
   async sendWelcomeEmail(
@@ -66,9 +99,20 @@ export class EmailService {
     }
   }
 
-  async sendPasswordResetEmail(to: string, token: string): Promise<boolean> {
+  async sendPasswordResetEmail(
+    to: string,
+    token: string,
+    role?: string,
+  ): Promise<boolean> {
     try {
-      const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password?token=${token}`;
+      if (!this.transporter) {
+        this.logger.error(
+          `Cannot send password reset email to ${to}: SMTP transporter not configured`,
+        );
+        return false;
+      }
+      const baseUrl = this.getFrontendBaseUrl(role);
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
       const template = getPasswordResetEmailTemplate(resetUrl);
       const info = await this.transporter.sendMail({
         from:

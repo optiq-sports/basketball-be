@@ -257,7 +257,11 @@ export class AuthService {
       },
     });
 
-    await this.emailService.sendPasswordResetEmail(user.email, token);
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      token,
+      user.role,
+    );
     return { success: true };
   }
 

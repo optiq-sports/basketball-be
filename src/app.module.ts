@@ -25,6 +25,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { AuditLogsModule } from "./audit-logs/audit-logs.module";
 import { OverlayModule } from "./overlay/overlay.module";
 import { BroadcastModule } from "./broadcast/broadcast.module";
+import { BroadcasterModule } from "./broadcaster/broadcaster.module";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { BroadcastModule } from "./broadcast/broadcast.module";
     AuditLogsModule,
     OverlayModule,
     BroadcastModule,
+    BroadcasterModule,
   ],
   providers: [
     {

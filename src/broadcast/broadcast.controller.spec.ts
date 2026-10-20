@@ -2,22 +2,31 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { BroadcastController } from "./broadcast.controller";
 import { BroadcastService } from "./broadcast.service";
 import type { AppRequest } from "../common/interfaces/app.interface";
+import { Role } from "@prisma/client";
 
 describe("BroadcastController", () => {
   let controller: BroadcastController;
   let service: BroadcastService;
 
+  const mockBroadcastService = {
+    resolveSlug: jest.fn(),
+    getBroadcastClientBySlug: jest.fn(),
+    getBroadcastMatches: jest.fn(),
+    getOverlayState: jest.fn(),
+    updateOverlayState: jest.fn(),
+    createOverlayLink: jest.fn(),
+    revokeOverlayLink: jest.fn(),
+  };
+
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BroadcastController],
       providers: [
         {
           provide: BroadcastService,
-          useValue: {
-            resolveSlug: jest.fn(),
-            getBroadcastClientBySlug: jest.fn(),
-            getBroadcastMatches: jest.fn(),
-          },
+          useValue: mockBroadcastService,
         },
       ],
     }).compile();
@@ -30,6 +39,109 @@ describe("BroadcastController", () => {
     expect(controller).toBeDefined();
   });
 
+  describe("Overlay Endpoints", () => {
+    const mockUser = {
+      id: "usr_b1",
+      email: "broadcaster@test.com",
+      role: Role.BROADCASTER,
+    };
+    const mockReq = { user: mockUser } as unknown as AppRequest;
+
+    it("getOverlay should call service.getOverlayState", async () => {
+      const mockState = {
+        activeScene: "quarter_scores",
+        visible: true,
+        scorebugVisible: true,
+        autoDismissAt: null,
+        payload: { v: 1 },
+        updatedAt: new Date(),
+      };
+      mockBroadcastService.getOverlayState.mockResolvedValue(mockState);
+
+      const result = await controller.getOverlay(
+        "match_1",
+        undefined,
+        mockUser,
+      );
+      expect(result).toEqual(mockState);
+      expect(mockBroadcastService.getOverlayState).toHaveBeenCalledWith(
+        mockUser,
+        "match_1",
+        undefined,
+      );
+    });
+
+    it("updateOverlay should call service.updateOverlayState", async () => {
+      const mockDto = {
+        activeScene: "player_spotlight" as const,
+        payload: { v: 1, player: "LeBron" },
+        visible: true,
+      };
+      const mockState = {
+        ...mockDto,
+        scorebugVisible: true,
+        autoDismissAt: null,
+        updatedAt: new Date(),
+      };
+      mockBroadcastService.updateOverlayState.mockResolvedValue(mockState);
+
+      const result = await controller.updateOverlay(
+        "match_1",
+        mockDto,
+        mockUser,
+      );
+      expect(result).toEqual(mockState);
+      expect(mockBroadcastService.updateOverlayState).toHaveBeenCalledWith(
+        mockUser,
+        "match_1",
+        mockDto,
+      );
+    });
+
+    it("createOverlayLink should call service.createOverlayLink", async () => {
+      const mockDto = { expiresInHours: 48 };
+      const mockLink = {
+        token: "ovl_test123",
+        tokenPrefix: "ovl_test...",
+        expiresAt: new Date(),
+        outputUrl: "https://broadcast.optiqsports.com/overlay/ovl_test123",
+      };
+      mockBroadcastService.createOverlayLink.mockResolvedValue(mockLink);
+
+      const result = await controller.createOverlayLink(
+        "match_1",
+        mockDto,
+        mockUser,
+      );
+      expect(result).toEqual(mockLink);
+      expect(mockBroadcastService.createOverlayLink).toHaveBeenCalledWith(
+        mockUser,
+        "match_1",
+        mockDto,
+      );
+    });
+
+    it("revokeOverlayLink should call service.revokeOverlayLink", async () => {
+      const mockRes = {
+        success: true,
+        message: "Overlay link revoked successfully",
+      };
+      mockBroadcastService.revokeOverlayLink.mockResolvedValue(mockRes);
+
+      const result = await controller.revokeOverlayLink(
+        "match_1",
+        "usr_b1",
+        mockUser,
+      );
+      expect(result).toEqual(mockRes);
+      expect(mockBroadcastService.revokeOverlayLink).toHaveBeenCalledWith(
+        mockUser,
+        "match_1",
+        "usr_b1",
+      );
+    });
+  });
+
   describe("getClientBySlug", () => {
     it("should resolve slug and return broadcast client", async () => {
       const mockClient = {
@@ -38,17 +150,20 @@ describe("BroadcastController", () => {
         slug: "onesporttv",
         clientType: "broadcast",
       };
-      (service.resolveSlug as jest.Mock).mockReturnValue("onesporttv");
-      (service.getBroadcastClientBySlug as jest.Mock).mockResolvedValue(
+      mockBroadcastService.resolveSlug.mockReturnValue("onesporttv");
+      mockBroadcastService.getBroadcastClientBySlug.mockResolvedValue(
         mockClient,
       );
 
       const result = await controller.getClientBySlug("onesporttv", undefined);
       expect(result).toEqual(mockClient);
-      expect(service.resolveSlug).toHaveBeenCalledWith("onesporttv", undefined);
-      expect(service.getBroadcastClientBySlug).toHaveBeenCalledWith(
+      expect(mockBroadcastService.resolveSlug).toHaveBeenCalledWith(
         "onesporttv",
+        undefined,
       );
+      expect(
+        mockBroadcastService.getBroadcastClientBySlug,
+      ).toHaveBeenCalledWith("onesporttv");
     });
   });
 
@@ -63,8 +178,8 @@ describe("BroadcastController", () => {
         },
         matches: [],
       };
-      (service.resolveSlug as jest.Mock).mockReturnValue("onesporttv");
-      (service.getBroadcastMatches as jest.Mock).mockResolvedValue(mockResult);
+      mockBroadcastService.resolveSlug.mockReturnValue("onesporttv");
+      mockBroadcastService.getBroadcastMatches.mockResolvedValue(mockResult);
 
       const mockReq = { user: undefined } as unknown as AppRequest;
       const result = await controller.getMatchesBySlug(
@@ -73,8 +188,11 @@ describe("BroadcastController", () => {
         mockReq,
       );
       expect(result).toEqual(mockResult as any);
-      expect(service.resolveSlug).toHaveBeenCalledWith("onesporttv", undefined);
-      expect(service.getBroadcastMatches).toHaveBeenCalledWith(
+      expect(mockBroadcastService.resolveSlug).toHaveBeenCalledWith(
+        "onesporttv",
+        undefined,
+      );
+      expect(mockBroadcastService.getBroadcastMatches).toHaveBeenCalledWith(
         "onesporttv",
         undefined,
       );
@@ -89,8 +207,8 @@ describe("BroadcastController", () => {
         slug: "onesporttv",
         clientType: "broadcast",
       };
-      (service.resolveSlug as jest.Mock).mockReturnValue("onesporttv");
-      (service.getBroadcastClientBySlug as jest.Mock).mockResolvedValue(
+      mockBroadcastService.resolveSlug.mockReturnValue("onesporttv");
+      mockBroadcastService.getBroadcastClientBySlug.mockResolvedValue(
         mockClient,
       );
 
@@ -98,13 +216,13 @@ describe("BroadcastController", () => {
         "onesporttv.optiqsports.com",
       );
       expect(result).toEqual(mockClient);
-      expect(service.resolveSlug).toHaveBeenCalledWith(
+      expect(mockBroadcastService.resolveSlug).toHaveBeenCalledWith(
         undefined,
         "onesporttv.optiqsports.com",
       );
-      expect(service.getBroadcastClientBySlug).toHaveBeenCalledWith(
-        "onesporttv",
-      );
+      expect(
+        mockBroadcastService.getBroadcastClientBySlug,
+      ).toHaveBeenCalledWith("onesporttv");
     });
   });
 
@@ -119,8 +237,8 @@ describe("BroadcastController", () => {
         },
         matches: [],
       };
-      (service.resolveSlug as jest.Mock).mockReturnValue("onesporttv");
-      (service.getBroadcastMatches as jest.Mock).mockResolvedValue(mockResult);
+      mockBroadcastService.resolveSlug.mockReturnValue("onesporttv");
+      mockBroadcastService.getBroadcastMatches.mockResolvedValue(mockResult);
 
       const mockReq = { user: undefined } as unknown as AppRequest;
       const result = await controller.getMatchesByHost(
@@ -128,11 +246,11 @@ describe("BroadcastController", () => {
         mockReq,
       );
       expect(result).toEqual(mockResult as any);
-      expect(service.resolveSlug).toHaveBeenCalledWith(
+      expect(mockBroadcastService.resolveSlug).toHaveBeenCalledWith(
         undefined,
         "onesporttv.optiqsports.com",
       );
-      expect(service.getBroadcastMatches).toHaveBeenCalledWith(
+      expect(mockBroadcastService.getBroadcastMatches).toHaveBeenCalledWith(
         "onesporttv",
         undefined,
       );

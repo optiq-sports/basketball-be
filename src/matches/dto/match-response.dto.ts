@@ -91,4 +91,10 @@ export class MatchResponseDto {
     nullable: true,
   })
   gameSessions?: GameSessionSummaryDto | null;
+
+  @ApiProperty({
+    type: "array",
+    required: false,
+  })
+  broadcasters?: Record<string, unknown>[];
 }

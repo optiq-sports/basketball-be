@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { OverlayService } from "./overlay.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../common/redis/redis.service";
+import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import {
   BadRequestException,
   NotFoundException,
@@ -9,21 +10,26 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import * as crypto from "crypto";
-import { firstValueFrom, take, toArray } from "rxjs";
+import { firstValueFrom } from "rxjs";
 
 describe("OverlayService", () => {
   let service: OverlayService;
-  let prisma: PrismaService;
-  let redisService: RedisService;
+  let auditLogsService: AuditLogsService;
 
   const mockPrisma = {
+    $transaction: jest.fn(),
     clientOverlayToken: {
       findUnique: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn(),
     },
     overlayScene: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
       upsert: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -34,8 +40,13 @@ describe("OverlayService", () => {
     publishOverlayUpdate: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockAuditLogsService = {
+    recordLog: jest.fn().mockResolvedValue({}),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (cb) => cb(mockPrisma));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,12 +59,15 @@ describe("OverlayService", () => {
           provide: RedisService,
           useValue: mockRedis,
         },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
+        },
       ],
     }).compile();
 
     service = module.get<OverlayService>(OverlayService);
-    prisma = module.get<PrismaService>(PrismaService);
-    redisService = module.get<RedisService>(RedisService);
+    auditLogsService = module.get<AuditLogsService>(AuditLogsService);
     service.onModuleInit();
   });
 
@@ -122,11 +136,12 @@ describe("OverlayService", () => {
       .update(rawToken)
       .digest("hex");
 
-    it("should return clientId and matchId for a valid active token", async () => {
+    it("should return clientId, matchId, and broadcasterId for a valid active token", async () => {
       mockPrisma.clientOverlayToken.findUnique.mockResolvedValue({
         id: "tok_1",
         clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: "usr_broadcaster_1",
         tokenHash,
         isActive: true,
         revokedAt: null,
@@ -138,6 +153,7 @@ describe("OverlayService", () => {
       expect(res).toEqual({
         clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: "usr_broadcaster_1",
       });
       expect(mockPrisma.clientOverlayToken.update).toHaveBeenCalledWith({
         where: { id: "tok_1" },
@@ -157,6 +173,7 @@ describe("OverlayService", () => {
         id: "tok_1",
         clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: null,
         isActive: false,
         revokedAt: new Date(),
         expiresAt: new Date(Date.now() + 3600000),
@@ -173,6 +190,7 @@ describe("OverlayService", () => {
         id: "tok_1",
         clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: null,
         isActive: true,
         revokedAt: null,
         expiresAt: new Date(Date.now() + 3600000),
@@ -189,6 +207,7 @@ describe("OverlayService", () => {
         id: "tok_1",
         clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: null,
         isActive: true,
         revokedAt: null,
         expiresAt: new Date(Date.now() - 1000), // in the past
@@ -203,7 +222,7 @@ describe("OverlayService", () => {
 
   describe("getSceneState", () => {
     it("should return default blank state if no record in database", async () => {
-      mockPrisma.overlayScene.findUnique.mockResolvedValue(null);
+      mockPrisma.overlayScene.findFirst.mockResolvedValue(null);
 
       const state = await service.getSceneState("client_1", "match_1");
       expect(state).toEqual({
@@ -216,9 +235,9 @@ describe("OverlayService", () => {
       });
     });
 
-    it("should return stored scene state if record exists", async () => {
+    it("should return stored scene state if record exists for broadcaster", async () => {
       const storedDate = new Date();
-      mockPrisma.overlayScene.findUnique.mockResolvedValue({
+      mockPrisma.overlayScene.findFirst.mockResolvedValue({
         activeScene: "player_spotlight",
         visible: true,
         scorebugVisible: false,
@@ -227,7 +246,11 @@ describe("OverlayService", () => {
         updatedAt: storedDate,
       });
 
-      const state = await service.getSceneState("client_1", "match_1");
+      const state = await service.getSceneState(
+        "client_1",
+        "match_1",
+        "usr_broadcaster_1",
+      );
       expect(state).toEqual({
         activeScene: "player_spotlight",
         visible: true,
@@ -239,10 +262,15 @@ describe("OverlayService", () => {
     });
   });
 
-  describe("upsertScene & patchScene", () => {
-    it("should upsert scene and broadcast update", async () => {
+  describe("saveSceneState, upsertScene & patchScene", () => {
+    it("should create new scene when no existing record exists", async () => {
       const now = new Date();
-      mockPrisma.overlayScene.upsert.mockResolvedValue({
+      mockPrisma.overlayScene.findFirst.mockResolvedValue(null);
+      mockPrisma.overlayScene.create.mockResolvedValue({
+        id: "sc_1",
+        clientId: "client_1",
+        matchId: "match_1",
+        broadcasterId: "usr_b1",
         activeScene: "quarter_scores",
         visible: true,
         scorebugVisible: true,
@@ -251,25 +279,39 @@ describe("OverlayService", () => {
         updatedAt: now,
       });
 
-      const res = await service.upsertScene("client_1", "user_1", {
+      const res = await service.saveSceneState({
+        clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: "usr_b1",
         activeScene: "quarter_scores",
         payload: { v: 1, q1: 24 },
         visible: true,
       });
 
       expect(res.activeScene).toBe("quarter_scores");
+      expect(mockPrisma.overlayScene.create).toHaveBeenCalled();
       expect(mockRedis.publishOverlayUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           matchId: "match_1",
+          broadcasterId: "usr_b1",
           state: res,
         }),
       );
     });
 
-    it("should patch scene and broadcast update", async () => {
+    it("should update existing scene when record exists", async () => {
       const now = new Date();
-      mockPrisma.overlayScene.upsert.mockResolvedValue({
+      mockPrisma.overlayScene.findFirst.mockResolvedValue({
+        id: "sc_1",
+        clientId: "client_1",
+        matchId: "match_1",
+        broadcasterId: "usr_b1",
+      });
+      mockPrisma.overlayScene.update.mockResolvedValue({
+        id: "sc_1",
+        clientId: "client_1",
+        matchId: "match_1",
+        broadcasterId: "usr_b1",
         activeScene: "team_comparison",
         visible: true,
         scorebugVisible: true,
@@ -284,10 +326,87 @@ describe("OverlayService", () => {
       });
 
       expect(res.activeScene).toBe("team_comparison");
+      expect(mockPrisma.overlayScene.update).toHaveBeenCalled();
       expect(mockRedis.publishOverlayUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           matchId: "match_1",
           state: res,
+        }),
+      );
+    });
+  });
+
+  describe("issueOverlayToken and revokeOverlayToken", () => {
+    it("should issue overlay token, invalidate prior tokens, record audit log, and return outputUrl", async () => {
+      const expiresAt = new Date(Date.now() + 24 * 3600 * 1000);
+      mockPrisma.clientOverlayToken.create.mockResolvedValue({
+        id: "tok_new",
+        clientId: "client_1",
+        matchId: "match_1",
+        broadcasterId: "usr_b1",
+        tokenHash: "hash123",
+        tokenPrefix: "ovl_12345678...",
+        expiresAt,
+        isActive: true,
+      });
+
+      const res = await service.issueOverlayToken({
+        clientId: "client_1",
+        matchId: "match_1",
+        broadcasterId: "usr_b1",
+        actorUserId: "usr_b1",
+        actorRole: "BROADCASTER",
+        expiresInHours: 24,
+      });
+
+      expect(res.token).toMatch(/^ovl_/);
+      expect(res.tokenPrefix).toMatch(/^ovl_/);
+      expect(res.outputUrl).toContain("/overlay/ovl_");
+      expect(mockPrisma.clientOverlayToken.updateMany).toHaveBeenCalledWith({
+        where: {
+          matchId: "match_1",
+          broadcasterId: "usr_b1",
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          revokedAt: expect.any(Date),
+        },
+      });
+      expect(mockAuditLogsService.recordLog).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: "CREATE_OVERLAY_TOKEN",
+          entityType: "client_overlay_token",
+        }),
+      );
+    });
+
+    it("should revoke overlay tokens and record audit log", async () => {
+      const res = await service.revokeOverlayToken({
+        clientId: "client_1",
+        matchId: "match_1",
+        broadcasterId: "usr_b1",
+        actorUserId: "usr_b1",
+        actorRole: "BROADCASTER",
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockPrisma.clientOverlayToken.updateMany).toHaveBeenCalledWith({
+        where: {
+          matchId: "match_1",
+          broadcasterId: "usr_b1",
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          revokedAt: expect.any(Date),
+        },
+      });
+      expect(mockAuditLogsService.recordLog).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: "REVOKE_OVERLAY_TOKEN",
         }),
       );
     });
@@ -322,13 +441,14 @@ describe("OverlayService", () => {
         id: "tok_1",
         clientId: "client_1",
         matchId: "match_1",
+        broadcasterId: "usr_b1",
         isActive: true,
         revokedAt: null,
         expiresAt: new Date(Date.now() + 3600000),
         client: { isActive: true },
       });
 
-      mockPrisma.overlayScene.findUnique.mockResolvedValue({
+      mockPrisma.overlayScene.findFirst.mockResolvedValue({
         activeScene: "scoring_run",
         visible: true,
         scorebugVisible: true,

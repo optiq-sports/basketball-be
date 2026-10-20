@@ -27,6 +27,10 @@ model User {
   clientUsers   ClientUser[]
   notifications Notification[]
   overlayScenes OverlayScene[]
+  broadcasterMatches   MatchBroadcaster[]   @relation("BroadcasterMatches")
+  assignedBroadcasters MatchBroadcaster[]   @relation("AssignedBroadcasters")
+  broadcasterOverlayScenes OverlayScene[]   @relation("BroadcasterOverlayScenes")
+  broadcasterOverlayTokens ClientOverlayToken[] @relation("BroadcasterOverlayTokens")
 
   @@map("user")
 }
@@ -212,6 +216,7 @@ model Match {
   stats          MatchStat[]
   overlayTokens  ClientOverlayToken[]
   overlayScenes  OverlayScene[]
+  broadcasters   MatchBroadcaster[]
 
   @@map("match")
 }
@@ -377,6 +382,7 @@ enum Role {
   STATISTICIAN
   SUPER_ADMIN
   CLIENT
+  BROADCASTER
 }
 
 enum UserStatus {
@@ -502,23 +508,26 @@ model ClientEmbedToken {
 }
 
 model ClientOverlayToken {
-  id          String    @id @default(cuid()) @map("id")
-  clientId    String    @map("client_id")
-  matchId     String    @map("match_id")
-  tokenHash   String    @unique @map("token_hash")
-  tokenPrefix String    @map("token_prefix")
-  expiresAt   DateTime  @map("expires_at")
-  revokedAt   DateTime? @map("revoked_at")
-  isActive    Boolean   @default(true) @map("is_active")
-  lastUsedAt  DateTime? @map("last_used_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(cuid()) @map("id")
+  clientId      String    @map("client_id")
+  matchId       String    @map("match_id")
+  broadcasterId String?   @map("broadcaster_id")
+  tokenHash     String    @unique @map("token_hash")
+  tokenPrefix   String    @map("token_prefix")
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastUsedAt    DateTime? @map("last_used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  match         Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  broadcaster   User?     @relation("BroadcasterOverlayTokens", fields: [broadcasterId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([matchId])
+  @@index([broadcasterId])
   @@map("client_overlay_token")
 }
 
@@ -561,6 +570,7 @@ model OverlayScene {
   id              String    @id @default(cuid()) @map("id")
   clientId        String    @map("client_id")
   matchId         String    @map("match_id")
+  broadcasterId   String?   @map("broadcaster_id")
   activeScene     String    @default("blank") @map("active_scene")
   payload         Json      @default("{}") @map("payload")
   visible         Boolean   @default(false) @map("visible")
@@ -573,11 +583,30 @@ model OverlayScene {
   client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   match           Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   updatedByUser   User?     @relation(fields: [updatedByUserId], references: [id])
+  broadcaster     User?     @relation("BroadcasterOverlayScenes", fields: [broadcasterId], references: [id], onDelete: Cascade)
 
-  @@unique([clientId, matchId])
   @@index([clientId])
   @@index([matchId])
+  @@index([broadcasterId])
+  @@index([matchId, broadcasterId])
   @@map("overlay_scene")
+}
+
+model MatchBroadcaster {
+  id               String   @id @default(cuid()) @map("id")
+  matchId          String   @map("match_id")
+  userId           String   @map("user_id")
+  assignedAt       DateTime @default(now()) @map("assigned_at")
+  assignedByUserId String?  @map("assigned_by_user_id")
+
+  match            Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user             User     @relation("BroadcasterMatches", fields: [userId], references: [id], onDelete: Cascade)
+  assignedByUser   User?    @relation("AssignedBroadcasters", fields: [assignedByUserId], references: [id])
+
+  @@unique([matchId, userId])
+  @@index([matchId])
+  @@index([userId])
+  @@map("match_broadcaster")
 }
 
 

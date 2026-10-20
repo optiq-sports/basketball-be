@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Role } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../common/redis/redis.service";
 import { QueueService } from "../../common/queue/queue.service";
@@ -37,12 +38,22 @@ export class StatdashProjectionsService {
     private readonly queueService: QueueService,
   ) {}
 
-  private async checkSessionAccess(sessionId: string, user?: any) {
-    if (!user || user?.role === "SUPER_ADMIN") return;
+  private async checkSessionAccess(
+    sessionId: string,
+    user?: AuthenticatedUser,
+  ) {
+    if (!user || user?.role === Role.SUPER_ADMIN) return;
 
     const session = await this.prisma.gameSession.findUnique({
       where: { id: sessionId },
-      include: { match: { select: { clientId: true } } },
+      include: {
+        match: {
+          select: {
+            clientId: true,
+            broadcasters: { select: { userId: true } },
+          },
+        },
+      },
     });
 
     if (!session) {
@@ -50,6 +61,19 @@ export class StatdashProjectionsService {
         code: "SD_SESSION_NOT_FOUND",
         message: "Session does not exist",
       });
+    }
+
+    if (user?.role === Role.BROADCASTER) {
+      const isAssigned = session.match?.broadcasters?.some(
+        (b) => b.userId === user.id,
+      );
+      if (!isAssigned) {
+        throw new NotFoundException({
+          code: "SD_SESSION_NOT_FOUND",
+          message: "Session does not exist",
+        });
+      }
+      return;
     }
 
     if (

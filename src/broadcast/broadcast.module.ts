@@ -2,9 +2,10 @@ import { Module } from "@nestjs/common";
 import { BroadcastController } from "./broadcast.controller";
 import { BroadcastService } from "./broadcast.service";
 import { PrismaModule } from "../prisma/prisma.module";
+import { OverlayModule } from "../overlay/overlay.module";
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, OverlayModule],
   controllers: [BroadcastController],
   providers: [BroadcastService],
   exports: [BroadcastService],
