@@ -326,10 +326,12 @@ describe("MatchesService", () => {
       mockPrismaService.match.findFirst
         .mockResolvedValueOnce({
           id: "m-1",
+          clientId: "client-1",
           broadcasters: [],
         })
         .mockResolvedValueOnce({
           id: "m-1",
+          clientId: "client-1",
           broadcasters: [
             { id: "mb-1", matchId: "m-1", userId: "b-1" },
             { id: "mb-2", matchId: "m-1", userId: "b-2" },
@@ -374,6 +376,7 @@ describe("MatchesService", () => {
     it("should throw BadRequestException if one or more broadcaster IDs are invalid", async () => {
       mockPrismaService.match.findFirst.mockResolvedValueOnce({
         id: "m-1",
+        clientId: "client-1",
         broadcasters: [],
       });
 
@@ -382,6 +385,31 @@ describe("MatchesService", () => {
       await expect(
         service.assignBroadcasters("m-1", ["b-1", "b-2"], mockUser),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should refuse broadcaster not linked to match client", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-1",
+        clientId: "client-1",
+        broadcasters: [],
+      });
+
+      // User exists and is broadcaster, but not returned because not linked to client-1
+      mockPrismaService.user.findMany.mockResolvedValueOnce([]);
+
+      await expect(
+        service.assignBroadcasters("m-1", ["b-other-client"], mockUser),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.user.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["b-other-client"] },
+          role: Role.BROADCASTER,
+          clientUsers: {
+            some: { clientId: "client-1" },
+          },
+        },
+        select: { id: true },
+      });
     });
   });
 });

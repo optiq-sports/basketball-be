@@ -4,7 +4,11 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { EmailService } from "../notifications/email.service";
 import { Role, UserStatus } from "@prisma/client";
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 
 describe("BroadcasterService", () => {
@@ -55,6 +59,14 @@ describe("BroadcasterService", () => {
     clientIds: ["client-1"],
   };
 
+  const mockSuperAdmin: AuthenticatedUser = {
+    id: "super-1",
+    email: "super@example.com",
+    name: "Super Admin",
+    role: Role.SUPER_ADMIN,
+    clientIds: [],
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -93,7 +105,29 @@ describe("BroadcasterService", () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it("should link existing broadcaster to a new client if already a broadcaster", async () => {
+    it("should throw ConflictException for ADMIN if broadcaster with email already exists", async () => {
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({
+        id: "broadcaster-1",
+        email: "existing@example.com",
+        role: Role.BROADCASTER,
+        clientUsers: [{ clientId: "client-other" }],
+      });
+
+      await expect(
+        service.create({ email: "existing@example.com" }, mockAdminUser),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it("should reject ADMIN specifying a clientId outside their clientIds", async () => {
+      await expect(
+        service.create(
+          { email: "new@example.com", clientId: "other-client" },
+          mockAdminUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should allow SUPER_ADMIN to link existing broadcaster to a new client", async () => {
       mockPrismaService.user.findUnique
         .mockResolvedValueOnce({
           id: "broadcaster-1",
@@ -116,8 +150,8 @@ describe("BroadcasterService", () => {
       });
 
       const result = await service.create(
-        { email: "existing@example.com" },
-        mockAdminUser,
+        { email: "existing@example.com", clientId: "client-1" },
+        mockSuperAdmin,
       );
 
       expect(mockPrismaService.clientUser.create).toHaveBeenCalledWith({
@@ -271,11 +305,27 @@ describe("BroadcasterService", () => {
   });
 
   describe("remove", () => {
-    it("should deactivate broadcaster and record audit log", async () => {
+    it("should throw NotFoundException if broadcaster does not belong to admin client", async () => {
+      mockPrismaService.user.findFirst.mockResolvedValueOnce({
+        id: "b-other",
+        role: Role.BROADCASTER,
+        status: UserStatus.ACTIVE,
+        clientUsers: [{ clientId: "other-client" }],
+      });
+
+      await expect(service.remove("b-other", mockAdminUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("should deactivate broadcaster, record audit log with sanitized before data", async () => {
       mockPrismaService.user.findFirst.mockResolvedValueOnce({
         id: "b-1",
         role: Role.BROADCASTER,
         status: UserStatus.ACTIVE,
+        password: "hashed_password",
+        passwordResetToken: "secret_token",
+        clientUsers: [{ clientId: "client-1" }],
       });
 
       mockPrismaService.user.update.mockResolvedValueOnce({
@@ -291,12 +341,17 @@ describe("BroadcasterService", () => {
         data: { status: UserStatus.INACTIVE },
         omit: { password: true },
       });
+
       expect(mockAuditLogsService.recordLog).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           action: "DELETE",
           entityType: "broadcaster",
           entityId: "b-1",
+          before: expect.not.objectContaining({
+            password: expect.anything(),
+            passwordResetToken: expect.anything(),
+          }),
         }),
       );
       expect(result.status).toBe(UserStatus.INACTIVE);

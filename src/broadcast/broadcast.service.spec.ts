@@ -31,6 +31,7 @@ describe("BroadcastService", () => {
     saveSceneState: jest.fn(),
     issueOverlayToken: jest.fn(),
     revokeOverlayToken: jest.fn(),
+    getActiveOverlayLink: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -53,130 +54,6 @@ describe("BroadcastService", () => {
     service = module.get<BroadcastService>(BroadcastService);
     prisma = module.get<PrismaService>(PrismaService);
     overlayService = module.get<OverlayService>(OverlayService);
-  });
-
-  describe("resolveSlug", () => {
-    it("should return the slug when provided directly", () => {
-      expect(service.resolveSlug("onesporttv")).toBe("onesporttv");
-      expect(service.resolveSlug("OneSportTV ")).toBe("onesporttv");
-    });
-
-    it("should resolve slug from host header when subdomain is present", () => {
-      expect(service.resolveSlug(undefined, "onesporttv.optiqsports.com")).toBe(
-        "onesporttv",
-      );
-      expect(service.resolveSlug(undefined, "sportsone.localhost:3000")).toBe(
-        "sportsone",
-      );
-    });
-
-    it("should throw BadRequestException if subdomain is reserved or localhost", () => {
-      expect(() =>
-        service.resolveSlug(undefined, "api.optiqsports.com"),
-      ).toThrow(BadRequestException);
-      expect(() =>
-        service.resolveSlug(undefined, "www.optiqsports.com"),
-      ).toThrow(BadRequestException);
-      expect(() => service.resolveSlug(undefined, "localhost:3000")).toThrow(
-        BadRequestException,
-      );
-    });
-
-    it("should throw BadRequestException if slug is 'matches' without host subdomain", () => {
-      expect(() => service.resolveSlug("matches", undefined)).toThrow(
-        BadRequestException,
-      );
-    });
-  });
-
-  describe("getBroadcastClientBySlug", () => {
-    it("should return broadcast client details", async () => {
-      const mockClient = {
-        id: "client_1",
-        name: "OneSport TV",
-        slug: "onesporttv",
-        clientType: "broadcast",
-        websiteUrl: "https://onesport.tv",
-        logo: "https://onesport.tv/logo.png",
-      };
-      mockPrisma.client.findFirst.mockResolvedValue(mockClient);
-
-      const result = await service.getBroadcastClientBySlug("onesporttv");
-      expect(result).toEqual(mockClient);
-      expect(mockPrisma.client.findFirst).toHaveBeenCalledWith({
-        where: {
-          slug: "onesporttv",
-          clientType: "broadcast",
-        },
-        select: expect.any(Object),
-      });
-    });
-
-    it("should throw NotFoundException if client not found", async () => {
-      mockPrisma.client.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.getBroadcastClientBySlug("nonexistent"),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe("getBroadcastMatches", () => {
-    it("should return games assigned to the broadcast client", async () => {
-      const mockClient = {
-        id: "client_1",
-        name: "OneSport TV",
-        slug: "onesporttv",
-        clientType: "broadcast",
-        websiteUrl: "https://onesport.tv",
-        logo: null,
-      };
-      const mockMatches = [
-        {
-          id: "match_1",
-          clientId: "client_1",
-          homeTeam: { id: "team_1", name: "Lakers" },
-          awayTeam: { id: "team_2", name: "Celtics" },
-          scheduledDate: new Date(),
-        },
-      ];
-
-      mockPrisma.client.findFirst.mockResolvedValue(mockClient);
-      mockPrisma.match.findMany.mockResolvedValue(mockMatches);
-
-      const result = await service.getBroadcastMatches("onesporttv");
-      expect(result.client).toEqual(mockClient);
-      expect(result.matches).toEqual(mockMatches as any);
-      expect(mockPrisma.match.findMany).toHaveBeenCalledWith({
-        where: { clientId: "client_1" },
-        include: expect.any(Object),
-        orderBy: { scheduledDate: "asc" },
-      });
-    });
-
-    it("should return empty matches if authenticated CLIENT user does not match the broadcast client", async () => {
-      const mockClient = {
-        id: "client_1",
-        name: "OneSport TV",
-        slug: "onesporttv",
-        clientType: "broadcast",
-        websiteUrl: null,
-        logo: null,
-      };
-      mockPrisma.client.findFirst.mockResolvedValue(mockClient);
-
-      const otherUser = {
-        id: "user_other",
-        email: "other@operator.com",
-        role: Role.CLIENT,
-        clientIds: ["client_other"],
-      };
-
-      const result = await service.getBroadcastMatches("onesporttv", otherUser);
-      expect(result.client).toEqual(mockClient);
-      expect(result.matches).toEqual([]);
-      expect(mockPrisma.match.findMany).not.toHaveBeenCalled();
-    });
   });
 
   describe("checkBroadcastMatchAccess", () => {
@@ -254,7 +131,7 @@ describe("BroadcastService", () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it("should allow ADMIN if match belongs to their client", async () => {
+    it("should allow ADMIN if match belongs to their client and resolve broadcaster", async () => {
       mockPrisma.match.findUnique.mockResolvedValue(mockMatch);
       const matchAdmin: AuthenticatedUser = {
         id: "admin_1",
@@ -270,7 +147,43 @@ describe("BroadcastService", () => {
       expect(res.resolvedBroadcasterId).toBe("broadcaster_1");
     });
 
-    it("should allow SUPER_ADMIN on any match", async () => {
+    it("should reject if match has no assigned broadcasters when accessed by ADMIN", async () => {
+      mockPrisma.match.findUnique.mockResolvedValue({
+        id: "match_1",
+        clientId: "client_1",
+        broadcasters: [],
+      });
+      const matchAdmin: AuthenticatedUser = {
+        id: "admin_1",
+        email: "admin@client1.com",
+        role: Role.ADMIN,
+        clientIds: ["client_1"],
+      };
+
+      await expect(
+        service.checkBroadcastMatchAccess(matchAdmin, "match_1"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should reject admin specifying a broadcaster not assigned to match", async () => {
+      mockPrisma.match.findUnique.mockResolvedValue(mockMatch);
+      const matchAdmin: AuthenticatedUser = {
+        id: "admin_1",
+        email: "admin@client1.com",
+        role: Role.ADMIN,
+        clientIds: ["client_1"],
+      };
+
+      await expect(
+        service.checkBroadcastMatchAccess(
+          matchAdmin,
+          "match_1",
+          "unassigned_broadcaster",
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should allow SUPER_ADMIN on any match when broadcaster is assigned", async () => {
       mockPrisma.match.findUnique.mockResolvedValue(mockMatch);
       const superAdmin: AuthenticatedUser = {
         id: "super_admin_1",
@@ -281,9 +194,9 @@ describe("BroadcastService", () => {
       const res = await service.checkBroadcastMatchAccess(
         superAdmin,
         "match_1",
-        "custom_broadcaster_id",
+        "broadcaster_1",
       );
-      expect(res.resolvedBroadcasterId).toBe("custom_broadcaster_id");
+      expect(res.resolvedBroadcasterId).toBe("broadcaster_1");
     });
   });
 
@@ -350,6 +263,23 @@ describe("BroadcastService", () => {
           broadcasterId: "broadcaster_1",
           activeScene: "player_spotlight",
         }),
+      );
+    });
+
+    it("should get active overlay link", async () => {
+      mockPrisma.match.findUnique.mockResolvedValue(mockMatch);
+      const linkInfo = {
+        tokenPrefix: "ovl_abc12345...",
+        expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
+      };
+      mockOverlayService.getActiveOverlayLink.mockResolvedValue(linkInfo);
+
+      const res = await service.getOverlayLink(assignedBroadcaster, "match_1");
+      expect(res).toEqual(linkInfo);
+      expect(mockOverlayService.getActiveOverlayLink).toHaveBeenCalledWith(
+        "client_1",
+        "match_1",
+        "broadcaster_1",
       );
     });
 

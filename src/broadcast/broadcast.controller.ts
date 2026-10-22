@@ -7,8 +7,6 @@ import {
   Param,
   Body,
   Query,
-  Headers,
-  Req,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -17,20 +15,17 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
-  ApiHeader,
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { BroadcastService } from "./broadcast.service";
-import { BroadcastClientDto } from "./dto/broadcast-client.dto";
-import { BroadcastMatchesResponseDto } from "./dto/broadcast-matches-response.dto";
 import {
   PutBroadcastOverlayDto,
   CreateBroadcastOverlayLinkDto,
   BroadcastOverlayLinkResponseDto,
+  ActiveBroadcastOverlayLinkResponseDto,
 } from "./dto/broadcast-overlay.dto";
 import { OverlaySceneResponseDto } from "../overlay/dto/overlay-scene.dto";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
-import type { AppRequest } from "../common/interfaces/app.interface";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -219,133 +214,53 @@ export class BroadcastController {
     );
   }
 
-  @Get("matches")
+  @Get("matches/:matchId/overlay-link")
   @ApiOperation({
-    summary: "Get broadcast client matches resolved from Host subdomain",
+    summary: "Get active overlay token metadata for a match",
+    description:
+      "Returns the masked token prefix and expiry of the active overlay link for this match and broadcaster without exposing the raw secret token. Returns 404 if no link exists.",
   })
-  @ApiHeader({
-    name: "host",
-    description: "Subdomain host header (e.g. onesporttv.optiqsports.com)",
+  @ApiParam({
+    name: "matchId",
+    description: "Match ID",
+    example: "cmvdsfu3x0007l006phgl1etr",
+  })
+  @ApiQuery({
+    name: "broadcasterId",
     required: false,
+    description: "Target broadcaster user ID (for ADMIN or SUPER_ADMIN users)",
   })
   @ApiResponse({
     status: 200,
-    description: "Broadcast client games retrieved successfully",
-    type: BroadcastMatchesResponseDto,
+    description: "Active overlay link metadata",
+    type: ActiveBroadcastOverlayLinkResponseDto,
   })
   @AppErrorResponse(
     400,
     "Bad Request",
     "GET",
-    "/api/broadcast/matches",
-    "Broadcast client slug could not be determined",
+    "/api/broadcast/matches/:matchId/overlay-link",
+    "A broadcaster must be assigned to this match or specified via broadcasterId",
+  )
+  @AppErrorResponse(
+    403,
+    "Forbidden",
+    "GET",
+    "/api/broadcast/matches/:matchId/overlay-link",
+    "Client users or unassigned users cannot access overlay links",
   )
   @AppErrorResponse(
     404,
     "Not Found",
     "GET",
-    "/api/broadcast/matches",
-    "Broadcast client not found",
+    "/api/broadcast/matches/:matchId/overlay-link",
+    "Match not found or no active overlay link found",
   )
-  getMatchesByHost(
-    @Headers("host") host: string | undefined,
-    @Req() req: AppRequest,
-  ): Promise<BroadcastMatchesResponseDto> {
-    const slug = this.broadcastService.resolveSlug(undefined, host);
-    return this.broadcastService.getBroadcastMatches(slug, req.user);
-  }
-
-  @Get(":slug/matches")
-  @ApiOperation({
-    summary: "Get games assigned to a broadcast client by slug",
-  })
-  @ApiParam({
-    name: "slug",
-    description: "Broadcast client slug (e.g. onesporttv)",
-    example: "onesporttv",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Broadcast client games retrieved successfully",
-    type: BroadcastMatchesResponseDto,
-  })
-  @AppErrorResponse(
-    404,
-    "Not Found",
-    "GET",
-    "/api/broadcast/:slug/matches",
-    "Broadcast client not found",
-  )
-  getMatchesBySlug(
-    @Param("slug") slugParam: string,
-    @Headers("host") host: string | undefined,
-    @Req() req: AppRequest,
-  ): Promise<BroadcastMatchesResponseDto> {
-    const slug = this.broadcastService.resolveSlug(slugParam, host);
-    return this.broadcastService.getBroadcastMatches(slug, req.user);
-  }
-
-  @Get(":slug")
-  @ApiOperation({
-    summary: "Get broadcast client profile by slug",
-  })
-  @ApiParam({
-    name: "slug",
-    description: "Broadcast client slug (e.g. onesporttv)",
-    example: "onesporttv",
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Broadcast client details retrieved successfully",
-    type: BroadcastClientDto,
-  })
-  @AppErrorResponse(
-    404,
-    "Not Found",
-    "GET",
-    "/api/broadcast/:slug",
-    "Broadcast client not found",
-  )
-  getClientBySlug(
-    @Param("slug") slugParam: string,
-    @Headers("host") host: string | undefined,
-  ): Promise<BroadcastClientDto> {
-    const slug = this.broadcastService.resolveSlug(slugParam, host);
-    return this.broadcastService.getBroadcastClientBySlug(slug);
-  }
-
-  @Get()
-  @ApiOperation({
-    summary: "Get broadcast client profile resolved from Host subdomain",
-  })
-  @ApiHeader({
-    name: "host",
-    description: "Subdomain host header (e.g. onesporttv.optiqsports.com)",
-    required: false,
-  })
-  @ApiResponse({
-    status: 200,
-    description: "Broadcast client details retrieved successfully",
-    type: BroadcastClientDto,
-  })
-  @AppErrorResponse(
-    400,
-    "Bad Request",
-    "GET",
-    "/api/broadcast",
-    "Broadcast client slug could not be determined",
-  )
-  @AppErrorResponse(
-    404,
-    "Not Found",
-    "GET",
-    "/api/broadcast",
-    "Broadcast client not found",
-  )
-  getClientByHost(
-    @Headers("host") host: string | undefined,
-  ): Promise<BroadcastClientDto> {
-    const slug = this.broadcastService.resolveSlug(undefined, host);
-    return this.broadcastService.getBroadcastClientBySlug(slug);
+  getOverlayLink(
+    @Param("matchId") matchId: string,
+    @Query("broadcasterId") broadcasterId: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ActiveBroadcastOverlayLinkResponseDto> {
+    return this.broadcastService.getOverlayLink(user, matchId, broadcasterId);
   }
 }

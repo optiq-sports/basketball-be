@@ -428,9 +428,7 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
       await tx.clientOverlayToken.updateMany({
         where: {
           matchId: params.matchId,
-          ...(params.broadcasterId
-            ? { broadcasterId: params.broadcasterId }
-            : {}),
+          broadcasterId: params.broadcasterId ?? null,
           isActive: true,
         },
         data: {
@@ -481,6 +479,37 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Get active overlay link summary without token
+   */
+  async getActiveOverlayLink(
+    _clientId: string,
+    matchId: string,
+    broadcasterId: string,
+  ): Promise<{ tokenPrefix: string; expiresAt: Date }> {
+    const activeToken = await this.prisma.clientOverlayToken.findFirst({
+      where: {
+        matchId,
+        broadcasterId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        tokenPrefix: true,
+        expiresAt: true,
+      },
+    });
+
+    if (!activeToken) {
+      throw new NotFoundException(
+        "No active overlay link found for this match and broadcaster",
+      );
+    }
+
+    return activeToken;
+  }
+
+  /**
    * Revoke overlay token(s) for a match and broadcaster
    */
   async revokeOverlayToken(params: {
@@ -494,9 +523,7 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
       await tx.clientOverlayToken.updateMany({
         where: {
           matchId: params.matchId,
-          ...(params.broadcasterId
-            ? { broadcasterId: params.broadcasterId }
-            : {}),
+          broadcasterId: params.broadcasterId ?? null,
           isActive: true,
         },
         data: {
@@ -551,14 +578,7 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
     const live$ = this.updates$.pipe(
       filter((update) => {
         if (update.matchId !== matchId) return false;
-        if (
-          broadcasterId &&
-          update.broadcasterId &&
-          update.broadcasterId !== broadcasterId
-        ) {
-          return false;
-        }
-        return true;
+        return update.broadcasterId === broadcasterId;
       }),
       map((update): MessageEvent => ({
         type: "overlay",

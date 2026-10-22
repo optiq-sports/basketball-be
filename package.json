@@ -23,6 +23,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "ts-node prisma/seed.ts",
+    "start:worker": "ts-node src/worker.ts",
+    "sync:scores": "ts-node scripts/sync-completed-matches.ts",
     "prepare": "husky || true"
   },
   "packageManager": "pnpm@10.30.1",

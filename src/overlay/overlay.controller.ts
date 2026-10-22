@@ -6,6 +6,7 @@ import { OverlaySceneResponseDto } from "./dto/overlay-scene.dto";
 import { Observable, from } from "rxjs";
 import { switchMap } from "rxjs/operators";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { SkipResponseTransform } from "../common/decorators/skip-response-transform.decorator";
 
 @ApiTags("Overlay Output (Public OBS / vMix)")
 @Controller("overlay")
@@ -56,6 +57,7 @@ export class OverlayController {
   }
 
   @Sse(":token/stream")
+  @SkipResponseTransform()
   @ApiOperation({
     summary: "Subscribe to real-time overlay scene updates via SSE",
     description:

@@ -9,7 +9,6 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateApiKeyDto } from "./dto/create-api-key.dto";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { CreateEmbedTokenDto } from "./dto/create-embed-token.dto";
-import { CreateOverlayTokenDto } from "./dto/create-overlay-token.dto";
 import { AssignUserDto } from "./dto/assign-user.dto";
 import { ClientFilterDto } from "./dto/client-filter.dto";
 import * as crypto from "crypto";
@@ -19,19 +18,12 @@ import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import * as bcrypt from "bcrypt";
 import { Prisma, Role } from "@prisma/client";
 
-import { OverlayService } from "../overlay/overlay.service";
-import {
-  UpsertOverlaySceneDto,
-  PatchOverlaySceneDto,
-} from "../overlay/dto/overlay-scene.dto";
-
 @Injectable()
 export class ClientsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly auditLogsService: AuditLogsService,
-    private readonly overlayService: OverlayService,
   ) {}
 
   private checkClientAccess(user: AuthenticatedUser, clientId: string) {
@@ -254,7 +246,9 @@ export class ClientsService {
     );
   }
 
-  async listClientUsers(clientId: string) {
+  async listClientUsers(user: AuthenticatedUser, clientId: string) {
+    this.checkClientAccess(user, clientId);
+
     const client = await this.prisma.client.findUnique({
       where: { id: clientId },
     });
@@ -286,6 +280,10 @@ export class ClientsService {
     userId: string,
     actorUser?: AuthenticatedUser,
   ) {
+    if (actorUser) {
+      this.checkClientAccess(actorUser, clientId);
+    }
+
     const clientUser = await this.prisma.clientUser.findUnique({
       where: {
         clientId_userId: {
@@ -327,6 +325,10 @@ export class ClientsService {
     dto: AssignUserDto,
     actorUser?: AuthenticatedUser,
   ) {
+    if (actorUser) {
+      this.checkClientAccess(actorUser, clientId);
+    }
+
     const { userId } = dto;
 
     // Ensure client exists
@@ -393,7 +395,13 @@ export class ClientsService {
     });
   }
 
-  async updateClient(id: string, data: Prisma.ClientUpdateInput) {
+  async updateClient(
+    user: AuthenticatedUser,
+    id: string,
+    data: Prisma.ClientUpdateInput,
+  ) {
+    this.checkClientAccess(user, id);
+
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) throw new NotFoundException("Client not found");
 
@@ -404,6 +412,10 @@ export class ClientsService {
   }
 
   async deleteClient(id: string, actorUser?: AuthenticatedUser) {
+    if (actorUser && actorUser.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException("Requires SUPER_ADMIN role");
+    }
+
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) throw new NotFoundException("Client not found");
 
@@ -536,250 +548,5 @@ export class ClientsService {
         revokedAt: revoked.revokedAt,
       };
     });
-  }
-
-  async createOrReissueOverlayToken(
-    user: AuthenticatedUser,
-    dto: CreateOverlayTokenDto,
-  ) {
-    const clientId = dto.clientId || user.clientIds?.[0];
-    if (!clientId) {
-      throw new ForbiddenException("User is not assigned to any client");
-    }
-
-    this.checkClientAccess(user, clientId);
-
-    const match = await this.prisma.match.findFirst({
-      where: { id: dto.matchId, clientId },
-    });
-    if (!match) {
-      throw new NotFoundException("Match not found for this client");
-    }
-
-    const expiresInHours = dto.expiresInHours ?? 24;
-    const expiresAt = new Date(Date.now() + expiresInHours * 3600 * 1000);
-
-    const rawKey = crypto.randomBytes(32).toString("hex");
-    const token = `ovl_${rawKey}`;
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const tokenPrefix = `ovl_${rawKey.slice(0, 8)}...`;
-
-    const created = await this.prisma.$transaction(async (tx) => {
-      // Reissue: invalidate previous active overlay tokens for this client & match
-      await tx.clientOverlayToken.updateMany({
-        where: {
-          clientId,
-          matchId: dto.matchId,
-          isActive: true,
-        },
-        data: {
-          isActive: false,
-          revokedAt: new Date(),
-        },
-      });
-
-      const overlayToken = await tx.clientOverlayToken.create({
-        data: {
-          clientId,
-          matchId: dto.matchId,
-          tokenHash,
-          tokenPrefix,
-          expiresAt,
-          isActive: true,
-        },
-      });
-
-      await this.auditLogsService.recordLog(tx, {
-        actorUserId: user.id,
-        actorRole: user.role,
-        clientId,
-        action: "CREATE_OVERLAY_TOKEN",
-        entityType: "client_overlay_token",
-        entityId: overlayToken.id,
-        after: {
-          id: overlayToken.id,
-          matchId: overlayToken.matchId,
-          expiresAt: overlayToken.expiresAt,
-        },
-      });
-
-      return overlayToken;
-    });
-
-    return {
-      id: created.id,
-      clientId: created.clientId,
-      matchId: created.matchId,
-      token, // Return upon creation/reissue
-      tokenPrefix: created.tokenPrefix,
-      expiresAt: created.expiresAt,
-      isActive: created.isActive,
-      createdAt: created.createdAt,
-    };
-  }
-
-  async getActiveOverlayToken(
-    user: AuthenticatedUser,
-    clientId: string,
-    matchId: string,
-  ) {
-    this.checkClientAccess(user, clientId);
-
-    const token = await this.prisma.clientOverlayToken.findFirst({
-      where: {
-        clientId,
-        matchId,
-        isActive: true,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        clientId: true,
-        matchId: true,
-        tokenPrefix: true,
-        expiresAt: true,
-        isActive: true,
-        createdAt: true,
-        lastUsedAt: true,
-      },
-    });
-
-    if (!token) {
-      throw new NotFoundException(
-        "No active overlay token found for this match",
-      );
-    }
-
-    return token;
-  }
-
-  async revokeOverlayToken(user: AuthenticatedUser, id: string) {
-    const token = await this.prisma.clientOverlayToken.findUnique({
-      where: { id },
-    });
-    if (!token) throw new NotFoundException("Overlay token not found");
-
-    this.checkClientAccess(user, token.clientId);
-
-    return this.prisma.$transaction(async (tx) => {
-      const revoked = await tx.clientOverlayToken.update({
-        where: { id },
-        data: {
-          isActive: false,
-          revokedAt: new Date(),
-        },
-      });
-
-      await this.auditLogsService.recordLog(tx, {
-        actorUserId: user.id,
-        actorRole: user.role,
-        clientId: token.clientId,
-        action: "REVOKE_OVERLAY_TOKEN",
-        entityType: "client_overlay_token",
-        entityId: id,
-        before: token,
-        after: revoked,
-      });
-
-      return {
-        id: revoked.id,
-        message: "Overlay token revoked successfully",
-        isActive: false,
-        revokedAt: revoked.revokedAt,
-      };
-    });
-  }
-
-  private resolveUserClientId(user: AuthenticatedUser): string {
-    const clientId = user.clientIds?.[0];
-    if (!clientId) {
-      throw new ForbiddenException("User is not assigned to any client");
-    }
-    return clientId;
-  }
-
-  async getMyOverlays(user: AuthenticatedUser, matchId?: string) {
-    const clientId = this.resolveUserClientId(user);
-    return this.overlayService.listScenes(clientId, matchId);
-  }
-
-  async getMyOverlayByMatch(user: AuthenticatedUser, matchId: string) {
-    const clientId = this.resolveUserClientId(user);
-    return this.overlayService.getSceneState(clientId, matchId);
-  }
-
-  async upsertMyOverlay(user: AuthenticatedUser, dto: UpsertOverlaySceneDto) {
-    const clientId = this.resolveUserClientId(user);
-    const result = await this.overlayService.upsertScene(
-      clientId,
-      user.id,
-      dto,
-    );
-
-    await this.auditLogsService.recordLog(this.prisma, {
-      actorUserId: user.id,
-      actorRole: user.role,
-      clientId,
-      action: "UPDATE_OVERLAY_SCENE",
-      entityType: "overlay_scene",
-      entityId: `${clientId}_${dto.matchId}`,
-      after: result,
-    });
-
-    return result;
-  }
-
-  async patchMyOverlay(
-    user: AuthenticatedUser,
-    matchId: string,
-    dto: PatchOverlaySceneDto,
-  ) {
-    const clientId = this.resolveUserClientId(user);
-    if (!matchId) {
-      throw new BadRequestException("matchId is required");
-    }
-    const result = await this.overlayService.patchScene(
-      clientId,
-      user.id,
-      matchId,
-      dto,
-    );
-
-    await this.auditLogsService.recordLog(this.prisma, {
-      actorUserId: user.id,
-      actorRole: user.role,
-      clientId,
-      action: "UPDATE_OVERLAY_SCENE",
-      entityType: "overlay_scene",
-      entityId: `${clientId}_${matchId}`,
-      after: result,
-    });
-
-    return result;
-  }
-
-  async resetMyOverlay(user: AuthenticatedUser, matchId: string) {
-    const clientId = this.resolveUserClientId(user);
-    if (!matchId) {
-      throw new BadRequestException("matchId is required");
-    }
-    const result = await this.overlayService.resetScene(
-      clientId,
-      user.id,
-      matchId,
-    );
-
-    await this.auditLogsService.recordLog(this.prisma, {
-      actorUserId: user.id,
-      actorRole: user.role,
-      clientId,
-      action: "RESET_OVERLAY_SCENE",
-      entityType: "overlay_scene",
-      entityId: `${clientId}_${matchId}`,
-    });
-
-    return result;
   }
 }

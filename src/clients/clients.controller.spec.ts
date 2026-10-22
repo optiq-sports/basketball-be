@@ -20,21 +20,14 @@ describe("ClientsController", () => {
     createClient: jest.fn(),
     listClients: jest.fn(),
     findOne: jest.fn(),
-    update: jest.fn(),
+    updateClient: jest.fn(),
+    deleteClient: jest.fn(),
     assignUserToClient: jest.fn(),
     listClientUsers: jest.fn(),
     unlinkUserFromClient: jest.fn(),
     createEmbedToken: jest.fn(),
     listEmbedTokens: jest.fn(),
     revokeEmbedToken: jest.fn(),
-    createOrReissueOverlayToken: jest.fn(),
-    getActiveOverlayToken: jest.fn(),
-    revokeOverlayToken: jest.fn(),
-    getMyOverlays: jest.fn(),
-    getMyOverlayByMatch: jest.fn(),
-    upsertMyOverlay: jest.fn(),
-    patchMyOverlay: jest.fn(),
-    resetMyOverlay: jest.fn(),
   };
 
   const mockUser: AuthenticatedUser = {
@@ -42,6 +35,14 @@ describe("ClientsController", () => {
     email: "client@example.com",
     name: "Client User",
     role: Role.CLIENT,
+    clientIds: ["client-1"],
+  };
+
+  const adminUser: AuthenticatedUser = {
+    id: "admin-1",
+    email: "admin@example.com",
+    name: "Admin User",
+    role: Role.ADMIN,
     clientIds: ["client-1"],
   };
 
@@ -116,9 +117,12 @@ describe("ClientsController", () => {
       ];
       mockClientsService.listClientUsers.mockResolvedValue(mockUsers);
 
-      const result = await controller.listClientUsers("client-1");
+      const result = await controller.listClientUsers(adminUser, "client-1");
       expect(result).toEqual(mockUsers);
-      expect(service.listClientUsers).toHaveBeenCalledWith("client-1");
+      expect(service.listClientUsers).toHaveBeenCalledWith(
+        adminUser,
+        "client-1",
+      );
     });
   });
 
@@ -130,7 +134,7 @@ describe("ClientsController", () => {
       mockClientsService.unlinkUserFromClient.mockResolvedValue(mockResponse);
 
       const result = await controller.unlinkUserFromClient(
-        mockUser,
+        adminUser,
         "client-1",
         "user-1",
       );
@@ -138,8 +142,59 @@ describe("ClientsController", () => {
       expect(service.unlinkUserFromClient).toHaveBeenCalledWith(
         "client-1",
         "user-1",
-        mockUser,
+        adminUser,
       );
+    });
+  });
+
+  describe("assignUserToClient", () => {
+    it("should assign user to client", async () => {
+      const dto: AssignUserDto = { userId: "user-2" };
+      const mockResult = { clientId: "client-1", userId: "user-2" };
+      mockClientsService.assignUserToClient.mockResolvedValue(mockResult);
+
+      const result = await controller.assignUserToClient(
+        adminUser,
+        "client-1",
+        dto,
+      );
+      expect(result).toEqual(mockResult);
+      expect(service.assignUserToClient).toHaveBeenCalledWith(
+        "client-1",
+        dto,
+        adminUser,
+      );
+    });
+  });
+
+  describe("updateClient", () => {
+    it("should update client passing actor user", async () => {
+      const updateData = { name: "Updated Name" };
+      const mockResult = { id: "client-1", name: "Updated Name" };
+      mockClientsService.updateClient.mockResolvedValue(mockResult);
+
+      const result = await controller.updateClient(
+        adminUser,
+        "client-1",
+        updateData,
+      );
+      expect(result).toEqual(mockResult);
+      expect(service.updateClient).toHaveBeenCalledWith(
+        adminUser,
+        "client-1",
+        updateData,
+      );
+    });
+  });
+
+  describe("deleteClient", () => {
+    it("should delete client passing actor user", async () => {
+      const mockResult = { id: "client-1", isActive: false };
+      mockClientsService.deleteClient.mockResolvedValue(mockResult);
+
+      const result = await controller.deleteClient(adminUser, "client-1");
+      expect(result).toEqual(mockResult);
+      expect(service.deleteClient).toHaveBeenCalledWith("client-1", adminUser);
     });
   });
 
@@ -185,123 +240,6 @@ describe("ClientsController", () => {
       const result = await controller.revokeEmbedToken(mockUser, "emb-1");
       expect(result).toEqual(mockResult);
       expect(service.revokeEmbedToken).toHaveBeenCalledWith(mockUser, "emb-1");
-    });
-  });
-
-  describe("Overlay Tokens", () => {
-    it("should generate/reissue overlay token for current client match", async () => {
-      const mockResult = {
-        id: "ovl-1",
-        token: "ovl_secret",
-        matchId: "match-1",
-      };
-      mockClientsService.createOrReissueOverlayToken.mockResolvedValue(
-        mockResult,
-      );
-
-      const result = await controller.createMyOverlayToken(
-        mockUser,
-        "match-1",
-        { expiresInHours: 12 },
-      );
-
-      expect(result).toEqual(mockResult);
-      expect(service.createOrReissueOverlayToken).toHaveBeenCalledWith(
-        mockUser,
-        {
-          clientId: "client-1",
-          matchId: "match-1",
-          expiresInHours: 12,
-        },
-      );
-    });
-
-    it("should get active overlay token for match", async () => {
-      const mockResult = { id: "ovl-1", matchId: "match-1" };
-      mockClientsService.getActiveOverlayToken.mockResolvedValue(mockResult);
-
-      const result = await controller.getMyOverlayToken(mockUser, "match-1");
-      expect(result).toEqual(mockResult);
-      expect(service.getActiveOverlayToken).toHaveBeenCalledWith(
-        mockUser,
-        "client-1",
-        "match-1",
-      );
-    });
-
-    it("should revoke overlay token", async () => {
-      const mockResult = { message: "Overlay token revoked successfully" };
-      mockClientsService.revokeOverlayToken.mockResolvedValue(mockResult);
-
-      const result = await controller.revokeOverlayToken(mockUser, "ovl-1");
-      expect(result).toEqual(mockResult);
-      expect(service.revokeOverlayToken).toHaveBeenCalledWith(
-        mockUser,
-        "ovl-1",
-      );
-    });
-  });
-
-  describe("Overlay Scenes (Control Channel)", () => {
-    const mockScene = {
-      activeScene: "player_spotlight",
-      visible: true,
-      scorebugVisible: true,
-      autoDismissAt: null,
-      payload: { v: 1 },
-      updatedAt: new Date(),
-    };
-
-    it("should get client overlay scenes", async () => {
-      mockClientsService.getMyOverlays.mockResolvedValue([mockScene]);
-      const res = await controller.getMyOverlays(mockUser, "match-1");
-      expect(res).toEqual([mockScene]);
-      expect(service.getMyOverlays).toHaveBeenCalledWith(mockUser, "match-1");
-    });
-
-    it("should get overlay scene by matchId", async () => {
-      mockClientsService.getMyOverlayByMatch.mockResolvedValue(mockScene);
-      const res = await controller.getMyOverlayByMatch(mockUser, "match-1");
-      expect(res).toEqual(mockScene);
-      expect(service.getMyOverlayByMatch).toHaveBeenCalledWith(
-        mockUser,
-        "match-1",
-      );
-    });
-
-    it("should upsert overlay scene", async () => {
-      mockClientsService.upsertMyOverlay.mockResolvedValue(mockScene);
-      const dto = {
-        matchId: "match-1",
-        activeScene: "player_spotlight" as const,
-      };
-      const res = await controller.upsertMyOverlay(mockUser, dto);
-      expect(res).toEqual(mockScene);
-      expect(service.upsertMyOverlay).toHaveBeenCalledWith(mockUser, dto);
-    });
-
-    it("should patch overlay scene with param", async () => {
-      mockClientsService.patchMyOverlay.mockResolvedValue(mockScene);
-      const dto = { visible: true };
-      const res = await controller.patchMyOverlayWithParam(
-        mockUser,
-        "match-1",
-        dto,
-      );
-      expect(res).toEqual(mockScene);
-      expect(service.patchMyOverlay).toHaveBeenCalledWith(
-        mockUser,
-        "match-1",
-        dto,
-      );
-    });
-
-    it("should reset overlay scene with param", async () => {
-      const mockReset = { success: true, message: "Reset" };
-      mockClientsService.resetMyOverlay.mockResolvedValue(mockReset);
-      const res = await controller.resetMyOverlayWithParam(mockUser, "match-1");
-      expect(res).toEqual(mockReset);
-      expect(service.resetMyOverlay).toHaveBeenCalledWith(mockUser, "match-1");
     });
   });
 });
