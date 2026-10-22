@@ -124,3 +124,17 @@ export class BroadcastOverlayLinkResponseDto {
   })
   outputUrl: string;
 }
+
+export class ActiveBroadcastOverlayLinkResponseDto {
+  @ApiProperty({
+    example: "ovl_a1b2c3d4...",
+    description: "Masked token prefix for reference and display",
+  })
+  tokenPrefix: string;
+
+  @ApiProperty({
+    example: "2026-10-21T15:00:00.000Z",
+    description: "Expiry timestamp of the overlay token",
+  })
+  expiresAt: Date;
+}

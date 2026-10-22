@@ -24,6 +24,22 @@ export class QueueWorkerService implements OnModuleDestroy {
       return;
     }
 
+    // Serverless hosts (e.g. Vercel) freeze between requests, causing jobs to stall.
+    // Workers must run in a dedicated long-running process unless explicitly enabled.
+    const isServerless =
+      process.env.VERCEL === "1" ||
+      Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const workersExplicitlyEnabled =
+      process.env.ENABLE_QUEUE_WORKERS === "true";
+    const workersDisabled = process.env.DISABLE_QUEUE_WORKERS === "true";
+
+    if (workersDisabled || (isServerless && !workersExplicitlyEnabled)) {
+      this.logger.log(
+        "Queue workers disabled in serverless/web process to prevent job stalling. Run workers in a dedicated process.",
+      );
+      return;
+    }
+
     this.connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
     this.bootstrapWorkers();
   }
@@ -36,25 +52,46 @@ export class QueueWorkerService implements OnModuleDestroy {
   private bootstrapWorkers() {
     if (!this.connection) return;
 
+    // Default concurrency to 2 to stay safely within Prisma/DB connection pool limits (limit 5)
+    const concurrency = Math.max(
+      1,
+      parseInt(process.env.QUEUE_CONCURRENCY || "2", 10),
+    );
+
     this.workers.push(
       new Worker(
         "statdash-projections",
         async (job: Job) => this.handleProjectionJob(job),
-        { connection: this.connection, concurrency: 5 },
+        {
+          connection: this.connection,
+          concurrency,
+          stalledInterval: 30000,
+          maxStalledCount: 2,
+        },
       ),
     );
     this.workers.push(
       new Worker(
         "statdash-recompute",
         async (job: Job) => this.handleRecomputeJob(job),
-        { connection: this.connection, concurrency: 5 },
+        {
+          connection: this.connection,
+          concurrency,
+          stalledInterval: 30000,
+          maxStalledCount: 2,
+        },
       ),
     );
     this.workers.push(
       new Worker(
         "statdash-matchstat-sync",
         async (job: Job) => this.handleMatchStatSyncJob(job),
-        { connection: this.connection, concurrency: 5 },
+        {
+          connection: this.connection,
+          concurrency,
+          stalledInterval: 30000,
+          maxStalledCount: 2,
+        },
       ),
     );
 

@@ -25,6 +25,24 @@ function resolveCorsOrigin(): (
       .map((s) => s.trim())
       .filter(Boolean),
   );
+
+  const platformUrls = [
+    process.env.PORTAL_URL,
+    process.env.ADMIN_URL,
+    process.env.BROADCAST_URL,
+    process.env.STATDASH_URL,
+  ];
+
+  for (const rawUrl of platformUrls) {
+    if (rawUrl) {
+      try {
+        allowed.add(new URL(rawUrl).origin);
+      } catch {
+        allowed.add(rawUrl.replace(/\/$/, ""));
+      }
+    }
+  }
+
   return (origin, callback) => {
     if (!origin) {
       callback(null, true);

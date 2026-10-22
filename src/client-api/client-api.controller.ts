@@ -30,6 +30,7 @@ import {
 } from "./dto/client-api.dto";
 import { BoxScoreResponseDto } from "../statdash/projections/dto/statdash-projection-responses.dto";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
+import { SkipResponseTransform } from "../common/decorators/skip-response-transform.decorator";
 import { from, Observable } from "rxjs";
 import { switchMap } from "rxjs/operators";
 import { MessageEvent } from "@nestjs/common";
@@ -371,6 +372,7 @@ export class ClientApiController {
   }
 
   @Sse("matches/:matchId/stream")
+  @SkipResponseTransform()
   @ApiOperation({
     summary: "Connect to Server-Sent Events (SSE) stream for a match",
   })

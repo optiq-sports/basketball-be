@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateMatchDto } from "./dto/create-match.dto";
@@ -114,7 +115,13 @@ export class MatchesService {
         tournament: true,
         homeTeam: true,
         awayTeam: true,
-        statistician: true,
+        statistician: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
   }
@@ -193,7 +200,13 @@ export class MatchesService {
           tournament: true,
           homeTeam: true,
           awayTeam: true,
-          statistician: true,
+          statistician: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           broadcasters: {
             include: {
               user: {
@@ -279,7 +292,13 @@ export class MatchesService {
       where,
       include: {
         tournament: true,
-        statistician: true,
+        statistician: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         broadcasters: {
           include: {
             user: {
@@ -411,7 +430,13 @@ export class MatchesService {
           tournament: true,
           homeTeam: true,
           awayTeam: true,
-          statistician: true,
+          statistician: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           stats: {
             include: {
               player: true,
@@ -480,9 +505,22 @@ export class MatchesService {
     broadcasterIds: string[],
     user: AuthenticatedUser,
   ): Promise<MatchResponseDto> {
-    const existingMatch = await this.findOne(id, user);
+    const existingMatch = await this.prisma.match.findFirst({
+      where: { id },
+      include: { broadcasters: true },
+    });
     if (!existingMatch) {
       throw new NotFoundException("Match not found");
+    }
+
+    if (
+      user.role === Role.ADMIN &&
+      user.clientIds &&
+      !user.clientIds.includes(existingMatch.clientId)
+    ) {
+      throw new ForbiddenException(
+        "You do not have permission to manage broadcasters for this match",
+      );
     }
 
     if (broadcasterIds.length > 0) {
@@ -490,13 +528,18 @@ export class MatchesService {
         where: {
           id: { in: broadcasterIds },
           role: Role.BROADCASTER,
+          clientUsers: {
+            some: {
+              clientId: existingMatch.clientId,
+            },
+          },
         },
         select: { id: true },
       });
 
       if (validBroadcasters.length !== broadcasterIds.length) {
         throw new BadRequestException(
-          "One or more broadcaster IDs are invalid or not broadcasters",
+          "One or more broadcaster IDs are invalid, not broadcasters, or not linked to the match's client",
         );
       }
     }

@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateBroadcasterDto } from "./dto/create-broadcaster.dto";
@@ -36,11 +37,25 @@ export class BroadcasterService {
     });
 
     // Determine target clientId
+    if (
+      actorUser?.role === Role.ADMIN &&
+      createBroadcasterDto.clientId &&
+      (!actorUser.clientIds ||
+        !actorUser.clientIds.includes(createBroadcasterDto.clientId))
+    ) {
+      throw new ForbiddenException(
+        "Not authorized to assign broadcaster to a client outside your assigned clients",
+      );
+    }
+
     const targetClientId =
       createBroadcasterDto.clientId ||
       (actorUser?.role === Role.ADMIN ? actorUser.clientIds?.[0] : undefined);
 
     if (existingUser) {
+      if (actorUser?.role === Role.ADMIN) {
+        throw new ConflictException("User with this email already exists");
+      }
       if (existingUser.role !== Role.BROADCASTER) {
         throw new ConflictException("User with this email already exists");
       }
@@ -380,8 +395,25 @@ export class BroadcasterService {
   async remove(id: string, actorUser?: AuthenticatedUser) {
     const existing = await this.prisma.user.findFirst({
       where: { id, role: Role.BROADCASTER },
+      include: { clientUsers: true },
     });
     if (!existing) throw new NotFoundException("Broadcaster not found");
+
+    if (actorUser && actorUser.role === Role.ADMIN) {
+      const belongsToClient = existing.clientUsers.some((cu) =>
+        actorUser.clientIds?.includes(cu.clientId),
+      );
+      if (!belongsToClient) {
+        throw new NotFoundException("Broadcaster not found");
+      }
+    }
+
+    const {
+      password: _password,
+      passwordResetToken: _passwordResetToken,
+      clientUsers: _clientUsers,
+      ...sanitizedBefore
+    } = existing;
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.user.update({
@@ -396,7 +428,7 @@ export class BroadcasterService {
         action: "DELETE",
         entityType: "broadcaster",
         entityId: id,
-        before: existing,
+        before: sanitizedBefore,
         after: updated,
       });
 
