@@ -78,14 +78,77 @@ describe("ClientApiService", () => {
     });
 
     it("should return matches for a client", async () => {
-      const mockMatches = [{ id: "match1" }, { id: "match2" }];
-      (prisma.match.findMany as jest.Mock).mockResolvedValue(mockMatches);
+      const mockDbMatches = [
+        {
+          id: "match1",
+          status: "SCHEDULED",
+          scheduledDate: new Date("2026-10-25T19:00:00.000Z"),
+          homeScore: 0,
+          awayScore: 0,
+          tournamentId: "tourney_1",
+          venue: "Main Court",
+          tournament: { id: "tourney_1", name: "Summer League" },
+          homeTeam: {
+            id: "t1",
+            name: "Lakers",
+            code: "LAL",
+            color: "#552583",
+            logo: "lakers.png",
+          },
+          awayTeam: {
+            id: "t2",
+            name: "Celtics",
+            code: "BOS",
+            color: "#007A33",
+            logo: "celtics.png",
+          },
+        },
+      ];
+      (prisma.match.findMany as jest.Mock).mockResolvedValue(mockDbMatches);
 
       const result = await service.getMatches("client1");
-      expect(result).toEqual(mockMatches);
+      expect(result).toEqual([
+        {
+          id: "match1",
+          status: "SCHEDULED",
+          scheduledDate: new Date("2026-10-25T19:00:00.000Z"),
+          homeScore: 0,
+          awayScore: 0,
+          tournamentId: "tourney_1",
+          tournamentName: "Summer League",
+          tournament: { id: "tourney_1", name: "Summer League" },
+          venue: "Main Court",
+          homeTeam: {
+            id: "t1",
+            name: "Lakers",
+            code: "LAL",
+            color: "#552583",
+            logo: "lakers.png",
+          },
+          awayTeam: {
+            id: "t2",
+            name: "Celtics",
+            code: "BOS",
+            color: "#007A33",
+            logo: "celtics.png",
+          },
+        },
+      ]);
       expect(prisma.match.findMany).toHaveBeenCalledWith({
         where: { clientId: "client1" },
         select: expect.any(Object),
+        orderBy: { scheduledDate: "asc" },
+      });
+    });
+
+    it("should filter matches by tournamentId when provided", async () => {
+      (prisma.match.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.getMatches("client1", "tourney_123");
+      expect(prisma.match.findMany).toHaveBeenCalledWith({
+        where: { clientId: "client1", tournamentId: "tourney_123" },
+        select: expect.any(Object),
+        orderBy: { scheduledDate: "asc" },
       });
     });
   });
@@ -107,6 +170,7 @@ describe("ClientApiService", () => {
     it("should return match details with rosters", async () => {
       const mockMatch = {
         id: "match1",
+        tournament: { id: "tourney_1", name: "Summer League" },
         homeTeam: {
           id: "team_home",
           playerTeams: [
@@ -132,6 +196,8 @@ describe("ClientApiService", () => {
       const result = await service.getMatchDetails("client1", "match1");
       expect(result).toEqual({
         id: "match1",
+        tournament: { id: "tourney_1", name: "Summer League" },
+        tournamentName: "Summer League",
         homeTeam: {
           id: "team_home",
           players: [

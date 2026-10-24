@@ -15,20 +15,62 @@ export class ClientApiService {
     private readonly statdashRealtimeService: StatdashRealtimeService,
   ) {}
 
-  async getMatches(clientId: string | undefined) {
+  async getMatches(clientId: string | undefined, tournamentId?: string) {
     if (!clientId) throw new NotFoundException("Client ID is missing");
-    return this.prisma.match.findMany({
-      where: { clientId },
+    const matches = await this.prisma.match.findMany({
+      where: {
+        clientId,
+        ...(tournamentId ? { tournamentId } : {}),
+      },
       select: {
         id: true,
         status: true,
         scheduledDate: true,
         homeScore: true,
         awayScore: true,
-        homeTeam: { select: { id: true, name: true, code: true } },
-        awayTeam: { select: { id: true, name: true, code: true } },
+        tournamentId: true,
+        venue: true,
+        tournament: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        homeTeam: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
+            logo: true,
+          },
+        },
+        awayTeam: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            color: true,
+            logo: true,
+          },
+        },
       },
+      orderBy: { scheduledDate: "asc" },
     });
+
+    return matches.map((m) => ({
+      id: m.id,
+      status: m.status,
+      scheduledDate: m.scheduledDate,
+      homeScore: m.homeScore,
+      awayScore: m.awayScore,
+      tournamentId: m.tournamentId,
+      tournamentName: m.tournament?.name ?? "",
+      tournament: m.tournament,
+      venue: m.venue,
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+    }));
   }
 
   async getMatchDetails(clientId: string | undefined, matchId: string) {
@@ -36,6 +78,12 @@ export class ClientApiService {
     const match = await this.prisma.match.findFirst({
       where: { id: matchId, clientId },
       include: {
+        tournament: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         homeTeam: {
           include: {
             playerTeams: {
@@ -106,6 +154,7 @@ export class ClientApiService {
 
     return {
       ...match,
+      tournamentName: match.tournament?.name ?? "",
       homeTeam: formatTeamWithPlayers(match.homeTeam),
       awayTeam: formatTeamWithPlayers(match.awayTeam),
     };

@@ -21,13 +21,11 @@ async function main() {
     where: {
       OR: [
         { status: "COMPLETED" },
-        { gameSessions: { some: { status: "COMPLETED" } } },
+        { gameSessions: { status: "COMPLETED" } },
       ],
     },
     include: {
-      gameSessions: {
-        orderBy: { updatedAt: "desc" },
-      },
+      gameSessions: true,
     },
   });
 
@@ -35,9 +33,9 @@ async function main() {
 
   let syncedCount = 0;
   for (const match of matches) {
-    const session = match.gameSessions[0];
+    const session = match.gameSessions;
     if (!session) {
-      logger.warn(`Match ${match.id} has no game sessions to sync.`);
+      logger.warn(`Match ${match.id} has no game session to sync.`);
       continue;
     }
 

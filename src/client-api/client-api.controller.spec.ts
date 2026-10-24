@@ -64,9 +64,23 @@ describe("ClientApiController", () => {
     const expectedResult = [{ id: "match1" }];
     (service.getMatches as jest.Mock).mockResolvedValue(expectedResult);
 
-    const result = await controller.getMatches(mockRequest);
+    const result = await controller.getMatches(mockRequest, {});
     expect(result).toBe(expectedResult);
-    expect(service.getMatches).toHaveBeenCalledWith("client_id_1");
+    expect(service.getMatches).toHaveBeenCalledWith("client_id_1", undefined);
+  });
+
+  it("should get matches for client filtered by tournamentId", async () => {
+    const expectedResult = [{ id: "match1", tournamentId: "tourney_1" }];
+    (service.getMatches as jest.Mock).mockResolvedValue(expectedResult);
+
+    const result = await controller.getMatches(mockRequest, {
+      tournamentId: "tourney_1",
+    });
+    expect(result).toBe(expectedResult);
+    expect(service.getMatches).toHaveBeenCalledWith(
+      "client_id_1",
+      "tourney_1",
+    );
   });
 
   it("should get teams for client", async () => {
