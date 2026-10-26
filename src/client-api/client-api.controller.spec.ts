@@ -77,10 +77,7 @@ describe("ClientApiController", () => {
       tournamentId: "tourney_1",
     });
     expect(result).toBe(expectedResult);
-    expect(service.getMatches).toHaveBeenCalledWith(
-      "client_id_1",
-      "tourney_1",
-    );
+    expect(service.getMatches).toHaveBeenCalledWith("client_id_1", "tourney_1");
   });
 
   it("should get teams for client", async () => {

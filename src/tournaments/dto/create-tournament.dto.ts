@@ -98,10 +98,11 @@ export class CreateTournamentDto {
   @ApiProperty({
     example: "John Doe",
     description: "Crew Chief name",
-    required: false,
+    required: true,
   })
   @IsString()
-  crewChief?: string;
+  @IsNotEmpty()
+  crewChief: string;
 
   @ApiProperty({
     example: "Jane Smith",
@@ -117,6 +118,7 @@ export class CreateTournamentDto {
     description: "Second Umpire name",
     required: false,
   })
+  @IsOptional()
   @IsString()
   umpire2?: string;
 
