@@ -19,6 +19,7 @@ import {
 } from "@nestjs/swagger";
 import {
   ClientMatchDto,
+  ClientMatchQueryDto,
   ClientShotChartEventDto,
   ClientTeamDto,
   ClientTeamDetailDto,
@@ -253,7 +254,14 @@ export class ClientApiController {
   // ---------------------------------------------------------------------------
 
   @Get("matches")
-  @ApiOperation({ summary: "List all matches for the client" })
+  @ApiOperation({
+    summary: "List matches for the client, optionally filtered by tournament",
+  })
+  @ApiQuery({
+    name: "tournamentId",
+    required: false,
+    description: "Optional tournament ID to filter matches.",
+  })
   @ApiQuery({
     name: "clientId",
     required: false,
@@ -267,9 +275,12 @@ export class ClientApiController {
     "/api/v1/client/matches",
     "Invalid or missing API key",
   )
-  getMatches(@Req() req: AppRequest, @Query("clientId") clientId?: string) {
-    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
-    return this.clientApiService.getMatches(authorizedClientId);
+  getMatches(@Req() req: AppRequest, @Query() query: ClientMatchQueryDto) {
+    const authorizedClientId = this.getAuthorizedClientId(req, query.clientId);
+    return this.clientApiService.getMatches(
+      authorizedClientId,
+      query.tournamentId,
+    );
   }
 
   @Get("matches/:matchId")

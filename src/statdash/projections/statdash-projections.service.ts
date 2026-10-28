@@ -483,7 +483,7 @@ export class StatdashProjectionsService {
       }
     }
 
-    const [updatedSession, storedProjection] = await this.prisma.$transaction([
+    const txResults = (await this.prisma.$transaction([
       this.prisma.gameSession.update({
         where: { id: sessionId },
         data: {
@@ -531,7 +531,13 @@ export class StatdashProjectionsService {
           version: replay.version,
         },
       }),
-    ]);
+    ])) as unknown[];
+    const updatedSession = txResults[0] as {
+      version: number;
+      homeScore: number;
+      awayScore: number;
+    };
+    const storedProjection = (txResults[2] ?? txResults[1]) as { id: string };
 
     await this.syncMatchStatsFromBoxScore(
       sessionForTeamContext.match.id,
@@ -711,10 +717,10 @@ export class StatdashProjectionsService {
 
       if (event.eventType === "substitution") {
         if (payload.homeLineup && Array.isArray(payload.homeLineup)) {
-          homeLineup = payload.homeLineup as string[];
+          homeLineup = [...(payload.homeLineup as string[])];
         }
         if (payload.awayLineup && Array.isArray(payload.awayLineup)) {
-          awayLineup = payload.awayLineup as string[];
+          awayLineup = [...(payload.awayLineup as string[])];
         }
 
         if (payload.playerOutId && payload.playerInId && payload.teamId) {
@@ -724,7 +730,17 @@ export class StatdashProjectionsService {
               : payload.teamId === teamContext?.awayTeamId
                 ? awayLineup
                 : null;
-          if (targetLineup) {
+          const carriesLineup =
+            targetLineup === homeLineup
+              ? Array.isArray(payload.homeLineup)
+              : targetLineup === awayLineup
+                ? Array.isArray(payload.awayLineup)
+                : Boolean(
+                    Array.isArray(payload.homeLineup) ||
+                    Array.isArray(payload.awayLineup),
+                  );
+
+          if (!carriesLineup && targetLineup) {
             const index = targetLineup.indexOf(payload.playerOutId as string);
             if (index !== -1) {
               targetLineup[index] = payload.playerInId as string;
@@ -918,7 +934,17 @@ export class StatdashProjectionsService {
               : payload.teamId === teamContext?.awayTeamId
                 ? awayLineup
                 : null;
-          if (targetLineup) {
+          const carriesLineup =
+            targetLineup === homeLineup
+              ? Array.isArray(payload.homeLineup)
+              : targetLineup === awayLineup
+                ? Array.isArray(payload.awayLineup)
+                : Boolean(
+                    Array.isArray(payload.homeLineup) ||
+                    Array.isArray(payload.awayLineup),
+                  );
+
+          if (!carriesLineup && targetLineup) {
             const index = targetLineup.indexOf(outId);
             if (index !== -1) {
               targetLineup[index] = inId;

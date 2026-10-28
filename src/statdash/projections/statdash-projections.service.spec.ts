@@ -1,8 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { Role } from "@prisma/client";
 import { StatdashProjectionsService } from "./statdash-projections.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../common/redis/redis.service";
 import { QueueService } from "../../common/queue/queue.service";
+import type { AuthenticatedUser } from "../../common/interfaces/user.interface";
 
 describe("StatdashProjectionsService", () => {
   let service: StatdashProjectionsService;
@@ -581,6 +583,184 @@ describe("StatdashProjectionsService", () => {
       };
 
       await expect(service.getBoxScore("sess_1", user)).rejects.toThrow();
+    });
+  });
+
+  describe("substitution minutes and +/- calculation (Item 39)", () => {
+    const makeGameEvents = () => [
+      {
+        id: "e1",
+        eventType: "substitution",
+        sequence: 1,
+        period: 1,
+        clockSecondsRemaining: 600,
+        payload: {
+          homeLineup: ["starter1", "h2", "h3", "h4", "h5"],
+          awayLineup: ["a1", "a2", "a3", "a4", "a5"],
+          period: 1,
+          clockSecondsRemaining: 600,
+        },
+      },
+      {
+        id: "e2",
+        eventType: "shot",
+        sequence: 2,
+        period: 1,
+        clockSecondsRemaining: 0,
+        payload: {
+          teamId: "home_team",
+          shooterPlayerId: "h2",
+          playerId: "h2",
+          shot: { result: "made", value: 2 },
+          period: 1,
+          clockSecondsRemaining: 0,
+        },
+      },
+      {
+        id: "e3",
+        eventType: "substitution",
+        sequence: 3,
+        period: 2,
+        clockSecondsRemaining: 600,
+        payload: {
+          teamId: "home_team",
+          playerOutId: "starter1",
+          playerInId: "sub1",
+          homeLineup: ["sub1", "h2", "h3", "h4", "h5"],
+          awayLineup: ["a1", "a2", "a3", "a4", "a5"],
+          period: 2,
+          clockSecondsRemaining: 600,
+        },
+      },
+      {
+        id: "e4",
+        eventType: "shot",
+        sequence: 4,
+        period: 2,
+        clockSecondsRemaining: 0,
+        payload: {
+          teamId: "home_team",
+          shooterPlayerId: "h2",
+          playerId: "h2",
+          shot: { result: "made", value: 2 },
+          period: 2,
+          clockSecondsRemaining: 0,
+        },
+      },
+      {
+        id: "e5",
+        eventType: "shot",
+        sequence: 5,
+        period: 3,
+        clockSecondsRemaining: 0,
+        payload: {
+          teamId: "home_team",
+          shooterPlayerId: "h2",
+          playerId: "h2",
+          shot: { result: "made", value: 2 },
+          period: 3,
+          clockSecondsRemaining: 0,
+        },
+      },
+      {
+        id: "e6",
+        eventType: "shot",
+        sequence: 6,
+        period: 4,
+        clockSecondsRemaining: 0,
+        payload: {
+          teamId: "home_team",
+          shooterPlayerId: "h2",
+          playerId: "h2",
+          shot: { result: "made", value: 2 },
+          period: 4,
+          clockSecondsRemaining: 0,
+        },
+      },
+    ];
+
+    it("ensures starter shows 10 minutes and substitute shows 30 minutes both before and after replayScoreFromEvents", () => {
+      const events = makeGameEvents();
+      const teamContext = { homeTeamId: "home_team", awayTeamId: "away_team" };
+
+      // 1. Box score built alone
+      const boxScoreBefore = service.buildBoxScoreFromEvents(
+        events,
+        events.length,
+        teamContext,
+      );
+
+      // Starter played 10 minutes (600s), substitute played 30 minutes (1800s)
+      expect(boxScoreBefore.players.starter1.secondsPlayed).toBe(600);
+      expect(boxScoreBefore.players.sub1.secondsPlayed).toBe(1800);
+
+      // 2. Replay score run first (as rebuild runs), then build box score
+      service.replayScoreFromEvents(events, events.length, teamContext);
+
+      // Verify that replayScoreFromEvents did NOT mutate the original lineup array in event 1 payload
+      expect(
+        (events[0].payload as { homeLineup: string[] }).homeLineup,
+      ).toEqual(["starter1", "h2", "h3", "h4", "h5"]);
+
+      const boxScoreAfter = service.buildBoxScoreFromEvents(
+        events,
+        events.length,
+        teamContext,
+      );
+
+      // Starter STILL shows 10 minutes (600s) and substitute STILL shows 30 minutes (1800s)
+      expect(boxScoreAfter.players.starter1.secondsPlayed).toBe(600);
+      expect(boxScoreAfter.players.sub1.secondsPlayed).toBe(1800);
+
+      // Check plus/minus: made shots were 2 in Q1, 2 in Q2, 2 in Q3, 2 in Q4 (+8 total for on-court home players)
+      // Starter was only on court for Q1 shot -> +2
+      expect(boxScoreAfter.players.starter1.plusMinus).toBe(2);
+      // Sub was on court for Q2, Q3, Q4 shots -> +6 (not doubled to +12 or +20)
+      expect(boxScoreAfter.players.sub1.plusMinus).toBe(6);
+      // Other home starters on court for all 4 shots -> +8
+      expect(boxScoreAfter.players.h2.plusMinus).toBe(8);
+    });
+
+    it("works correctly during rebuildAndPersist", async () => {
+      const events = makeGameEvents();
+      prisma.gameEvent.findMany.mockResolvedValueOnce(events);
+      prisma.gameSession.findUnique.mockResolvedValueOnce({
+        id: "sess_rebuild",
+        version: 6,
+        matchId: "match_1",
+        match: {
+          id: "match_1",
+          homeTeamId: "home_team",
+          awayTeamId: "away_team",
+          homeTeam: { playerTeams: [] },
+          awayTeam: { playerTeams: [] },
+        },
+      });
+      prisma.gameSession.update.mockResolvedValueOnce({
+        version: 6,
+        homeScore: 8,
+        awayScore: 0,
+      });
+      prisma.projectionState.upsert.mockResolvedValueOnce({ id: "proj_1" });
+      prisma.matchPlayer.findMany.mockResolvedValueOnce([]);
+      redisService.setProjectionCached.mockResolvedValue(true);
+      redisService.invalidateProjectionCache.mockResolvedValue(true);
+      redisService.invalidateSessionSnapshotCache.mockResolvedValue(true);
+
+      const adminUser: AuthenticatedUser = {
+        id: "admin_1",
+        email: "admin@test.com",
+        name: "Admin",
+        role: Role.ADMIN,
+        clientIds: ["client_1"],
+      };
+
+      const result = await service.rebuildAndPersist("sess_rebuild", adminUser);
+
+      expect(result.boxScore.players.starter1.secondsPlayed).toBe(600);
+      expect(result.boxScore.players.sub1.secondsPlayed).toBe(1800);
+      expect(result.boxScore.players.starter1.plusMinus).toBe(2);
+      expect(result.boxScore.players.sub1.plusMinus).toBe(6);
     });
   });
 });

@@ -38,31 +38,76 @@ export class ClientMatchTeamDto {
   @ApiProperty({ example: "LAL" })
   code: string;
 
+  @ApiPropertyOptional({ example: "#552583", nullable: true })
+  color?: string | null;
+
+  @ApiPropertyOptional({
+    example: "https://example.com/logo.png",
+    nullable: true,
+  })
+  logo?: string | null;
+
   @ApiPropertyOptional({ type: [ClientPlayerRosterDto] })
   players?: ClientPlayerRosterDto[];
 }
 
-export class ClientMatchDto {
-  @ApiProperty()
+export class ClientMatchTournamentDto {
+  @ApiProperty({ example: "tourney_123" })
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: "Summer League 2026" })
+  name: string;
+}
+
+export class ClientMatchDto {
+  @ApiProperty({ example: "match_123" })
+  id: string;
+
+  @ApiProperty({ example: "SCHEDULED" })
   status: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: "2026-10-25T19:00:00.000Z" })
   scheduledDate: Date;
 
-  @ApiProperty()
+  @ApiProperty({ example: 0 })
   homeScore: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 0 })
   awayScore: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: "tourney_123" })
+  tournamentId: string;
+
+  @ApiProperty({ example: "Summer League 2026" })
+  tournamentName: string;
+
+  @ApiPropertyOptional({ type: ClientMatchTournamentDto })
+  tournament?: ClientMatchTournamentDto;
+
+  @ApiPropertyOptional({ example: "Madison Square Garden", nullable: true })
+  venue: string | null;
+
+  @ApiProperty({ type: ClientMatchTeamDto })
   homeTeam: ClientMatchTeamDto;
 
-  @ApiProperty()
+  @ApiProperty({ type: ClientMatchTeamDto })
   awayTeam: ClientMatchTeamDto;
+}
+
+export class ClientMatchQueryDto {
+  @ApiPropertyOptional({
+    description: "Optional tournament ID to filter matches",
+    example: "tourney_123",
+  })
+  @IsOptional()
+  tournamentId?: string;
+
+  @ApiPropertyOptional({
+    description: "Optional client ID. Defaults to assigned client.",
+    example: "client_123",
+  })
+  @IsOptional()
+  clientId?: string;
 }
 
 export class ClientShotChartEventDto {

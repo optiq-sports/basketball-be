@@ -176,9 +176,7 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
         },
         orderBy: { updatedAt: "desc" },
       });
-    }
-
-    if (!scene) {
+    } else {
       scene = await this.prisma.overlayScene.findFirst({
         where: {
           matchId,
