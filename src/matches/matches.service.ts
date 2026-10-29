@@ -297,7 +297,7 @@ export class MatchesService {
     const idFilter: Prisma.MatchWhereInput = {
       OR: [
         { id: normalizedId },
-        { matchKey: { equals: normalizedId, mode: "insensitive" } },
+        // { matchKey: { equals: normalizedId, mode: "insensitive" } },
       ],
     };
 
