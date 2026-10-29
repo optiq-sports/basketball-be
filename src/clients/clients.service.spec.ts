@@ -86,6 +86,7 @@ describe("ClientsService", () => {
 
   const mockUser: AuthenticatedUser = {
     id: "user1",
+    name: "User One",
     email: "test@example.com",
     role: Role.CLIENT,
     clientIds: ["client1"],
@@ -93,6 +94,7 @@ describe("ClientsService", () => {
 
   const adminUser: AuthenticatedUser = {
     id: "admin1",
+    name: "Admin One",
     email: "admin@example.com",
     role: Role.ADMIN,
     clientIds: ["client1"],
@@ -100,6 +102,7 @@ describe("ClientsService", () => {
 
   const otherAdmin: AuthenticatedUser = {
     id: "admin2",
+    name: "Admin Two",
     email: "admin2@example.com",
     role: Role.ADMIN,
     clientIds: ["client2"],
@@ -107,6 +110,7 @@ describe("ClientsService", () => {
 
   const superAdminUser: AuthenticatedUser = {
     id: "superadmin1",
+    name: "Super Admin",
     email: "super@example.com",
     role: Role.SUPER_ADMIN,
     clientIds: [],
@@ -214,17 +218,13 @@ describe("ClientsService", () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it("should update user role to CLIENT if not already CLIENT", async () => {
+    it("should preserve user role (e.g. ADMIN) and not overwrite it to CLIENT", async () => {
       (prisma.client.findUnique as jest.Mock).mockResolvedValue({
         id: "client1",
       });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: "u1",
         role: Role.ADMIN,
-      });
-      (prisma.user.update as jest.Mock).mockResolvedValue({
-        id: "u1",
-        role: Role.CLIENT,
       });
       (prisma.clientUser.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.clientUser.create as jest.Mock).mockResolvedValue({
@@ -234,11 +234,13 @@ describe("ClientsService", () => {
 
       await service.assignUserToClient("client1", { userId: "u1" }, adminUser);
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: "u1" },
-        data: { role: Role.CLIENT },
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.clientUser.create).toHaveBeenCalledWith({
+        data: {
+          clientId: "client1",
+          userId: "u1",
+        },
       });
-      expect(prisma.clientUser.create).toHaveBeenCalled();
     });
 
     it("should throw BadRequestException if assigning a SUPER_ADMIN", async () => {

@@ -5,6 +5,7 @@ import { PlayerDeduplicationService } from "../common/services/player-deduplicat
 import { NotFoundException, ConflictException } from "@nestjs/common";
 import { PlayerPosition } from "@prisma/client";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import * as xlsx from "xlsx";
 
 describe("PlayersService", () => {
   let service: PlayersService;
@@ -473,6 +474,196 @@ describe("PlayersService", () => {
 
       await expect(service.permanentDelete("p1")).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe("processBulkUpload", () => {
+    it("should map readable positions in multiple formats, handle real date cells and text dates, and report unknown positions and dates", async () => {
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team-1" });
+      mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
+        matchType: "NO_MATCH",
+      });
+      mockPrismaService.playerTeam.findFirst.mockResolvedValue(null);
+
+      const createdPlayers: Array<Record<string, unknown>> = [];
+      mockPrismaService.player.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => {
+          createdPlayers.push(data);
+          return Promise.resolve({
+            id: `p-${data.firstName}`,
+            ...data,
+          });
+        },
+      );
+      mockPrismaService.playerTeam.create.mockResolvedValue({});
+
+      // Create an Excel sheet with:
+      // - position written 4 ways: "Point Guard", "PG", "Small Forward", "guard (point)"
+      // - real date cell (August 15, 2010)
+      // - text dates: "15/08/2010" and "2010-08-15"
+      // - unknown position: "Wing"
+      // - unreadable date: "not-a-date"
+      const realDateCell = new Date(Date.UTC(2010, 7, 15));
+      const wsData = [
+        ["First Name", "Last Name", "Position", "Date of Birth", "Jersey"],
+        ["Chioma", "Okeke", "Point Guard", realDateCell, 5],
+        ["Ada", "Obi", "PG", "15/08/2010", 7],
+        ["Zainab", "Ali", "Small Forward", "2010-08-15", 10],
+        ["Grace", "Eze", "guard (point)", "15/08/2010", 12],
+        ["Wing", "Player", "Wing", "2010-08-15", 14],
+        ["BadDate", "Player", "Center", "not-a-date", 15],
+      ];
+
+      const ws = xlsx.utils.aoa_to_sheet(wsData);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
+      const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const result = await service.processBulkUpload("team-1", { buffer });
+
+      expect(result.totalProcessed).toBe(6);
+      expect(result.created).toBe(4);
+      expect(result.errors).toHaveLength(2);
+
+      // Verify row 6 error for position "Wing"
+      const posError = result.errors.find((e) => e.row === 6);
+      expect(posError).toBeDefined();
+      expect(posError?.error).toContain("Position 'Wing' isn't one of");
+
+      // Verify row 7 error for invalid date
+      const dateError = result.errors.find((e) => e.row === 7);
+      expect(dateError).toBeDefined();
+      expect(dateError?.error).toContain("Invalid date of birth: 'not-a-date'");
+
+      // Verify valid players created with correct enum and dates
+      expect(createdPlayers).toHaveLength(4);
+
+      // Chioma: "Point Guard" -> POINT_GUARD, real date cell
+      expect(createdPlayers[0].firstName).toBe("Chioma");
+      expect(createdPlayers[0].position).toBe(PlayerPosition.POINT_GUARD);
+      expect((createdPlayers[0].dateOfBirth as Date).getUTCFullYear()).toBe(
+        2010,
+      );
+      expect((createdPlayers[0].dateOfBirth as Date).getUTCMonth()).toBe(7); // August (0-indexed)
+      expect((createdPlayers[0].dateOfBirth as Date).getUTCDate()).toBe(15);
+
+      // Ada: "PG" -> POINT_GUARD, text date "15/08/2010"
+      expect(createdPlayers[1].firstName).toBe("Ada");
+      expect(createdPlayers[1].position).toBe(PlayerPosition.POINT_GUARD);
+      expect((createdPlayers[1].dateOfBirth as Date).getUTCFullYear()).toBe(
+        2010,
+      );
+      expect((createdPlayers[1].dateOfBirth as Date).getUTCMonth()).toBe(7);
+      expect((createdPlayers[1].dateOfBirth as Date).getUTCDate()).toBe(15);
+
+      // Zainab: "Small Forward" -> SMALL_FORWARD, text date "2010-08-15"
+      expect(createdPlayers[2].firstName).toBe("Zainab");
+      expect(createdPlayers[2].position).toBe(PlayerPosition.SMALL_FORWARD);
+      expect((createdPlayers[2].dateOfBirth as Date).getUTCFullYear()).toBe(
+        2010,
+      );
+      expect((createdPlayers[2].dateOfBirth as Date).getUTCMonth()).toBe(7);
+      expect((createdPlayers[2].dateOfBirth as Date).getUTCDate()).toBe(15);
+
+      // Grace: "guard (point)" -> POINT_GUARD, text date "15/08/2010"
+      expect(createdPlayers[3].firstName).toBe("Grace");
+      expect(createdPlayers[3].position).toBe(PlayerPosition.POINT_GUARD);
+      expect((createdPlayers[3].dateOfBirth as Date).getUTCFullYear()).toBe(
+        2010,
+      );
+      expect((createdPlayers[3].dateOfBirth as Date).getUTCMonth()).toBe(7);
+      expect((createdPlayers[3].dateOfBirth as Date).getUTCDate()).toBe(15);
+    });
+
+    it("should throw NotFoundException if team does not exist", async () => {
+      mockPrismaService.team.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.processBulkUpload("invalid-team", { buffer: Buffer.from("") }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("mapPlayerPosition and parseDateOfBirth helpers", () => {
+    it("should map various representations of all 5 positions", () => {
+      expect(service.mapPlayerPosition("Point Guard").position).toBe(
+        PlayerPosition.POINT_GUARD,
+      );
+      expect(service.mapPlayerPosition("point-guard").position).toBe(
+        PlayerPosition.POINT_GUARD,
+      );
+      expect(service.mapPlayerPosition("PG").position).toBe(
+        PlayerPosition.POINT_GUARD,
+      );
+      expect(service.mapPlayerPosition("guard (point)").position).toBe(
+        PlayerPosition.POINT_GUARD,
+      );
+
+      expect(service.mapPlayerPosition("Shooting Guard").position).toBe(
+        PlayerPosition.SHOOTING_GUARD,
+      );
+      expect(service.mapPlayerPosition("SG").position).toBe(
+        PlayerPosition.SHOOTING_GUARD,
+      );
+      expect(service.mapPlayerPosition("guard (shooting)").position).toBe(
+        PlayerPosition.SHOOTING_GUARD,
+      );
+
+      expect(service.mapPlayerPosition("Small Forward").position).toBe(
+        PlayerPosition.SMALL_FORWARD,
+      );
+      expect(service.mapPlayerPosition("SF").position).toBe(
+        PlayerPosition.SMALL_FORWARD,
+      );
+      expect(service.mapPlayerPosition("forward (small)").position).toBe(
+        PlayerPosition.SMALL_FORWARD,
+      );
+
+      expect(service.mapPlayerPosition("Power Forward").position).toBe(
+        PlayerPosition.POWER_FORWARD,
+      );
+      expect(service.mapPlayerPosition("PF").position).toBe(
+        PlayerPosition.POWER_FORWARD,
+      );
+      expect(service.mapPlayerPosition("forward (power)").position).toBe(
+        PlayerPosition.POWER_FORWARD,
+      );
+
+      expect(service.mapPlayerPosition("Center").position).toBe(
+        PlayerPosition.CENTER,
+      );
+      expect(service.mapPlayerPosition("C").position).toBe(
+        PlayerPosition.CENTER,
+      );
+
+      expect(service.mapPlayerPosition("").position).toBeUndefined();
+      expect(service.mapPlayerPosition(undefined).position).toBeUndefined();
+
+      expect(service.mapPlayerPosition("Wing").error).toContain(
+        "Position 'Wing' isn't one of",
+      );
+    });
+
+    it("should parse text and Date objects correctly and reject invalid dates", () => {
+      const d1 = service.parseDateOfBirth("2010-08-15");
+      expect(d1.date?.getUTCFullYear()).toBe(2010);
+      expect(d1.date?.getUTCMonth()).toBe(7);
+      expect(d1.date?.getUTCDate()).toBe(15);
+
+      const d2 = service.parseDateOfBirth("15/08/2010");
+      expect(d2.date?.getUTCFullYear()).toBe(2010);
+      expect(d2.date?.getUTCMonth()).toBe(7);
+      expect(d2.date?.getUTCDate()).toBe(15);
+
+      const d3 = service.parseDateOfBirth(new Date(Date.UTC(2010, 7, 15)));
+      expect(d3.date?.getUTCFullYear()).toBe(2010);
+
+      expect(service.parseDateOfBirth("").date).toBeUndefined();
+      expect(service.parseDateOfBirth(undefined).date).toBeUndefined();
+
+      expect(service.parseDateOfBirth("garbage").error).toContain(
+        "Invalid date of birth: 'garbage'",
       );
     });
   });

@@ -763,4 +763,73 @@ describe("StatdashProjectionsService", () => {
       expect(result.boxScore.players.sub1.plusMinus).toBe(6);
     });
   });
+
+  describe("statistician access in checkSessionAccess", () => {
+    const statisticianUser: AuthenticatedUser = {
+      id: "stat_irene",
+      email: "irenebasil62@gmail.com",
+      name: "Irene",
+      role: Role.STATISTICIAN,
+      clientIds: [],
+    };
+
+    it("allows access when statistician is assigned to the session match even with no clientIds", async () => {
+      prisma.gameSession.findUnique.mockResolvedValueOnce({
+        id: "sess_assigned",
+        match: {
+          clientId: "client_kaduna",
+          statisticianId: "stat_irene",
+          broadcasters: [],
+        },
+      });
+      redisService.getProjectionCached.mockResolvedValueOnce({
+        score: { home: 10, away: 8 },
+      });
+
+      const result = await service.getBoxScore(
+        "sess_assigned",
+        statisticianUser,
+      );
+      expect(result).toEqual({ score: { home: 10, away: 8 } });
+    });
+
+    it("allows access when session match belongs to a client in user.clientIds", async () => {
+      const statisticianWithClient: AuthenticatedUser = {
+        ...statisticianUser,
+        clientIds: ["client_kaduna"],
+      };
+      prisma.gameSession.findUnique.mockResolvedValueOnce({
+        id: "sess_client_match",
+        match: {
+          clientId: "client_kaduna",
+          statisticianId: null,
+          broadcasters: [],
+        },
+      });
+      redisService.getProjectionCached.mockResolvedValueOnce({
+        score: { home: 20, away: 22 },
+      });
+
+      const result = await service.getBoxScore(
+        "sess_client_match",
+        statisticianWithClient,
+      );
+      expect(result).toEqual({ score: { home: 20, away: 22 } });
+    });
+
+    it("throws NotFoundException when statistician is not assigned and match client is not in clientIds", async () => {
+      prisma.gameSession.findUnique.mockResolvedValueOnce({
+        id: "sess_other",
+        match: {
+          clientId: "client_other",
+          statisticianId: "stat_other",
+          broadcasters: [],
+        },
+      });
+
+      await expect(
+        service.getBoxScore("sess_other", statisticianUser),
+      ).rejects.toThrow();
+    });
+  });
 });

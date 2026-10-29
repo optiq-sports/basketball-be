@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateStatisticianDto } from "./dto/create-statistician.dto";
@@ -25,13 +26,32 @@ export class StatisticianService {
     private auditLogsService: AuditLogsService,
   ) {}
 
-  async create(createStatisticianDto: CreateStatisticianDto) {
+  async create(
+    createStatisticianDto: CreateStatisticianDto,
+    actorUser?: AuthenticatedUser,
+  ) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: createStatisticianDto.email },
     });
     if (existingUser) {
       throw new ConflictException("User with this email already exists");
     }
+
+    // Determine target clientId
+    if (
+      actorUser?.role === Role.ADMIN &&
+      createStatisticianDto.clientId &&
+      (!actorUser.clientIds ||
+        !actorUser.clientIds.includes(createStatisticianDto.clientId))
+    ) {
+      throw new ForbiddenException(
+        "Not authorized to assign statistician to a client outside your assigned clients",
+      );
+    }
+
+    const targetClientId =
+      createStatisticianDto.clientId ||
+      (actorUser?.role === Role.ADMIN ? actorUser.clientIds?.[0] : undefined);
 
     const password = createStatisticianDto.password || "123456789";
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -91,6 +111,15 @@ export class StatisticianService {
           bio,
         },
       });
+
+      if (targetClientId) {
+        await prisma.clientUser.create({
+          data: {
+            clientId: targetClientId,
+            userId: user.id,
+          },
+        });
+      }
 
       return prisma.user.findUnique({
         where: { id: user.id },

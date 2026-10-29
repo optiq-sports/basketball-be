@@ -578,10 +578,12 @@ export class OverlayService implements OnModuleInit, OnModuleDestroy {
         if (update.matchId !== matchId) return false;
         return update.broadcasterId === broadcasterId;
       }),
-      map((update): MessageEvent => ({
-        type: "overlay",
-        data: update.state,
-      })),
+      map(
+        (update): MessageEvent => ({
+          type: "overlay",
+          data: update.state,
+        }),
+      ),
     );
 
     // Heartbeat comment frame

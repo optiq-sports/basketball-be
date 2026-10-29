@@ -78,7 +78,10 @@ export class MatchesController {
     "/api/matches",
     "Tournament or Teams not found",
   )
-  create(@Body() createMatchDto: CreateMatchDto, @CurrentUser() user: any) {
+  create(
+    @Body() createMatchDto: CreateMatchDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.matchesService.create(createMatchDto, user);
   }
 
@@ -217,7 +220,7 @@ export class MatchesController {
   update(
     @Param("id") id: string,
     @Body() updateMatchDto: UpdateMatchDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.matchesService.update(id, updateMatchDto, user);
   }
@@ -248,7 +251,7 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  remove(@Param("id") id: string, @CurrentUser() user: any) {
+  remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.matchesService.remove(id, user);
   }
 }

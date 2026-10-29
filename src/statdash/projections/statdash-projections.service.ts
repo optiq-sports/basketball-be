@@ -50,6 +50,7 @@ export class StatdashProjectionsService {
         match: {
           select: {
             clientId: true,
+            statisticianId: true,
             broadcasters: { select: { userId: true } },
           },
         },
@@ -76,13 +77,25 @@ export class StatdashProjectionsService {
       return;
     }
 
-    if (
-      user?.role === "CLIENT" ||
-      user?.role === "ADMIN" ||
-      user?.role === "STATISTICIAN"
-    ) {
+    if (user?.role === Role.STATISTICIAN) {
+      const isAssigned = session.match?.statisticianId === user.id;
+      const isClientMatch =
+        session.match?.clientId &&
+        user.clientIds &&
+        user.clientIds.includes(session.match.clientId);
+
+      if (!isAssigned && !isClientMatch) {
+        throw new NotFoundException({
+          code: "SD_SESSION_NOT_FOUND",
+          message: "Session does not exist",
+        });
+      }
+      return;
+    }
+
+    if (user?.role === "CLIENT" || user?.role === "ADMIN") {
       if (
-        session.match.clientId &&
+        session.match?.clientId &&
         (!user.clientIds || !user.clientIds.includes(session.match.clientId))
       ) {
         throw new NotFoundException({
@@ -93,7 +106,7 @@ export class StatdashProjectionsService {
     }
   }
 
-  async getBoxScore(sessionId: string, user?: any) {
+  async getBoxScore(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
@@ -124,7 +137,7 @@ export class StatdashProjectionsService {
     return rebuilt.boxScore;
   }
 
-  async getShotChart(sessionId: string, user?: any) {
+  async getShotChart(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
@@ -162,7 +175,7 @@ export class StatdashProjectionsService {
   async getPlayerGameProjection(
     sessionId: string,
     playerId: string,
-    user?: any,
+    user?: AuthenticatedUser,
   ) {
     // getBoxScore already checks session access, but we do it anyway if needed or let getBoxScore handle it.
     // We must pass user to getBoxScore.
@@ -170,7 +183,7 @@ export class StatdashProjectionsService {
     return box.players[playerId] ?? this.emptyPlayerProjection(playerId);
   }
 
-  async getMatchSummary(sessionId: string, user?: any) {
+  async getMatchSummary(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const session = await this.prisma.gameSession.findUnique({
       where: { id: sessionId },
@@ -371,7 +384,7 @@ export class StatdashProjectionsService {
     return timeline;
   }
 
-  async rebuildAndPersist(sessionId: string, user?: any) {
+  async rebuildAndPersist(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const [events, sessionForTeamContext] = await Promise.all([
       this.getSessionEvents(sessionId),
@@ -592,7 +605,8 @@ export class StatdashProjectionsService {
         const payload = event.payload as Record<string, unknown>;
         const targetEventId = payload.targetEventId as string | undefined;
         const correctedPayload = payload.correctedPayload as
-          Record<string, unknown> | undefined;
+          | Record<string, unknown>
+          | undefined;
         if (targetEventId && correctedPayload) {
           corrections.set(targetEventId, correctedPayload);
         }
@@ -1093,7 +1107,8 @@ export class StatdashProjectionsService {
         }
         case "assist": {
           const aId = (payload.assistPlayerId ?? payload.playerId) as
-            string | undefined;
+            | string
+            | undefined;
           if (aId) {
             ensurePlayer(aId, eventTeamId);
             players[aId].assists += 1;
@@ -1348,7 +1363,8 @@ export class StatdashProjectionsService {
       }
       case "turnover": {
         const turnover = payload.turnover as
-          Record<string, unknown> | undefined;
+          | Record<string, unknown>
+          | undefined;
         const type = turnover?.type || payload.type;
         return type
           ? `${String(type).replace(/_/g, " ")} turnover`

@@ -94,6 +94,10 @@ export class MatchesService {
       );
     }
 
+    const matchKey =
+      createMatchDto.matchKey?.trim().toUpperCase() ||
+      Math.random().toString(36).substring(2, 10).toUpperCase();
+
     return this.prisma.match.create({
       data: {
         tournamentId: createMatchDto.tournamentId,
@@ -102,6 +106,7 @@ export class MatchesService {
         venue: createMatchDto.venue,
         statisticianId: createMatchDto.statisticianId,
         clientId: tournament.clientId,
+        matchKey,
         scheduledDate: new Date(
           createMatchDto.scheduledDate.endsWith("Z") ||
             createMatchDto.scheduledDate.includes("+") ||
@@ -155,6 +160,26 @@ export class MatchesService {
           },
         },
       };
+    } else if (user.role === Role.STATISTICIAN) {
+      const clientIds = user.clientIds || [];
+      if (clientIds.length > 0) {
+        where = {
+          OR: [
+            { statisticianId: user.id },
+            {
+              statisticianId: null,
+              OR: [
+                { clientId: { in: clientIds } },
+                { tournament: { clientId: { in: clientIds } } },
+              ],
+            },
+          ],
+        };
+      } else {
+        where = {
+          statisticianId: user.id,
+        };
+      }
     } else {
       const tenantFilter = getTenantFilter(user);
       where = {
@@ -174,10 +199,13 @@ export class MatchesService {
       where.stage = stage;
     }
     const andConditions: Prisma.MatchWhereInput[] = [];
-    if (statisticianId) {
-      andConditions.push({
-        OR: [{ statisticianId }, { statisticianId: null }],
-      });
+    if (user.role !== Role.STATISTICIAN) {
+      const targetStatId = statisticianId || filterDto?.statisticianId;
+      if (targetStatId) {
+        andConditions.push({
+          OR: [{ statisticianId: targetStatId }, { statisticianId: null }],
+        });
+      }
     }
     if (search) {
       andConditions.push({
@@ -265,25 +293,66 @@ export class MatchesService {
     id: string,
     user: AuthenticatedUser,
   ): Promise<MatchResponseDto> {
+    const normalizedId = id.trim();
+    const idFilter: Prisma.MatchWhereInput = {
+      OR: [
+        { id: normalizedId },
+        { matchKey: { equals: normalizedId, mode: "insensitive" } },
+      ],
+    };
+
     let where: Prisma.MatchWhereInput;
     if (user.role === Role.SUPER_ADMIN) {
-      where = { id };
+      where = idFilter;
     } else if (user.role === Role.BROADCASTER) {
       where = {
-        id,
-        broadcasters: {
-          some: {
-            userId: user.id,
+        AND: [
+          idFilter,
+          {
+            broadcasters: {
+              some: {
+                userId: user.id,
+              },
+            },
           },
-        },
+        ],
+      };
+    } else if (user.role === Role.STATISTICIAN) {
+      const clientIds = user.clientIds || [];
+      where = {
+        AND: [
+          idFilter,
+          {
+            OR: [
+              { statisticianId: user.id },
+              {
+                statisticianId: null,
+                OR: [
+                  ...(clientIds.length > 0
+                    ? [
+                        { clientId: { in: clientIds } },
+                        { tournament: { clientId: { in: clientIds } } },
+                      ]
+                    : []),
+                  { matchKey: { equals: normalizedId, mode: "insensitive" } },
+                  { id: normalizedId },
+                ],
+              },
+            ],
+          },
+        ],
       };
     } else {
       const tenantFilter = getTenantFilter(user);
       where = {
-        id,
-        OR: [
-          { clientId: { in: user.clientIds || [] } },
-          { tournament: tenantFilter },
+        AND: [
+          idFilter,
+          {
+            OR: [
+              { clientId: { in: user.clientIds || [] } },
+              { tournament: tenantFilter },
+            ],
+          },
         ],
       };
     }
@@ -362,7 +431,7 @@ export class MatchesService {
     return {
       ...match,
       gameSessions: match.gameSessions ? [match.gameSessions] : [],
-    } as any;
+    } as unknown as MatchResponseDto;
   }
 
   async update(
@@ -372,7 +441,7 @@ export class MatchesService {
   ): Promise<MatchResponseDto> {
     const match = await this.findOne(id, user);
 
-    const updateData: any = { ...updateMatchDto };
+    const updateData: Record<string, unknown> = { ...updateMatchDto };
 
     // Handle unassigning statistician if frontend passes an empty string
     if (updateData.statisticianId === "") {
@@ -424,7 +493,7 @@ export class MatchesService {
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.match.update({
-        where: { id },
+        where: { id: match.id },
         data: updateData,
         include: {
           tournament: true,

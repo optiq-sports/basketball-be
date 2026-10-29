@@ -352,14 +352,7 @@ export class ClientsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Ensure user's role is CLIENT
-      if (user.role !== Role.CLIENT) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { role: Role.CLIENT },
-        });
-      }
-
+      // Preserve existing user role (e.g. ADMIN, STATISTICIAN) rather than demoting to CLIENT
       // Check if already assigned
       const existing = await tx.clientUser.findUnique({
         where: {
