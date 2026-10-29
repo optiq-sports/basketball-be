@@ -86,6 +86,14 @@ export class MatchResponseDto {
   updatedAt: Date;
 
   @ApiProperty({
+    example: "A8B2C4D1",
+    description: "Unique match key / code for statistician access",
+    required: false,
+    nullable: true,
+  })
+  matchKey?: string | null;
+
+  @ApiProperty({
     type: GameSessionSummaryDto,
     required: false,
     nullable: true,

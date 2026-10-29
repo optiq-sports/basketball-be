@@ -2,7 +2,8 @@ import { PaginationQueryDto } from "../dto/pagination-query.dto";
 
 export interface PaginationOptions {
   defaultOrderBy?:
-    Record<string, "asc" | "desc"> | Record<string, "asc" | "desc">[];
+    | Record<string, "asc" | "desc">
+    | Record<string, "asc" | "desc">[];
   searchFields?: string[];
 }
 

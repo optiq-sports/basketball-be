@@ -197,6 +197,106 @@ describe("StatdashSessionsService", () => {
     await expect(service.bootstrap({})).rejects.toThrow(BadRequestException);
   });
 
+  it("bootstraps session using matchKey and claims unassigned match for statistician", async () => {
+    redisService.getSessionSnapshotCached.mockResolvedValue(null);
+    prismaService.match.findFirst.mockResolvedValue({
+      id: "match_cuid_1",
+      matchKey: "MATCH123",
+      statisticianId: null,
+      homeScore: 0,
+      awayScore: 0,
+    });
+    prismaService.match.update.mockResolvedValue({
+      id: "match_cuid_1",
+      statisticianId: "stat_irene",
+    });
+    prismaService.gameSession.upsert.mockResolvedValue({
+      id: "session_1",
+      matchId: "match_cuid_1",
+      homeScore: 0,
+      awayScore: 0,
+      status: GameSessionStatus.PENDING,
+      match: {
+        id: "match_cuid_1",
+        statisticianId: "stat_irene",
+      },
+    });
+    redisService.getRecentEventsCached.mockResolvedValue([]);
+    prismaService.gameEvent.findMany.mockResolvedValue([]);
+    prismaService.lineupState.findFirst.mockResolvedValue(null);
+
+    const result = await service.bootstrap(
+      { matchId: "MATCH123" },
+      "stat_irene",
+    );
+
+    expect(prismaService.match.findFirst).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { id: "MATCH123" },
+          { matchKey: { equals: "MATCH123", mode: "insensitive" } },
+        ],
+      },
+    });
+    expect(prismaService.match.update).toHaveBeenCalledWith({
+      where: { id: "match_cuid_1" },
+      data: { statisticianId: "stat_irene" },
+    });
+    expect(prismaService.gameSession.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { matchId: "match_cuid_1" },
+      }),
+    );
+    expect(result.sessionId).toBe("session_1");
+  });
+
+  it("rejects bootstrap when match is assigned to another statistician", async () => {
+    redisService.getSessionSnapshotCached.mockResolvedValue(null);
+    prismaService.match.findFirst.mockResolvedValue({
+      id: "match_cuid_2",
+      statisticianId: "other_stat",
+      homeScore: 0,
+      awayScore: 0,
+    });
+
+    await expect(
+      service.bootstrap({ matchId: "match_cuid_2" }, "stat_irene"),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("claims unassigned match when bootstrapping by sessionId for statistician", async () => {
+    redisService.getSessionSnapshotCached.mockResolvedValue(null);
+    prismaService.gameSession.findUnique.mockResolvedValue({
+      id: "session_2",
+      matchId: "match_cuid_3",
+      homeScore: 10,
+      awayScore: 12,
+      status: GameSessionStatus.IN_PROGRESS,
+      match: {
+        id: "match_cuid_3",
+        statisticianId: null,
+      },
+    });
+    prismaService.match.update.mockResolvedValue({
+      id: "match_cuid_3",
+      statisticianId: "stat_irene",
+    });
+    redisService.getRecentEventsCached.mockResolvedValue([]);
+    prismaService.gameEvent.findMany.mockResolvedValue([]);
+    prismaService.lineupState.findFirst.mockResolvedValue(null);
+
+    const result = await service.bootstrap(
+      { sessionId: "session_2" },
+      "stat_irene",
+    );
+
+    expect(prismaService.match.update).toHaveBeenCalledWith({
+      where: { id: "match_cuid_3" },
+      data: { statisticianId: "stat_irene" },
+    });
+    expect(result.sessionId).toBe("session_2");
+  });
+
   it("starts a pending session", async () => {
     prismaService.gameSession.findUnique.mockResolvedValue({
       id: "session_1",

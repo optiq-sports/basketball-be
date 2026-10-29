@@ -4,7 +4,9 @@ import IORedis from "ioredis";
 
 type QueuePayload = Record<string, unknown>;
 type QueueName =
-  "statdash-projections" | "statdash-recompute" | "statdash-matchstat-sync";
+  | "statdash-projections"
+  | "statdash-recompute"
+  | "statdash-matchstat-sync";
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {

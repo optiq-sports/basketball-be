@@ -48,7 +48,10 @@ export class StatdashSessionsService {
     // Look up match by id or matchKey first without narrowing by statistician
     const match = await this.prisma.match.findFirst({
       where: {
-        OR: [{ id: normalizedMatchKey }, { matchKey: normalizedMatchKey }],
+        OR: [
+          { id: normalizedMatchKey },
+          { matchKey: { equals: normalizedMatchKey, mode: "insensitive" } },
+        ],
       },
       include: {
         gameSessions: true,
@@ -138,9 +141,25 @@ export class StatdashSessionsService {
       });
     }
 
+    if (session && !session.match?.statisticianId && statisticianId) {
+      await this.prisma.match.update({
+        where: { id: session.matchId },
+        data: { statisticianId },
+      });
+      if (session.match) {
+        session.match.statisticianId = statisticianId;
+      }
+    }
+
     if (!session && input.matchId) {
-      const match = await this.prisma.match.findUnique({
-        where: { id: input.matchId },
+      const normalizedMatchId = input.matchId.trim();
+      const match = await this.prisma.match.findFirst({
+        where: {
+          OR: [
+            { id: normalizedMatchId },
+            { matchKey: { equals: normalizedMatchId, mode: "insensitive" } },
+          ],
+        },
       });
       if (!match) {
         throw new NotFoundException({
@@ -167,13 +186,14 @@ export class StatdashSessionsService {
           where: { id: match.id },
           data: { statisticianId },
         });
+        match.statisticianId = statisticianId;
       }
 
       session = await this.prisma.gameSession.upsert({
-        where: { matchId: input.matchId },
+        where: { matchId: match.id },
         update: {},
         create: {
-          matchId: input.matchId,
+          matchId: match.id,
           homeScore: match.homeScore,
           awayScore: match.awayScore,
         },

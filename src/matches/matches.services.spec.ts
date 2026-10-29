@@ -221,10 +221,24 @@ describe("MatchesService", () => {
       expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            id: "m_broadcast",
-            OR: [
-              { clientId: { in: ["broadcast_client_1"] } },
-              { tournament: { clientId: { in: ["broadcast_client_1"] } } },
+            AND: [
+              {
+                OR: [
+                  { id: "m_broadcast" },
+                  {
+                    matchKey: {
+                      equals: "m_broadcast",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+              {
+                OR: [
+                  { clientId: { in: ["broadcast_client_1"] } },
+                  { tournament: { clientId: { in: ["broadcast_client_1"] } } },
+                ],
+              },
             ],
           },
         }),
@@ -302,12 +316,26 @@ describe("MatchesService", () => {
       expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            id: "m-assigned",
-            broadcasters: {
-              some: {
-                userId: "broadcaster-1",
+            AND: [
+              {
+                OR: [
+                  { id: "m-assigned" },
+                  {
+                    matchKey: {
+                      equals: "m-assigned",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
               },
-            },
+              {
+                broadcasters: {
+                  some: {
+                    userId: "broadcaster-1",
+                  },
+                },
+              },
+            ],
           },
         }),
       );
@@ -410,6 +438,163 @@ describe("MatchesService", () => {
         },
         select: { id: true },
       });
+    });
+  });
+
+  describe("statistician scoping in findAll and findOne", () => {
+    const statisticianUser: AuthenticatedUser = {
+      id: "stat-1",
+      name: "Stat User",
+      email: "stat@example.com",
+      role: Role.STATISTICIAN,
+      clientIds: [],
+    };
+
+    const statisticianWithClients: AuthenticatedUser = {
+      id: "stat-2",
+      name: "Stat With Clients",
+      email: "stat2@example.com",
+      role: Role.STATISTICIAN,
+      clientIds: ["client-alpha"],
+    };
+
+    it("should allow statistician without clientIds to see matches assigned to them in findAll", async () => {
+      mockPrismaService.match.findMany.mockResolvedValueOnce([
+        { id: "m-assigned-stat", statisticianId: "stat-1" },
+      ]);
+      mockPrismaService.match.count.mockResolvedValueOnce(1);
+
+      const result = await service.findAll(
+        statisticianUser,
+        { page: 1, limit: 10 },
+        statisticianUser.id,
+      );
+
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            statisticianId: "stat-1",
+          }),
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
+    it("should allow statistician with clientIds to see assigned matches and unassigned matches in their clients", async () => {
+      mockPrismaService.match.findMany.mockResolvedValueOnce([
+        { id: "m-assigned-stat", statisticianId: "stat-2" },
+      ]);
+      mockPrismaService.match.count.mockResolvedValueOnce(1);
+
+      await service.findAll(
+        statisticianWithClients,
+        { page: 1, limit: 10 },
+        statisticianWithClients.id,
+      );
+
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { statisticianId: "stat-2" },
+              {
+                statisticianId: null,
+                OR: [
+                  { clientId: { in: ["client-alpha"] } },
+                  { tournament: { clientId: { in: ["client-alpha"] } } },
+                ],
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it("should allow statistician to open assigned match in findOne regardless of client", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-assigned-stat",
+        clientId: "different-client",
+        statisticianId: "stat-1",
+      });
+
+      const result = await service.findOne("m-assigned-stat", statisticianUser);
+
+      expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                OR: [
+                  { id: "m-assigned-stat" },
+                  {
+                    matchKey: {
+                      equals: "m-assigned-stat",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+              {
+                OR: [
+                  { statisticianId: "stat-1" },
+                  {
+                    statisticianId: null,
+                    OR: [
+                      {
+                        matchKey: {
+                          equals: "m-assigned-stat",
+                          mode: "insensitive",
+                        },
+                      },
+                      { id: "m-assigned-stat" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+      expect(result.id).toBe("m-assigned-stat");
+    });
+
+    it("should allow statistician to open match using matchKey directly", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-assigned-stat",
+        matchKey: "MATCH123",
+        statisticianId: "stat-1",
+      });
+
+      const result = await service.findOne("MATCH123", statisticianUser);
+
+      expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { id: "MATCH123" },
+                  {
+                    matchKey: {
+                      equals: "MATCH123",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+      expect(result.id).toBe("m-assigned-stat");
+    });
+
+    it("should throw NotFoundException in findOne if match is not assigned to statistician", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.findOne("m-assigned-to-other", statisticianUser),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
