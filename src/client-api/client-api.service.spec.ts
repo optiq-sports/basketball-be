@@ -38,6 +38,9 @@ describe("ClientApiService", () => {
             playerTeam: {
               findMany: jest.fn(),
             },
+            player: {
+              findUnique: jest.fn(),
+            },
           },
         },
         {
@@ -45,6 +48,7 @@ describe("ClientApiService", () => {
           useValue: {
             getBoxScore: jest.fn(),
             getShotChart: jest.fn(),
+            getTimeline: jest.fn(),
           },
         },
         {
@@ -111,6 +115,7 @@ describe("ClientApiService", () => {
         {
           id: "match1",
           status: "SCHEDULED",
+          stage: null,
           scheduledDate: new Date("2026-10-25T19:00:00.000Z"),
           homeScore: 0,
           awayScore: 0,
@@ -196,6 +201,7 @@ describe("ClientApiService", () => {
       const result = await service.getMatchDetails("client1", "match1");
       expect(result).toEqual({
         id: "match1",
+        stage: null,
         tournament: { id: "tourney_1", name: "Summer League" },
         tournamentName: "Summer League",
         homeTeam: {
@@ -407,6 +413,7 @@ describe("ClientApiService", () => {
           name: "Warriors",
           code: "WAR",
           logo: null,
+          color: null,
           group: "Group A",
         },
       ]);
@@ -492,6 +499,7 @@ describe("ClientApiService", () => {
         {
           matchId: "m_1",
           playerId: "player_1",
+          teamId: "t_1",
           points: 30,
           rebounds: 5,
           assists: 8,
@@ -514,6 +522,7 @@ describe("ClientApiService", () => {
         {
           matchId: "m_2",
           playerId: "player_1",
+          teamId: "t_1",
           points: 20,
           rebounds: 5,
           assists: 4,
@@ -536,6 +545,7 @@ describe("ClientApiService", () => {
         {
           matchId: "m_1",
           playerId: "player_2",
+          teamId: "t_2",
           points: 25,
           rebounds: 10,
           assists: 5,
@@ -563,8 +573,8 @@ describe("ClientApiService", () => {
       ]);
 
       (prisma.playerTeam.findMany as jest.Mock).mockResolvedValue([
-        { playerId: "player_1", jerseyNumber: 30 },
-        { playerId: "player_2", jerseyNumber: 23 },
+        { playerId: "player_1", teamId: "t_1", jerseyNumber: 30 },
+        { playerId: "player_2", teamId: "t_2", jerseyNumber: 23 },
       ]);
 
       const leaders = await service.getTournamentLeaders(
@@ -724,6 +734,184 @@ describe("ClientApiService", () => {
             done();
           });
         });
+    });
+  });
+
+  describe("getTimeline", () => {
+    it("should throw 404 if match or session does not exist (before tip-off)", async () => {
+      (prisma.match.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.getTimeline("client1", "match1")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("should return timeline events from projections service including payload", async () => {
+      (prisma.match.findFirst as jest.Mock).mockResolvedValue({
+        id: "match1",
+        gameSessions: { id: "session1" },
+      });
+
+      const mockTimeline = [
+        {
+          sequence: 1,
+          period: 1,
+          clockSecondsRemaining: 710,
+          eventType: "shot",
+          homeScore: 2,
+          awayScore: 0,
+          payload: { shooterPlayerId: "p1", points: 2 },
+        },
+      ];
+      (projectionsService.getTimeline as jest.Mock).mockResolvedValue(
+        mockTimeline,
+      );
+
+      const result = await service.getTimeline("client1", "match1");
+      expect(result).toEqual(mockTimeline);
+    });
+  });
+
+  describe("getPlayerCard", () => {
+    it("should throw NotFoundException if player not in client tournaments", async () => {
+      (prisma.player.findUnique as jest.Mock).mockResolvedValue({
+        id: "p_outside",
+        firstName: "Outside",
+        lastName: "Player",
+        playerTeams: [],
+      });
+      (prisma.matchStat.findMany as jest.Mock).mockResolvedValue([]);
+
+      await expect(
+        service.getPlayerCard("client1", "p_outside"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should return player card and season lines for client tournament", async () => {
+      (prisma.player.findUnique as jest.Mock).mockResolvedValue({
+        id: "p1",
+        firstName: "LeBron",
+        lastName: "James",
+        photo: "photo.jpg",
+        position: "Forward",
+        height: "6'9\"",
+        nationality: "USA",
+        playerTeams: [
+          {
+            jerseyNumber: 23,
+            team: {
+              id: "t1",
+              name: "Lakers",
+              code: "LAL",
+              logo: "logo.png",
+              color: "#552583",
+              tournamentTeams: [
+                {
+                  tournament: {
+                    id: "tourn1",
+                    clientId: "client1",
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      (prisma.matchStat.findMany as jest.Mock).mockResolvedValue([
+        {
+          matchId: "m1",
+          playerId: "p1",
+          points: 30,
+          rebounds: 8,
+          assists: 10,
+          steals: 2,
+          blocks: 1,
+          fgm: 11,
+          fga: 18,
+          fg3m: 3,
+          fg3a: 6,
+          ftm: 5,
+          fta: 6,
+          match: {
+            id: "m1",
+            tournamentId: "tourn1",
+            tournament: { id: "tourn1", name: "Summer League" },
+          },
+        },
+      ]);
+
+      const result = await service.getPlayerCard("client1", "p1");
+      expect(result.id).toBe("p1");
+      expect(result.name).toBe("LeBron James");
+      expect(result.jerseyNumber).toBe(23);
+      expect(result.currentTeam?.name).toBe("Lakers");
+      expect(result.tournaments).toHaveLength(1);
+      expect(result.tournaments[0].tournamentName).toBe("Summer League");
+      expect(result.tournaments[0].gamesPlayed).toBe(1);
+      expect(result.tournaments[0].totals.points).toBe(30);
+      expect(result.tournaments[0].averages.points).toBe(30);
+      expect(result.tournaments[0].averages.assists).toBe(10);
+    });
+  });
+
+  describe("getTournamentLeaders category=all", () => {
+    it("should return all categories when category=all", async () => {
+      (prisma.tournament.findFirst as jest.Mock).mockResolvedValue({
+        id: "tourn_1",
+      });
+
+      (prisma.matchStat.findMany as jest.Mock).mockResolvedValue([
+        {
+          matchId: "m_1",
+          playerId: "p_1",
+          points: 20,
+          rebounds: 10,
+          assists: 5,
+          steals: 2,
+          blocks: 3,
+          turnovers: 1,
+          fg3m: 2,
+          player: {
+            id: "p_1",
+            firstName: "Anthony",
+            lastName: "Davis",
+            photo: null,
+          },
+          team: {
+            id: "t_1",
+            name: "Lakers",
+            code: "LAL",
+          },
+        },
+      ]);
+
+      (prisma.team.findMany as jest.Mock).mockResolvedValue([
+        { id: "t_1", name: "Lakers", code: "LAL" },
+      ]);
+
+      (prisma.playerTeam.findMany as jest.Mock).mockResolvedValue([
+        { playerId: "p_1", teamId: "t_1", jerseyNumber: 3 },
+      ]);
+
+      const result = (await service.getTournamentLeaders(
+        "client_1",
+        "tourn_1",
+        "all" as LeaderCategory,
+        5,
+      )) as Record<string, unknown[]>;
+
+      expect(result.points).toBeDefined();
+      expect(result.rebounds).toBeDefined();
+      expect(result.assists).toBeDefined();
+      expect(result.steals).toBeDefined();
+      expect(result.blocks).toBeDefined();
+      expect(result.turnovers).toBeDefined();
+      expect(result.fg3m).toBeDefined();
+      expect((result.points[0] as { totalValue: number }).totalValue).toBe(20);
+      expect((result.rebounds[0] as { totalValue: number }).totalValue).toBe(
+        10,
+      );
     });
   });
 });

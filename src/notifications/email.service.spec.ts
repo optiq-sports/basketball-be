@@ -55,4 +55,28 @@ describe("EmailService", () => {
     );
     expect(result).toBe(false);
   });
+
+  describe("getFrontendBaseUrl role routing", () => {
+    it("routes reset email correctly for each role", () => {
+      process.env.ADMIN_URL = "https://inhouse.optiqsports.com";
+      process.env.PORTAL_URL = "https://portal.optiqsports.com";
+      process.env.BROADCAST_URL = "https://broadcast.optiqsports.com";
+      process.env.STATDASH_URL = "https://inhouse.optiqsports.com";
+
+      const service = new EmailService();
+      const getBaseUrl = (
+        service as unknown as { getFrontendBaseUrl: (role?: string) => string }
+      ).getFrontendBaseUrl.bind(service);
+
+      expect(getBaseUrl("CLIENT")).toBe("https://portal.optiqsports.com");
+      expect(getBaseUrl("BROADCASTER")).toBe(
+        "https://broadcast.optiqsports.com",
+      );
+      expect(getBaseUrl("STATISTICIAN")).toBe(
+        "https://inhouse.optiqsports.com",
+      );
+      expect(getBaseUrl("ADMIN")).toBe("https://inhouse.optiqsports.com");
+      expect(getBaseUrl("SUPER_ADMIN")).toBe("https://inhouse.optiqsports.com");
+    });
+  });
 });

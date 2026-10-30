@@ -53,6 +53,17 @@ export class StatisticianService {
       createStatisticianDto.clientId ||
       (actorUser?.role === Role.ADMIN ? actorUser.clientIds?.[0] : undefined);
 
+    if (targetClientId) {
+      const client = await this.prisma.client.findUnique({
+        where: { id: targetClientId },
+      });
+      if (!client) {
+        throw new NotFoundException(
+          `Client with ID ${targetClientId} not found`,
+        );
+      }
+    }
+
     const password = createStatisticianDto.password || "123456789";
     const hashedPassword = await bcrypt.hash(password, 10);
 

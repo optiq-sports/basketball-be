@@ -25,6 +25,7 @@ export class ClientApiService {
       select: {
         id: true,
         status: true,
+        stage: true,
         scheduledDate: true,
         homeScore: true,
         awayScore: true,
@@ -61,6 +62,7 @@ export class ClientApiService {
     return matches.map((m) => ({
       id: m.id,
       status: m.status,
+      stage: m.stage ?? null,
       scheduledDate: m.scheduledDate,
       homeScore: m.homeScore,
       awayScore: m.awayScore,
@@ -154,6 +156,7 @@ export class ClientApiService {
 
     return {
       ...match,
+      stage: match.stage ?? null,
       tournamentName: match.tournament?.name ?? "",
       homeTeam: formatTeamWithPlayers(match.homeTeam),
       awayTeam: formatTeamWithPlayers(match.awayTeam),
@@ -184,6 +187,12 @@ export class ClientApiService {
 
     // Optionally remove any advanced analytics here if they were present
     return boxScore;
+  }
+
+  async getTimeline(clientId: string | undefined, matchId: string) {
+    if (!clientId) throw new NotFoundException("Client ID is missing");
+    const session = await this.getSessionForMatch(clientId, matchId);
+    return this.statdashProjectionsService.getTimeline(session.id);
   }
 
   private hasAdvancedAnalyticsScope(scopes?: string[]): boolean {
@@ -436,6 +445,7 @@ export class ClientApiService {
                 id: true,
                 name: true,
                 code: true,
+                color: true,
                 logo: true,
               },
             },
@@ -456,6 +466,7 @@ export class ClientApiService {
         name: t.team.name,
         code: t.team.code,
         logo: t.team.logo,
+        color: t.team.color ?? null,
         group: t.group,
       })),
     };
@@ -499,6 +510,7 @@ export class ClientApiService {
       teamName: string;
       teamCode: string;
       teamLogo: string | null;
+      group: string | null;
       played: number;
       won: number;
       lost: number;
@@ -518,6 +530,7 @@ export class ClientApiService {
         teamName: tt.team.name,
         teamCode: tt.team.code,
         teamLogo: tt.team.logo,
+        group: tt.group ?? null,
         played: 0,
         won: 0,
         lost: 0,
@@ -583,6 +596,7 @@ export class ClientApiService {
         teamName: stat.teamName,
         teamCode: stat.teamCode,
         teamLogo: stat.teamLogo,
+        group: stat.group,
         played: stat.played,
         won: stat.won,
         lost: stat.lost,
@@ -672,7 +686,7 @@ export class ClientApiService {
       teamName: string;
       teamCode: string;
       matchIds: Set<string>;
-      totalValue: number;
+      totals: Record<string, number>;
     };
 
     const aggMap = new Map<string, PlayerAgg>();
@@ -694,61 +708,268 @@ export class ClientApiService {
           teamName: team.name,
           teamCode: team.code,
           matchIds: new Set<string>(),
-          totalValue: 0,
+          totals: {
+            points: 0,
+            rebounds: 0,
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            turnovers: 0,
+            fg3m: 0,
+          },
         });
       }
 
       const p = aggMap.get(stat.playerId)!;
       p.matchIds.add(stat.matchId);
-      const val = (stat as unknown as Record<string, number>)[cat] || 0;
-      p.totalValue += val;
+      for (const validCat of validCategories) {
+        p.totals[validCat] =
+          (p.totals[validCat] || 0) +
+          ((stat as unknown as Record<string, number>)[validCat] || 0);
+      }
     }
 
-    const playerIds = Array.from(aggMap.keys());
-    const playerTeams = await this.prisma.playerTeam.findMany({
-      where: {
-        playerId: { in: playerIds },
-        isActive: true,
-      },
-      select: {
-        playerId: true,
-        jerseyNumber: true,
-      },
-    });
+    const playerAggEntries = Array.from(aggMap.values());
+    const playerTeams =
+      playerAggEntries.length > 0
+        ? await this.prisma.playerTeam.findMany({
+            where: {
+              OR: playerAggEntries.map((p) => ({
+                playerId: p.playerId,
+                teamId: p.teamId,
+              })),
+              isActive: true,
+            },
+            select: {
+              playerId: true,
+              teamId: true,
+              jerseyNumber: true,
+            },
+          })
+        : [];
     const jerseyMap = new Map<string, number>();
     for (const pt of playerTeams) {
-      jerseyMap.set(pt.playerId, pt.jerseyNumber);
+      jerseyMap.set(`${pt.playerId}_${pt.teamId}`, pt.jerseyNumber);
     }
 
-    const leaders = Array.from(aggMap.values())
-      .map((p) => {
-        const gamesPlayed = p.matchIds.size;
-        const perGameValue =
-          gamesPlayed > 0 ? Number((p.totalValue / gamesPlayed).toFixed(1)) : 0;
-        return {
-          playerId: p.playerId,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          jerseyNumber: jerseyMap.get(p.playerId) ?? null,
-          photo: p.photo,
-          teamId: p.teamId,
-          teamName: p.teamName,
-          teamCode: p.teamCode,
-          gamesPlayed,
-          totalValue: p.totalValue,
-          perGameValue,
-        };
-      })
-      .sort((a, b) => {
-        if (b.perGameValue !== a.perGameValue)
-          return b.perGameValue - a.perGameValue;
-        return b.totalValue - a.totalValue;
-      })
-      .slice(0, limit);
+    const buildCategoryLeaders = (targetCategory: string) => {
+      const leaders = playerAggEntries
+        .map((p) => {
+          const gamesPlayed = p.matchIds.size;
+          const totalValue = p.totals[targetCategory] || 0;
+          const perGameValue =
+            gamesPlayed > 0 ? Number((totalValue / gamesPlayed).toFixed(1)) : 0;
+          return {
+            playerId: p.playerId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            jerseyNumber: jerseyMap.get(`${p.playerId}_${p.teamId}`) ?? null,
+            photo: p.photo,
+            teamId: p.teamId,
+            teamName: p.teamName,
+            teamCode: p.teamCode,
+            gamesPlayed,
+            totalValue,
+            perGameValue,
+          };
+        })
+        .sort((a, b) => {
+          if (b.perGameValue !== a.perGameValue)
+            return b.perGameValue - a.perGameValue;
+          return b.totalValue - a.totalValue;
+        })
+        .slice(0, limit);
 
-    return leaders.map((item, index) => ({
-      rank: index + 1,
-      ...item,
-    }));
+      return leaders.map((item, index) => ({
+        rank: index + 1,
+        ...item,
+      }));
+    };
+
+    if (category === "all") {
+      return {
+        points: buildCategoryLeaders("points"),
+        rebounds: buildCategoryLeaders("rebounds"),
+        assists: buildCategoryLeaders("assists"),
+        steals: buildCategoryLeaders("steals"),
+        blocks: buildCategoryLeaders("blocks"),
+        turnovers: buildCategoryLeaders("turnovers"),
+        fg3m: buildCategoryLeaders("fg3m"),
+      };
+    }
+
+    const targetCat = validCategories.includes(category) ? category : "points";
+    return buildCategoryLeaders(targetCat);
+  }
+
+  async getPlayerCard(clientId: string | undefined, playerId: string) {
+    if (!clientId) throw new NotFoundException("Client ID is missing");
+
+    const player = await this.prisma.player.findUnique({
+      where: { id: playerId },
+      include: {
+        playerTeams: {
+          where: { isActive: true },
+          include: {
+            team: {
+              include: {
+                tournamentTeams: {
+                  where: {
+                    tournament: { clientId },
+                  },
+                  include: {
+                    tournament: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!player) {
+      throw new NotFoundException("Player not found");
+    }
+
+    const clientPlayerTeams = player.playerTeams.filter(
+      (pt) => pt.team.tournamentTeams.length > 0,
+    );
+
+    const clientStats = await this.prisma.matchStat.findMany({
+      where: {
+        playerId,
+        match: {
+          tournament: { clientId },
+        },
+      },
+      include: {
+        match: {
+          select: {
+            id: true,
+            tournamentId: true,
+            tournament: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (clientPlayerTeams.length === 0 && clientStats.length === 0) {
+      throw new NotFoundException("Player not found in client tournaments");
+    }
+
+    const primaryPt = clientPlayerTeams[0];
+    const currentTeam = primaryPt
+      ? {
+          id: primaryPt.team.id,
+          name: primaryPt.team.name,
+          code: primaryPt.team.code,
+          logo: primaryPt.team.logo,
+          color: primaryPt.team.color,
+        }
+      : null;
+    const jerseyNumber = primaryPt ? primaryPt.jerseyNumber : null;
+
+    type TourneyAgg = {
+      tournamentId: string;
+      tournamentName: string;
+      matchIds: Set<string>;
+      totals: {
+        points: number;
+        rebounds: number;
+        assists: number;
+        steals: number;
+        blocks: number;
+        fgm: number;
+        fga: number;
+        fg3m: number;
+        fg3a: number;
+        ftm: number;
+        fta: number;
+      };
+    };
+
+    const tourneyMap = new Map<string, TourneyAgg>();
+
+    for (const stat of clientStats) {
+      const tId = stat.match.tournamentId;
+      const tName = stat.match.tournament?.name ?? "";
+      if (!tourneyMap.has(tId)) {
+        tourneyMap.set(tId, {
+          tournamentId: tId,
+          tournamentName: tName,
+          matchIds: new Set<string>(),
+          totals: {
+            points: 0,
+            rebounds: 0,
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            fgm: 0,
+            fga: 0,
+            fg3m: 0,
+            fg3a: 0,
+            ftm: 0,
+            fta: 0,
+          },
+        });
+      }
+
+      const agg = tourneyMap.get(tId)!;
+      agg.matchIds.add(stat.match.id);
+      agg.totals.points += stat.points;
+      agg.totals.rebounds += stat.rebounds;
+      agg.totals.assists += stat.assists;
+      agg.totals.steals += stat.steals;
+      agg.totals.blocks += stat.blocks;
+      agg.totals.fgm += stat.fgm;
+      agg.totals.fga += stat.fga;
+      agg.totals.fg3m += stat.fg3m;
+      agg.totals.fg3a += stat.fg3a;
+      agg.totals.ftm += stat.ftm;
+      agg.totals.fta += stat.fta;
+    }
+
+    const seasonLines = Array.from(tourneyMap.values()).map((agg) => {
+      const gamesPlayed = agg.matchIds.size;
+      const round = (val: number) =>
+        gamesPlayed > 0 ? Number((val / gamesPlayed).toFixed(1)) : 0;
+
+      return {
+        tournamentId: agg.tournamentId,
+        tournamentName: agg.tournamentName,
+        gamesPlayed,
+        totals: { ...agg.totals },
+        averages: {
+          points: round(agg.totals.points),
+          rebounds: round(agg.totals.rebounds),
+          assists: round(agg.totals.assists),
+          steals: round(agg.totals.steals),
+          blocks: round(agg.totals.blocks),
+          fgm: round(agg.totals.fgm),
+          fga: round(agg.totals.fga),
+          fg3m: round(agg.totals.fg3m),
+          fg3a: round(agg.totals.fg3a),
+          ftm: round(agg.totals.ftm),
+          fta: round(agg.totals.fta),
+        },
+      };
+    });
+
+    return {
+      id: player.id,
+      name: `${player.firstName} ${player.lastName}`.trim(),
+      firstName: player.firstName,
+      lastName: player.lastName,
+      photo: player.photo ?? null,
+      position: player.position ?? null,
+      height: player.height ?? null,
+      nationality: player.nationality ?? null,
+      currentTeam,
+      jerseyNumber,
+      tournaments: seasonLines,
+    };
   }
 }

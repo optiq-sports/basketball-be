@@ -2,7 +2,11 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { MatchesService } from "./matches.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MatchStatus, Role } from "@prisma/client";
-import { NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
 import { AuthenticatedUser } from "src/common/interfaces/user.interface";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 
@@ -140,7 +144,28 @@ describe("MatchesService", () => {
 
       const result = await service.create(createDto, mockUser);
       expect(result).toEqual({ id: "match1" });
-      expect(mockPrismaService.match.create).toHaveBeenCalled();
+      expect(mockPrismaService.match.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            matchKey: expect.stringMatching(
+              /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/,
+            ),
+          }),
+        }),
+      );
+    });
+
+    it("should throw ConflictException if custom matchKey is already taken", async () => {
+      mockPrismaService.tournament.findFirst.mockResolvedValue({});
+      mockPrismaService.team.findUnique.mockResolvedValue({});
+      mockPrismaService.tournamentTeam.findUnique.mockResolvedValue({});
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "existing_match",
+      });
+
+      await expect(
+        service.create({ ...createDto, matchKey: "TAKENKEY" }, mockUser),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -367,8 +392,16 @@ describe("MatchesService", () => {
         });
 
       mockPrismaService.user.findMany.mockResolvedValueOnce([
-        { id: "b-1" },
-        { id: "b-2" },
+        {
+          id: "b-1",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-1" }],
+        },
+        {
+          id: "b-2",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-1" }],
+        },
       ]);
 
       const result = await service.assignBroadcasters(
@@ -401,43 +434,62 @@ describe("MatchesService", () => {
       expect(result.id).toBe("m-1");
     });
 
-    it("should throw BadRequestException if one or more broadcaster IDs are invalid", async () => {
+    it("should throw BadRequestException naming failed IDs and reasons if invalid", async () => {
       mockPrismaService.match.findFirst.mockResolvedValueOnce({
         id: "m-1",
         clientId: "client-1",
         broadcasters: [],
       });
 
-      mockPrismaService.user.findMany.mockResolvedValueOnce([{ id: "b-1" }]); // b-2 missing or not BROADCASTER
+      mockPrismaService.user.findMany.mockResolvedValueOnce([
+        {
+          id: "b-1",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-1" }],
+        },
+        {
+          id: "b-admin",
+          role: Role.ADMIN,
+          clientUsers: [{ clientId: "client-1" }],
+        },
+      ]); // b-missing not found, b-admin not a broadcaster
 
       await expect(
-        service.assignBroadcasters("m-1", ["b-1", "b-2"], mockUser),
-      ).rejects.toThrow(BadRequestException);
+        service.assignBroadcasters(
+          "m-1",
+          ["b-1", "b-admin", "b-missing"],
+          mockUser,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "One or more broadcaster IDs are invalid: b-admin (not a broadcaster), b-missing (not found)",
+        ),
+      );
     });
 
-    it("should refuse broadcaster not linked to match client", async () => {
+    it("should refuse broadcaster not linked to match client and name the ID", async () => {
       mockPrismaService.match.findFirst.mockResolvedValueOnce({
         id: "m-1",
         clientId: "client-1",
         broadcasters: [],
       });
 
-      // User exists and is broadcaster, but not returned because not linked to client-1
-      mockPrismaService.user.findMany.mockResolvedValueOnce([]);
+      // User exists and is broadcaster, but linked to client-2
+      mockPrismaService.user.findMany.mockResolvedValueOnce([
+        {
+          id: "b-other-client",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-2" }],
+        },
+      ]);
 
       await expect(
         service.assignBroadcasters("m-1", ["b-other-client"], mockUser),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.user.findMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: ["b-other-client"] },
-          role: Role.BROADCASTER,
-          clientUsers: {
-            some: { clientId: "client-1" },
-          },
-        },
-        select: { id: true },
-      });
+      ).rejects.toThrow(
+        new BadRequestException(
+          "One or more broadcaster IDs are invalid: b-other-client (other client)",
+        ),
+      );
     });
   });
 
@@ -546,7 +598,6 @@ describe("MatchesService", () => {
                           mode: "insensitive",
                         },
                       },
-                      { id: "m-assigned-stat" },
                     ],
                   },
                 ],
@@ -594,6 +645,14 @@ describe("MatchesService", () => {
 
       await expect(
         service.findOne("m-assigned-to-other", statisticianUser),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should refuse statistician outside client from opening unassigned match by id", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.findOne("unassigned_cuid_from_other_client", statisticianUser),
       ).rejects.toThrow(NotFoundException);
     });
   });

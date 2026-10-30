@@ -28,4 +28,16 @@ export class CreateEmbedTokenDto {
   @IsOptional()
   @IsString()
   clientId?: string;
+
+  @ApiProperty({
+    example: ["advanced_analytics"],
+    required: false,
+    description:
+      "Scopes granted to this embed token (e.g. 'advanced_analytics')",
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scopes?: string[];
 }
