@@ -3,7 +3,11 @@ import { StatisticianService } from "./statistician.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { Role } from "@prisma/client";
-import { ConflictException, ForbiddenException } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 
 describe("StatisticianService", () => {
@@ -25,6 +29,9 @@ describe("StatisticianService", () => {
     },
     clientUser: {
       create: jest.fn(),
+    },
+    client: {
+      findUnique: jest.fn().mockResolvedValue({ id: "client-kaduna" }),
     },
     $transaction: jest
       .fn()
@@ -189,6 +196,29 @@ describe("StatisticianService", () => {
           adminUser,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should throw NotFoundException if target clientId does not exist", async () => {
+      mockPrismaService.user.findUnique.mockResolvedValueOnce(null);
+      mockPrismaService.client.findUnique.mockResolvedValueOnce(null);
+
+      const superAdmin: AuthenticatedUser = {
+        id: "super-1",
+        email: "super@example.com",
+        role: Role.SUPER_ADMIN,
+      };
+
+      await expect(
+        service.create(
+          {
+            email: "stat-unknown-client@example.com",
+            firstName: "Alex",
+            lastName: "Smith",
+            clientId: "unknown-client-id",
+          },
+          superAdmin,
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it("should allow SUPER_ADMIN to link to any client", async () => {

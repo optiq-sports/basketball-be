@@ -31,6 +31,8 @@ describe("ClientApiController", () => {
             getTournamentDetails: jest.fn(),
             getTournamentStandings: jest.fn(),
             getTournamentLeaders: jest.fn(),
+            getTimeline: jest.fn(),
+            getPlayerCard: jest.fn(),
           },
         },
         {
@@ -204,5 +206,26 @@ describe("ClientApiController", () => {
       );
       done();
     });
+  });
+
+  it("should get timeline for match session", async () => {
+    const expectedTimeline = [{ sequence: 1, eventType: "shot" }];
+    (service.getTimeline as jest.Mock).mockResolvedValue(expectedTimeline);
+
+    const result = await controller.getTimeline(mockRequest, "match_1");
+    expect(result).toBe(expectedTimeline);
+    expect(service.getTimeline).toHaveBeenCalledWith("client_id_1", "match_1");
+  });
+
+  it("should get player card for client player", async () => {
+    const expectedCard = { id: "player_1", name: "LeBron James" };
+    (service.getPlayerCard as jest.Mock).mockResolvedValue(expectedCard);
+
+    const result = await controller.getPlayerCard(mockRequest, "player_1");
+    expect(result).toBe(expectedCard);
+    expect(service.getPlayerCard).toHaveBeenCalledWith(
+      "client_id_1",
+      "player_1",
+    );
   });
 });

@@ -3,7 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from "@nestjs/common";
+import { generateMatchKey } from "./utils/match-key.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateMatchDto } from "./dto/create-match.dto";
 import { UpdateMatchDto } from "./dto/update-match.dto";
@@ -94,9 +96,31 @@ export class MatchesService {
       );
     }
 
-    const matchKey =
-      createMatchDto.matchKey?.trim().toUpperCase() ||
-      Math.random().toString(36).substring(2, 10).toUpperCase();
+    let matchKey: string;
+    if (createMatchDto.matchKey?.trim()) {
+      const customKey = createMatchDto.matchKey.trim().toUpperCase();
+      const existing = await this.prisma.match.findFirst({
+        where: { matchKey: { equals: customKey, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `Match key "${customKey}" is already taken`,
+        );
+      }
+      matchKey = customKey;
+    } else {
+      let candidate = generateMatchKey(8);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const existing = await this.prisma.match.findFirst({
+          where: { matchKey: candidate },
+          select: { id: true },
+        });
+        if (!existing) break;
+        candidate = generateMatchKey(8);
+      }
+      matchKey = candidate;
+    }
 
     return this.prisma.match.create({
       data: {
@@ -297,7 +321,7 @@ export class MatchesService {
     const idFilter: Prisma.MatchWhereInput = {
       OR: [
         { id: normalizedId },
-        // { matchKey: { equals: normalizedId, mode: "insensitive" } },
+        { matchKey: { equals: normalizedId, mode: "insensitive" } },
       ],
     };
 
@@ -335,7 +359,6 @@ export class MatchesService {
                       ]
                     : []),
                   { matchKey: { equals: normalizedId, mode: "insensitive" } },
-                  { id: normalizedId },
                 ],
               },
             ],
@@ -593,22 +616,38 @@ export class MatchesService {
     }
 
     if (broadcasterIds.length > 0) {
-      const validBroadcasters = await this.prisma.user.findMany({
+      const users = await this.prisma.user.findMany({
         where: {
           id: { in: broadcasterIds },
-          role: Role.BROADCASTER,
+        },
+        select: {
+          id: true,
+          role: true,
           clientUsers: {
-            some: {
-              clientId: existingMatch.clientId,
-            },
+            select: { clientId: true },
           },
         },
-        select: { id: true },
       });
 
-      if (validBroadcasters.length !== broadcasterIds.length) {
+      const userMap = new Map(users.map((u) => [u.id, u]));
+      const failures: string[] = [];
+
+      for (const bId of broadcasterIds) {
+        const u = userMap.get(bId);
+        if (!u) {
+          failures.push(`${bId} (not found)`);
+        } else if (u.role !== Role.BROADCASTER) {
+          failures.push(`${bId} (not a broadcaster)`);
+        } else if (
+          !u.clientUsers.some((cu) => cu.clientId === existingMatch.clientId)
+        ) {
+          failures.push(`${bId} (other client)`);
+        }
+      }
+
+      if (failures.length > 0) {
         throw new BadRequestException(
-          "One or more broadcaster IDs are invalid, not broadcasters, or not linked to the match's client",
+          `One or more broadcaster IDs are invalid: ${failures.join(", ")}`,
         );
       }
     }

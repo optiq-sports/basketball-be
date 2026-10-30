@@ -142,6 +142,12 @@ export class ClientEmbedTokenResponseDto {
   })
   allowedOrigins: string[];
 
+  @ApiProperty({
+    example: ["advanced_analytics"],
+    type: [String],
+  })
+  scopes: string[];
+
   @ApiProperty({ example: true })
   isActive: boolean;
 

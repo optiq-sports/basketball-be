@@ -27,6 +27,9 @@ describe("StatdashSessionsService", () => {
     tournament: {
       findUnique: jest.fn(),
     },
+    clientUser: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     gameSession: {
       findUnique: jest.fn(),
       upsert: jest.fn(),
@@ -266,6 +269,9 @@ describe("StatdashSessionsService", () => {
 
   it("claims unassigned match when bootstrapping by sessionId for statistician", async () => {
     redisService.getSessionSnapshotCached.mockResolvedValue(null);
+    prismaService.clientUser.findMany.mockResolvedValueOnce([
+      { clientId: "client_kaduna" },
+    ]);
     prismaService.gameSession.findUnique.mockResolvedValue({
       id: "session_2",
       matchId: "match_cuid_3",
@@ -274,6 +280,7 @@ describe("StatdashSessionsService", () => {
       status: GameSessionStatus.IN_PROGRESS,
       match: {
         id: "match_cuid_3",
+        clientId: "client_kaduna",
         statisticianId: null,
       },
     });
@@ -295,6 +302,24 @@ describe("StatdashSessionsService", () => {
       data: { statisticianId: "stat_irene" },
     });
     expect(result.sessionId).toBe("session_2");
+  });
+
+  it("refuses to bootstrap/claim unassigned match by id for statistician outside client", async () => {
+    redisService.getSessionSnapshotCached.mockResolvedValue(null);
+    prismaService.gameSession.findUnique.mockResolvedValue(null);
+    prismaService.match.findFirst.mockResolvedValueOnce({
+      id: "match_cuid_foreign",
+      matchKey: "KEY12345",
+      clientId: "client_foreign",
+      statisticianId: null,
+      homeScore: 0,
+      awayScore: 0,
+    });
+    prismaService.clientUser.findMany.mockResolvedValueOnce([]);
+
+    await expect(
+      service.bootstrap({ matchId: "match_cuid_foreign" }, "stat_outside"),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it("starts a pending session", async () => {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../common/redis/redis.service";
@@ -32,6 +32,8 @@ type ProjectionTotals = {
 
 @Injectable()
 export class StatdashProjectionsService {
+  private readonly logger = new Logger(StatdashProjectionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
@@ -1405,30 +1407,65 @@ export class StatdashProjectionsService {
 
   private async syncMatchStatsFromBoxScore(
     matchId: string,
-    players: Record<string, ProjectionTotals & { playerId: string }>,
+    players: Record<
+      string,
+      ProjectionTotals & { playerId: string; teamId?: string | null }
+    >,
   ) {
     const entries = Object.values(players);
     if (entries.length === 0) return;
 
     const playerIds = entries.map((entry) => entry.playerId);
-    const matchPlayers = await this.prisma.matchPlayer.findMany({
-      where: {
-        matchId,
-        playerId: { in: playerIds },
-      },
-      select: {
-        playerId: true,
-        teamId: true,
-      },
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: { homeTeamId: true, awayTeamId: true },
     });
+
+    const matchPlayers =
+      (await this.prisma.matchPlayer.findMany({
+        where: {
+          matchId,
+          playerId: { in: playerIds },
+        },
+        select: {
+          playerId: true,
+          teamId: true,
+        },
+      })) ?? [];
     const playerToTeam = new Map<string, string>();
     for (const row of matchPlayers) {
       playerToTeam.set(row.playerId, row.teamId);
     }
 
+    const fallbackPlayerTeams = match
+      ? ((await this.prisma.playerTeam.findMany({
+          where: {
+            playerId: { in: playerIds },
+            teamId: { in: [match.homeTeamId, match.awayTeamId] },
+          },
+          select: {
+            playerId: true,
+            teamId: true,
+          },
+        })) ?? [])
+      : [];
+    const fallbackMap = new Map<string, string>();
+    for (const pt of fallbackPlayerTeams) {
+      fallbackMap.set(pt.playerId, pt.teamId);
+    }
+
     for (const entry of entries) {
-      const teamId = playerToTeam.get(entry.playerId);
-      if (!teamId) continue;
+      const teamId =
+        entry.teamId ||
+        playerToTeam.get(entry.playerId) ||
+        fallbackMap.get(entry.playerId);
+
+      if (!teamId) {
+        this.logger.warn(
+          `Player ${entry.playerId} in match ${matchId} has no associated team; skipping MatchStat sync.`,
+        );
+        continue;
+      }
 
       await this.prisma.matchStat.upsert({
         where: {

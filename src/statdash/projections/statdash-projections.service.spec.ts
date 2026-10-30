@@ -29,6 +29,10 @@ describe("StatdashProjectionsService", () => {
     },
     match: {
       update: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    playerTeam: {
+      findMany: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -830,6 +834,155 @@ describe("StatdashProjectionsService", () => {
       await expect(
         service.getBoxScore("sess_other", statisticianUser),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("syncMatchStatsFromBoxScore (Item 42)", () => {
+    it("syncs stats using teamId from box score line directly", async () => {
+      prisma.match.findUnique.mockResolvedValueOnce({
+        homeTeamId: "team_home",
+        awayTeamId: "team_away",
+      });
+      prisma.matchPlayer.findMany.mockResolvedValueOnce([]);
+
+      const syncFn = (
+        service as unknown as {
+          syncMatchStatsFromBoxScore: (
+            matchId: string,
+            players: Record<string, unknown>,
+          ) => Promise<void>;
+        }
+      ).syncMatchStatsFromBoxScore.bind(service);
+
+      await syncFn("match_1", {
+        p1: {
+          playerId: "p1",
+          teamId: "team_home",
+          points: 15,
+          rebounds: 5,
+          assists: 3,
+          blocks: 0,
+          steals: 1,
+          fouls: 2,
+          turnovers: 1,
+          fga: 10,
+          fgm: 6,
+          fg3a: 2,
+          fg3m: 1,
+          twoPa: 8,
+          twoPm: 5,
+          threePa: 2,
+          threePm: 1,
+          fta: 2,
+          ftm: 2,
+          oreb: 1,
+          dreb: 4,
+          plusMinus: 5,
+          eff: 18,
+          secondsPlayed: 1200,
+        },
+      });
+
+      expect(prisma.matchStat.upsert).toHaveBeenCalledWith({
+        where: {
+          matchId_playerId_teamId: {
+            matchId: "match_1",
+            playerId: "p1",
+            teamId: "team_home",
+          },
+        },
+        update: expect.objectContaining({ points: 15 }),
+        create: expect.objectContaining({ points: 15, teamId: "team_home" }),
+      });
+    });
+
+    it("falls back to player's PlayerTeam when box score line has no teamId", async () => {
+      prisma.match.findUnique.mockResolvedValueOnce({
+        homeTeamId: "team_home",
+        awayTeamId: "team_away",
+      });
+      prisma.matchPlayer.findMany.mockResolvedValueOnce([]);
+      prisma.playerTeam.findMany.mockResolvedValueOnce([
+        { playerId: "p2", teamId: "team_away" },
+      ]);
+
+      const syncFn = (
+        service as unknown as {
+          syncMatchStatsFromBoxScore: (
+            matchId: string,
+            players: Record<string, unknown>,
+          ) => Promise<void>;
+        }
+      ).syncMatchStatsFromBoxScore.bind(service);
+
+      await syncFn("match_1", {
+        p2: {
+          playerId: "p2",
+          points: 10,
+          rebounds: 4,
+          assists: 2,
+          blocks: 1,
+          steals: 0,
+          fouls: 1,
+          turnovers: 0,
+          fga: 8,
+          fgm: 4,
+          fg3a: 0,
+          fg3m: 0,
+          twoPa: 8,
+          twoPm: 4,
+          threePa: 0,
+          threePm: 0,
+          fta: 2,
+          ftm: 2,
+          oreb: 2,
+          dreb: 2,
+          plusMinus: -3,
+          eff: 12,
+          secondsPlayed: 1000,
+        },
+      });
+
+      expect(prisma.matchStat.upsert).toHaveBeenCalledWith({
+        where: {
+          matchId_playerId_teamId: {
+            matchId: "match_1",
+            playerId: "p2",
+            teamId: "team_away",
+          },
+        },
+        update: expect.objectContaining({ points: 10 }),
+        create: expect.objectContaining({ points: 10, teamId: "team_away" }),
+      });
+    });
+
+    it("logs a warning and skips when player is found in neither", async () => {
+      prisma.match.findUnique.mockResolvedValueOnce({
+        homeTeamId: "team_home",
+        awayTeamId: "team_away",
+      });
+      prisma.matchPlayer.findMany.mockResolvedValueOnce([]);
+      prisma.playerTeam.findMany.mockResolvedValueOnce([]);
+
+      const syncFn = (
+        service as unknown as {
+          syncMatchStatsFromBoxScore: (
+            matchId: string,
+            players: Record<string, unknown>,
+          ) => Promise<void>;
+        }
+      ).syncMatchStatsFromBoxScore.bind(service);
+
+      prisma.matchStat.upsert.mockClear();
+
+      await syncFn("match_1", {
+        p_unknown: {
+          playerId: "p_unknown",
+          points: 5,
+        },
+      });
+
+      expect(prisma.matchStat.upsert).not.toHaveBeenCalled();
     });
   });
 });

@@ -87,6 +87,9 @@ export class ClientMatchDto {
   @ApiPropertyOptional({ example: "Madison Square Garden", nullable: true })
   venue: string | null;
 
+  @ApiPropertyOptional({ example: "FINAL", nullable: true })
+  stage?: string | null;
+
   @ApiProperty({ type: ClientMatchTeamDto })
   homeTeam: ClientMatchTeamDto;
 
@@ -244,6 +247,9 @@ export class ClientTournamentTeamSummaryDto {
   @ApiProperty({ nullable: true })
   logo: string | null;
 
+  @ApiPropertyOptional({ example: "#552583", nullable: true })
+  color?: string | null;
+
   @ApiProperty({ example: "Group A", nullable: true })
   group: string | null;
 }
@@ -295,6 +301,9 @@ export class ClientStandingDto {
 
   @ApiProperty({ example: "W3" })
   streak: string;
+
+  @ApiPropertyOptional({ example: "Group A", nullable: true })
+  group?: string | null;
 }
 
 export enum LeaderCategory {
@@ -305,6 +314,7 @@ export enum LeaderCategory {
   BLOCKS = "blocks",
   TURNOVERS = "turnovers",
   FG3M = "fg3m",
+  ALL = "all",
 }
 
 export class ClientLeadersQueryDto {
@@ -313,7 +323,7 @@ export class ClientLeadersQueryDto {
     enum: LeaderCategory,
     required: false,
     description:
-      "Stat category: points, rebounds, assists, steals, blocks, turnovers, fg3m",
+      "Stat category: points, rebounds, assists, steals, blocks, turnovers, fg3m, or all",
   })
   @IsOptional()
   @IsIn([
@@ -324,8 +334,9 @@ export class ClientLeadersQueryDto {
     "blocks",
     "turnovers",
     "fg3m",
+    "all",
   ])
-  category?: LeaderCategory;
+  category?: LeaderCategory | "all";
 
   @ApiProperty({
     example: 10,
@@ -376,4 +387,166 @@ export class ClientLeaderDto {
 
   @ApiProperty({ example: 28.0 })
   perGameValue: number;
+}
+
+export class ClientAllLeadersDto {
+  @ApiProperty({ type: [ClientLeaderDto] })
+  points: ClientLeaderDto[];
+
+  @ApiProperty({ type: [ClientLeaderDto] })
+  rebounds: ClientLeaderDto[];
+
+  @ApiProperty({ type: [ClientLeaderDto] })
+  assists: ClientLeaderDto[];
+
+  @ApiProperty({ type: [ClientLeaderDto] })
+  steals: ClientLeaderDto[];
+
+  @ApiProperty({ type: [ClientLeaderDto] })
+  blocks: ClientLeaderDto[];
+
+  @ApiProperty({ type: [ClientLeaderDto] })
+  turnovers: ClientLeaderDto[];
+
+  @ApiProperty({ type: [ClientLeaderDto] })
+  fg3m: ClientLeaderDto[];
+}
+
+export class ClientTimelineEventDto {
+  @ApiProperty({ example: 1 })
+  sequence: number;
+
+  @ApiProperty({ example: 1 })
+  period: number;
+
+  @ApiProperty({ example: 680 })
+  clockSecondsRemaining: number;
+
+  @ApiProperty({ example: "shot" })
+  eventType: string;
+
+  @ApiProperty({ example: 2 })
+  homeScore: number;
+
+  @ApiProperty({ example: 0 })
+  awayScore: number;
+
+  @ApiProperty({ example: {} })
+  payload: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    example: "LeBron James made 2pt shot",
+    nullable: true,
+  })
+  description?: string;
+}
+
+export class ClientPlayerCurrentTeamDto {
+  @ApiProperty({ example: "team_123" })
+  id: string;
+
+  @ApiProperty({ example: "Lakers" })
+  name: string;
+
+  @ApiProperty({ example: "LAL" })
+  code: string;
+
+  @ApiPropertyOptional({
+    example: "https://example.com/logo.png",
+    nullable: true,
+  })
+  logo?: string | null;
+
+  @ApiPropertyOptional({ example: "#552583", nullable: true })
+  color?: string | null;
+}
+
+export class ClientPlayerStatMetricsDto {
+  @ApiProperty({ example: 25 })
+  points: number;
+
+  @ApiProperty({ example: 8 })
+  rebounds: number;
+
+  @ApiProperty({ example: 7 })
+  assists: number;
+
+  @ApiProperty({ example: 2 })
+  steals: number;
+
+  @ApiProperty({ example: 1 })
+  blocks: number;
+
+  @ApiProperty({ example: 10 })
+  fgm: number;
+
+  @ApiProperty({ example: 18 })
+  fga: number;
+
+  @ApiProperty({ example: 3 })
+  fg3m: number;
+
+  @ApiProperty({ example: 7 })
+  fg3a: number;
+
+  @ApiProperty({ example: 2 })
+  ftm: number;
+
+  @ApiProperty({ example: 3 })
+  fta: number;
+}
+
+export class ClientPlayerSeasonLineDto {
+  @ApiProperty({ example: "tourney_123" })
+  tournamentId: string;
+
+  @ApiProperty({ example: "Summer League 2026" })
+  tournamentName: string;
+
+  @ApiProperty({ example: 10 })
+  gamesPlayed: number;
+
+  @ApiProperty({ type: ClientPlayerStatMetricsDto })
+  totals: ClientPlayerStatMetricsDto;
+
+  @ApiProperty({ type: ClientPlayerStatMetricsDto })
+  averages: ClientPlayerStatMetricsDto;
+}
+
+export class ClientPlayerCardDto {
+  @ApiProperty({ example: "player_123" })
+  id: string;
+
+  @ApiProperty({ example: "LeBron James" })
+  name: string;
+
+  @ApiProperty({ example: "LeBron" })
+  firstName: string;
+
+  @ApiProperty({ example: "James" })
+  lastName: string;
+
+  @ApiPropertyOptional({
+    example: "https://example.com/photo.jpg",
+    nullable: true,
+  })
+  photo: string | null;
+
+  @ApiPropertyOptional({ example: "Forward", nullable: true })
+  position: string | null;
+
+  @ApiPropertyOptional({ example: "6'9\"", nullable: true })
+  height: string | null;
+
+  @ApiPropertyOptional({ example: "USA", nullable: true })
+  nationality: string | null;
+
+  @ApiPropertyOptional({ type: ClientPlayerCurrentTeamDto, nullable: true })
+  currentTeam: ClientPlayerCurrentTeamDto | null;
+
+  @ApiPropertyOptional({ example: 23, nullable: true })
+  jerseyNumber: number | null;
+
+  @ApiProperty({ type: [ClientPlayerSeasonLineDto] })
+  tournaments: ClientPlayerSeasonLineDto[];
 }

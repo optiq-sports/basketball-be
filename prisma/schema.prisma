@@ -495,6 +495,7 @@ model ClientEmbedToken {
   tokenHash      String    @unique @map("token_hash")
   tokenPrefix    String    @map("token_prefix")
   allowedOrigins String[]  @map("allowed_origins")
+  scopes         String[]  @default([]) @map("scopes")
   isActive       Boolean   @default(true) @map("is_active")
   revokedAt      DateTime? @map("revoked_at")
   lastUsedAt     DateTime? @map("last_used_at")

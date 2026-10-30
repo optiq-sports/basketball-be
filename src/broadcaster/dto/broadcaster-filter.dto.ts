@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsIn, IsOptional } from "class-validator";
+import { IsEnum, IsIn, IsOptional, IsString } from "class-validator";
 import { UserStatus } from "@prisma/client";
 import { PaginationQueryDto } from "../../common/dto/pagination-query.dto";
 
@@ -14,6 +14,14 @@ export const BROADCASTER_SORT_FIELDS = [
 export type BroadcasterSortField = (typeof BROADCASTER_SORT_FIELDS)[number];
 
 export class BroadcasterFilterDto extends PaginationQueryDto {
+  @ApiPropertyOptional({
+    description: "Filter broadcasters by client ID",
+    example: "client_123",
+  })
+  @IsOptional()
+  @IsString()
+  clientId?: string;
+
   @ApiPropertyOptional({
     enum: UserStatus,
     description: "Filter by user status",

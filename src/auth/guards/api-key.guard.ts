@@ -73,6 +73,7 @@ export class ApiKeyGuard implements CanActivate {
         clientIds: [embedToken.clientId],
         role: "EXTERNAL_CLIENT",
         tokenType: "EMBED_TOKEN",
+        scopes: embedToken.scopes ?? [],
       };
 
       this.prisma.clientEmbedToken

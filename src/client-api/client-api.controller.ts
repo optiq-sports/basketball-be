@@ -27,7 +27,10 @@ import {
   ClientTournamentDetailDto,
   ClientStandingDto,
   ClientLeaderDto,
+  ClientAllLeadersDto,
   ClientLeadersQueryDto,
+  ClientTimelineEventDto,
+  ClientPlayerCardDto,
 } from "./dto/client-api.dto";
 import { BoxScoreResponseDto } from "../statdash/projections/dto/statdash-projection-responses.dto";
 import { AppErrorResponse } from "../common/decorators/api-errors.decorator";
@@ -118,6 +121,43 @@ export class ClientApiController {
   ) {
     const authorizedClientId = this.getAuthorizedClientId(req, clientId);
     return this.clientApiService.getTeamDetails(authorizedClientId, teamId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Players
+  // ---------------------------------------------------------------------------
+
+  @Get("players/:playerId")
+  @ApiOperation({
+    summary: "Get player card and season lines for a specific player",
+  })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: ClientPlayerCardDto })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/players/:playerId",
+    "Invalid or missing API key",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/v1/client/players/:playerId",
+    "Player not found in client tournaments",
+  )
+  getPlayerCard(
+    @Req() req: AppRequest,
+    @Param("playerId") playerId: string,
+    @Query("clientId") clientId?: string,
+  ) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getPlayerCard(authorizedClientId, playerId);
   }
 
   // ---------------------------------------------------------------------------
@@ -219,7 +259,11 @@ export class ClientApiController {
     required: false,
     description: "Optional client ID. Defaults to assigned client.",
   })
-  @ApiResponse({ status: 200, type: [ClientLeaderDto] })
+  @ApiResponse({
+    status: 200,
+    type: [ClientLeaderDto],
+    description: "Returns list of leaders, or all categories if category=all",
+  })
   @AppErrorResponse(
     401,
     "Unauthorized",
@@ -343,6 +387,37 @@ export class ClientApiController {
   ) {
     const authorizedClientId = this.getAuthorizedClientId(req, clientId);
     return this.clientApiService.getBoxScore(authorizedClientId, matchId);
+  }
+
+  @Get("matches/:matchId/timeline")
+  @ApiOperation({ summary: "Get play-by-play timeline for a match session" })
+  @ApiQuery({
+    name: "clientId",
+    required: false,
+    description: "Optional client ID. Defaults to assigned client.",
+  })
+  @ApiResponse({ status: 200, type: [ClientTimelineEventDto] })
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "GET",
+    "/api/v1/client/matches/:matchId/timeline",
+    "Invalid or missing API key",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "GET",
+    "/api/v1/client/matches/:matchId/timeline",
+    "Match session not found",
+  )
+  getTimeline(
+    @Req() req: AppRequest,
+    @Param("matchId") matchId: string,
+    @Query("clientId") clientId?: string,
+  ) {
+    const authorizedClientId = this.getAuthorizedClientId(req, clientId);
+    return this.clientApiService.getTimeline(authorizedClientId, matchId);
   }
 
   @Get("matches/:matchId/shot-chart")

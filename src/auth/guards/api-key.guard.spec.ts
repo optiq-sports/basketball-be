@@ -219,6 +219,45 @@ describe("ApiKeyGuard", () => {
         clientIds: ["client_1"],
         role: "EXTERNAL_CLIENT",
         tokenType: "EMBED_TOKEN",
+        scopes: [],
+      });
+    });
+
+    it("should assign scopes to request.user when embed token has scopes", async () => {
+      const mockRequest = {
+        headers: {
+          "x-embed-token": "emb_token_123",
+          origin: "https://myclub.com",
+        },
+        query: {},
+        user: undefined as unknown,
+      };
+
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => mockRequest,
+        }),
+      } as unknown as ExecutionContext;
+
+      (
+        prismaService.clientEmbedToken.findUnique as jest.Mock
+      ).mockResolvedValue({
+        id: "emb_1",
+        clientId: "client_1",
+        allowedOrigins: ["https://myclub.com"],
+        scopes: ["advanced_analytics"],
+        isActive: true,
+        revokedAt: null,
+        client: { isActive: true },
+      });
+
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(mockRequest.user).toEqual({
+        clientIds: ["client_1"],
+        role: "EXTERNAL_CLIENT",
+        tokenType: "EMBED_TOKEN",
+        scopes: ["advanced_analytics"],
       });
     });
 
