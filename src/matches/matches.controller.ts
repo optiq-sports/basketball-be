@@ -18,12 +18,11 @@ import { AssignBroadcastersDto } from "./dto/assign-broadcasters.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { Role, MatchStatus } from "@prisma/client";
+import { Role } from "@prisma/client";
 import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
@@ -216,6 +215,13 @@ export class MatchesController {
     "PATCH",
     "/api/matches/:id",
     "Match not found",
+  )
+  @AppErrorResponse(
+    409,
+    "Conflict",
+    "PATCH",
+    "/api/matches/:id",
+    "Match key is already taken",
   )
   update(
     @Param("id") id: string,

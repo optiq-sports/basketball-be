@@ -287,6 +287,44 @@ describe("MatchesService", () => {
         }),
       );
     });
+
+    it("should throw ConflictException if matchKey is already taken by another match", async () => {
+      mockPrismaService.match.findFirst
+        .mockResolvedValueOnce({
+          id: "m1",
+          matchKey: "OLD_KEY",
+        })
+        .mockResolvedValueOnce({
+          id: "m2",
+          matchKey: "TAKEN_KEY",
+        });
+
+      await expect(
+        service.update("m1", { matchKey: "TAKEN_KEY" }, mockUser),
+      ).rejects.toThrow(
+        new ConflictException('Match key "TAKEN_KEY" is already taken'),
+      );
+    });
+
+    it("should allow updating match with custom matchKey when available", async () => {
+      mockPrismaService.match.findFirst
+        .mockResolvedValueOnce({
+          id: "m1",
+          matchKey: "OLD_KEY",
+        })
+        .mockResolvedValueOnce(null);
+      mockPrismaService.match.update.mockResolvedValue({
+        id: "m1",
+        matchKey: "NEW_KEY",
+      });
+
+      await service.update("m1", { matchKey: "new_key" }, mockUser);
+      expect(mockPrismaService.match.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ matchKey: "NEW_KEY" }),
+        }),
+      );
+    });
   });
 
   describe("remove", () => {

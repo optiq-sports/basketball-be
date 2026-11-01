@@ -471,6 +471,27 @@ export class MatchesService {
       updateData.statisticianId = null;
     }
 
+    if (updateMatchDto.matchKey !== undefined) {
+      if (updateMatchDto.matchKey.trim()) {
+        const customKey = updateMatchDto.matchKey.trim().toUpperCase();
+        const existing = await this.prisma.match.findFirst({
+          where: {
+            matchKey: { equals: customKey, mode: "insensitive" },
+            id: { not: match.id },
+          },
+          select: { id: true },
+        });
+        if (existing) {
+          throw new ConflictException(
+            `Match key "${customKey}" is already taken`,
+          );
+        }
+        updateData.matchKey = customKey;
+      } else {
+        delete updateData.matchKey;
+      }
+    }
+
     if (updateMatchDto.scheduledDate) {
       updateData.scheduledDate = new Date(
         updateMatchDto.scheduledDate.endsWith("Z") ||
@@ -515,27 +536,44 @@ export class MatchesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.match.update({
-        where: { id: match.id },
-        data: updateData,
-        include: {
-          tournament: true,
-          homeTeam: true,
-          awayTeam: true,
-          statistician: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+      let updated;
+      try {
+        updated = await tx.match.update({
+          where: { id: match.id },
+          data: updateData,
+          include: {
+            tournament: true,
+            homeTeam: true,
+            awayTeam: true,
+            statistician: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            stats: {
+              include: {
+                player: true,
+              },
             },
           },
-          stats: {
-            include: {
-              player: true,
-            },
-          },
-        },
-      });
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const key =
+            (updateData.matchKey as string) || updateMatchDto.matchKey;
+          throw new ConflictException(
+            key
+              ? `Match key "${key}" is already taken`
+              : "Match key is already taken",
+          );
+        }
+        throw error;
+      }
 
       if (
         updateData.homeScore !== undefined ||

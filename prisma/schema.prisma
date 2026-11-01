@@ -132,7 +132,7 @@ model PlayerTeam {
   player       Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
   team         Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  @@unique([teamId, jerseyNumber])
+  @@index([teamId, jerseyNumber])
   @@index([teamId, isActive])
   @@index([playerId, teamId])
   @@map("player_team")
