@@ -10,4 +10,3 @@ export function generateMatchKey(length = 8): string {
   }
   return result;
 }
-

@@ -26,6 +26,7 @@ describe("PlayersService", () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -68,6 +69,15 @@ describe("PlayersService", () => {
     prisma = module.get<PrismaService>(PrismaService);
     deduplicationService = module.get<PlayerDeduplicationService>(
       PlayerDeduplicationService,
+    );
+
+    mockPrismaService.$transaction.mockImplementation(
+      async (callback: (tx: unknown) => Promise<unknown>) => {
+        if (typeof callback === "function") {
+          return callback(mockPrismaService);
+        }
+        return callback;
+      },
     );
   });
 
@@ -151,6 +161,8 @@ describe("PlayersService", () => {
           },
           playerTeam: {
             create: jest.fn().mockResolvedValue({}),
+            findFirst: jest.fn().mockResolvedValue(null),
+            update: jest.fn().mockResolvedValue({}),
           },
         });
       });
@@ -173,6 +185,69 @@ describe("PlayersService", () => {
 
       await expect(service.createForTeam(createDto)).rejects.toThrow(
         NotFoundException,
+      );
+    });
+
+    it("should allow reusing jersey number if previous player on team is inactive", async () => {
+      const createDto = {
+        teamId: "team1",
+        firstName: "Michael",
+        lastName: "Jordan",
+        jerseyNumber: 23,
+      };
+
+      mockPrismaService.team.findUnique.mockResolvedValue({
+        id: "team1",
+        name: "Bulls",
+      });
+      mockPrismaService.playerTeam.findFirst.mockResolvedValue(null);
+      mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
+        matchType: "NO_MATCH",
+      });
+
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        return callback({
+          player: {
+            create: jest.fn().mockResolvedValue({
+              id: "player2",
+              firstName: "Michael",
+              lastName: "Jordan",
+            }),
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
+          playerTeam: {
+            create: jest.fn().mockResolvedValue({
+              id: "pt2",
+              jerseyNumber: 23,
+              isActive: true,
+            }),
+            findFirst: jest.fn().mockResolvedValue(null),
+            update: jest.fn().mockResolvedValue({}),
+          },
+        });
+      });
+
+      const result = await service.createForTeam(createDto);
+      expect(result).toBeDefined();
+    });
+
+    it("should throw ConflictException if jersey number is taken by an active player", async () => {
+      const createDto = {
+        teamId: "team1",
+        firstName: "Michael",
+        lastName: "Jordan",
+        jerseyNumber: 23,
+      };
+
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team1" });
+      mockPrismaService.playerTeam.findFirst.mockResolvedValue({
+        id: "pt1",
+        jerseyNumber: 23,
+        isActive: true,
+      });
+
+      await expect(service.createForTeam(createDto)).rejects.toThrow(
+        new ConflictException("Jersey number 23 is already taken in this team"),
       );
     });
   });
@@ -205,6 +280,8 @@ describe("PlayersService", () => {
           },
           playerTeam: {
             create: jest.fn().mockResolvedValue({}),
+            findFirst: jest.fn().mockResolvedValue(null),
+            update: jest.fn().mockResolvedValue({}),
           },
         });
       });
@@ -582,6 +659,145 @@ describe("PlayersService", () => {
       await expect(
         service.processBulkUpload("invalid-team", { buffer: Buffer.from("") }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should refuse a row with no jersey number with error 'Jersey number missing' and create no player", async () => {
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team-1" });
+      const createdPlayers: Array<Record<string, unknown>> = [];
+      mockPrismaService.player.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => {
+          createdPlayers.push(data);
+          return Promise.resolve({ id: "p-test", ...data });
+        },
+      );
+
+      const wsData = [
+        ["First Name", "Last Name", "Position", "Date of Birth", "Jersey"],
+        ["John", "Doe", "PG", "15/08/2000", ""],
+      ];
+      const ws = xlsx.utils.aoa_to_sheet(wsData);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
+      const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const result = await service.processBulkUpload("team-1", { buffer });
+
+      expect(result.created).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toEqual({
+        row: 2,
+        error: "Jersey number missing",
+      });
+      expect(createdPlayers).toHaveLength(0);
+    });
+
+    it("should create no player if transaction fails when linking to team", async () => {
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team-1" });
+      mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
+        matchType: "NO_MATCH",
+      });
+      mockPrismaService.playerTeam.findFirst.mockResolvedValue(null);
+
+      mockPrismaService.$transaction.mockImplementation(async () => {
+        throw new Error("DB link failed");
+      });
+
+      const wsData = [
+        ["First Name", "Last Name", "Position", "Date of Birth", "Jersey"],
+        ["John", "Doe", "PG", "15/08/2000", 10],
+      ];
+      const ws = xlsx.utils.aoa_to_sheet(wsData);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
+      const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const result = await service.processBulkUpload("team-1", { buffer });
+
+      expect(result.created).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toEqual({
+        row: 2,
+        error: "DB link failed",
+      });
+    });
+
+    it("should allow reusing jersey number if previous player is inactive in bulk upload", async () => {
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team-1" });
+      mockPrismaService.playerTeam.findFirst.mockResolvedValue(null);
+      mockDeduplicationService.findDuplicatePlayer.mockResolvedValue({
+        matchType: "NO_MATCH",
+      });
+
+      const wsData = [
+        ["First Name", "Last Name", "Position", "Date of Birth", "Jersey"],
+        ["New", "Player", "PG", "15/08/2000", 23],
+      ];
+      const ws = xlsx.utils.aoa_to_sheet(wsData);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
+      const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const result = await service.processBulkUpload("team-1", { buffer });
+
+      expect(result.created).toBe(1);
+      expect(result.errors).toHaveLength(0);
+    });
+  });
+
+  describe("assignToTeam and removeFromTeam", () => {
+    it("should deactivate active playerTeam association on removeFromTeam", async () => {
+      mockPrismaService.playerTeam.updateMany.mockResolvedValue({ count: 1 });
+      await service.removeFromTeam("p1", "team1");
+      expect(mockPrismaService.playerTeam.updateMany).toHaveBeenCalledWith({
+        where: { playerId: "p1", teamId: "team1", isActive: true },
+        data: expect.objectContaining({ isActive: false }),
+      });
+    });
+
+    it("should allow assigning player to jersey number previously held by removed player", async () => {
+      mockPrismaService.player.findUnique.mockResolvedValue({
+        id: "p2",
+        firstName: "New",
+        lastName: "Player",
+      });
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team1" });
+      mockPrismaService.playerTeam.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockPrismaService.playerTeam.create.mockResolvedValue({
+        id: "pt2",
+        jerseyNumber: 10,
+        isActive: true,
+      });
+
+      const result = await service.assignToTeam("p2", "team1", 10);
+      expect(result).toBeDefined();
+      expect(mockPrismaService.playerTeam.create).toHaveBeenCalledWith({
+        data: {
+          playerId: "p2",
+          teamId: "team1",
+          jerseyNumber: 10,
+          isActive: true,
+        },
+      });
+    });
+
+    it("should throw ConflictException on assignToTeam if jersey is taken by active player", async () => {
+      mockPrismaService.player.findUnique.mockResolvedValue({
+        id: "p2",
+        firstName: "New",
+        lastName: "Player",
+      });
+      mockPrismaService.team.findUnique.mockResolvedValue({ id: "team1" });
+      mockPrismaService.playerTeam.findFirst.mockResolvedValue({
+        id: "pt1",
+        jerseyNumber: 10,
+        isActive: true,
+      });
+
+      await expect(service.assignToTeam("p2", "team1", 10)).rejects.toThrow(
+        new ConflictException("Jersey number 10 is already taken in this team"),
+      );
     });
   });
 
