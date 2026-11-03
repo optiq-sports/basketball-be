@@ -90,6 +90,7 @@ export function createCorsDelegate(
         credentials: false,
         methods: ["GET", "HEAD", "OPTIONS"],
         allowedHeaders: ALLOWED_HEADERS,
+        maxAge: 86400,
       });
     }
     callback(null, {
@@ -97,6 +98,7 @@ export function createCorsDelegate(
       credentials: true,
       methods: METHODS,
       allowedHeaders: ALLOWED_HEADERS,
+      maxAge: 86400,
     });
   };
 }

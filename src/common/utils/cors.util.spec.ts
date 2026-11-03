@@ -102,6 +102,7 @@ describe("CORS Utility", () => {
         expect(options?.credentials).toBe(false);
         expect(options?.methods).toEqual(["GET", "HEAD", "OPTIONS"]);
         expect(options?.allowedHeaders).toEqual(ALLOWED_HEADERS);
+        expect(options?.maxAge).toBe(86400);
         done();
       });
     });
@@ -121,6 +122,7 @@ describe("CORS Utility", () => {
         expect(options?.credentials).toBe(true);
         expect(options?.methods).toEqual(METHODS);
         expect(options?.allowedHeaders).toEqual(ALLOWED_HEADERS);
+        expect(options?.maxAge).toBe(86400);
         done();
       });
     });
@@ -196,6 +198,7 @@ describe("CORS Utility", () => {
         "https://portal.optiqsports.com",
       );
       expect(res.headers["access-control-allow-credentials"]).toBe("true");
+      expect(res.headers["access-control-max-age"]).toBe("86400");
     });
   });
 });
