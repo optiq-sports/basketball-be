@@ -420,4 +420,67 @@ describe("StatdashEventsService", () => {
       deltaEvents: [{ eventType: "reversal" }],
     });
   });
+
+  it("accepts a team rebound without on-court player validation and sets possessionTeamId", async () => {
+    redisService.getIdempotencyResultCached.mockResolvedValue(null);
+    tx.gameSession.findUnique.mockResolvedValue({
+      id: "session_1",
+      matchId: "match_1",
+      version: 1,
+      quarter: 1,
+      clockSecondsRemaining: 500,
+      homeScore: 10,
+      awayScore: 8,
+      match: { homeTeamId: "home_team", awayTeamId: "away_team" },
+    });
+    tx.idempotencyRecord.findUnique.mockResolvedValue(null);
+    tx.lineupState.findFirst.mockResolvedValue({
+      homeLineup: ["h1", "h2", "h3", "h4", "h5"],
+      awayLineup: ["a1", "a2", "a3", "a4", "a5"],
+    });
+    tx.gameEvent.aggregate.mockResolvedValue({ _max: { sequence: 1 } });
+    tx.gameEvent.create.mockResolvedValue({
+      id: "ge_team_reb",
+      sequence: 2,
+      eventType: "rebound",
+      period: 1,
+      clockSecondsRemaining: 500,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    tx.gameEvent.findMany.mockResolvedValue([]);
+    tx.gameSession.update.mockResolvedValue({
+      id: "session_1",
+      version: 2,
+      homeScore: 10,
+      awayScore: 8,
+      possessionTeamId: "away_team",
+    });
+    tx.idempotencyRecord.create.mockResolvedValue({});
+
+    await service.handleCommand(
+      {
+        sessionId: "session_1",
+        commandType: "rebound",
+        payload: {
+          teamId: "away_team",
+          teamRebound: true,
+          rebound: {
+            type: "defensive",
+          },
+        },
+        expectedVersion: 1,
+        idempotencyKey: "idem_team_reb",
+      },
+      "actor_1",
+    );
+
+    expect(tx.gameSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "session_1" },
+        data: expect.objectContaining({
+          possessionTeamId: "away_team",
+        }),
+      }),
+    );
+  });
 });

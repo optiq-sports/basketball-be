@@ -266,6 +266,73 @@ export class StatdashSessionsService {
     return this.bootstrap({ sessionId });
   }
 
+  async updateJerseyColors(
+    sessionId: string,
+    homeJerseyColor: string | null,
+    awayJerseyColor: string | null,
+    statisticianId?: string,
+  ) {
+    const hexColorRegex = /^#[0-9a-fA-F]{6}$/;
+    if (
+      homeJerseyColor !== null &&
+      homeJerseyColor !== undefined &&
+      (typeof homeJerseyColor !== "string" ||
+        !hexColorRegex.test(homeJerseyColor))
+    ) {
+      throw new BadRequestException({
+        code: "SD_SESSION_INVALID_JERSEY_COLOR",
+        message: "homeJerseyColor must be a #rrggbb hex string",
+      });
+    }
+    if (
+      awayJerseyColor !== null &&
+      awayJerseyColor !== undefined &&
+      (typeof awayJerseyColor !== "string" ||
+        !hexColorRegex.test(awayJerseyColor))
+    ) {
+      throw new BadRequestException({
+        code: "SD_SESSION_INVALID_JERSEY_COLOR",
+        message: "awayJerseyColor must be a #rrggbb hex string",
+      });
+    }
+
+    const session = await this.prisma.gameSession.findUnique({
+      where: { id: sessionId },
+      include: { match: true },
+    });
+    if (!session) {
+      throw new NotFoundException({
+        code: "SD_SESSION_NOT_FOUND",
+        message: "Session does not exist",
+      });
+    }
+
+    if (
+      statisticianId &&
+      session.match?.statisticianId !== undefined &&
+      session.match?.statisticianId !== null &&
+      session.match.statisticianId !== statisticianId
+    ) {
+      throw new ForbiddenException({
+        code: "SD_SESSION_MATCH_NOT_ASSIGNED",
+        message:
+          "This match is assigned to another statistician. You do not have permission to access it.",
+      });
+    }
+
+    await this.prisma.gameSession.update({
+      where: { id: sessionId },
+      data: {
+        homeJerseyColor: homeJerseyColor ?? null,
+        awayJerseyColor: awayJerseyColor ?? null,
+      },
+    });
+
+    await this.redisService.invalidateSessionSnapshotCache(sessionId);
+
+    return this.bootstrap({ sessionId }, statisticianId, true);
+  }
+
   async startSession(sessionId: string) {
     const session = await this.prisma.gameSession.findUnique({
       where: { id: sessionId },
@@ -457,6 +524,8 @@ export class StatdashSessionsService {
         homeOnLeft: session.homeOnLeft,
         homeAttacksLeft: session.homeAttacksLeft,
       },
+      homeJerseyColor: session.homeJerseyColor ?? null,
+      awayJerseyColor: session.awayJerseyColor ?? null,
       jumpBallWinnerTeamId: session.jumpBallWinnerTeamId,
       possessionTeamId: session.possessionTeamId,
       activeLineups: latestLineup ?? { homeLineup: null, awayLineup: null },

@@ -48,4 +48,74 @@ describe("validateCommandPayload", () => {
       }),
     ).toThrow(BadRequestException);
   });
+
+  it("accepts a player rebound payload", () => {
+    const result = validateCommandPayload("rebound", {
+      teamId: "team_1",
+      reboundPlayerId: "player_3",
+      rebound: {
+        type: "defensive",
+      },
+    });
+
+    expect(result).toEqual({
+      teamId: "team_1",
+      reboundPlayerId: "player_3",
+      rebound: {
+        type: "defensive",
+      },
+    });
+  });
+
+  it("accepts a team rebound payload with teamRebound: true and no player", () => {
+    const result = validateCommandPayload("rebound", {
+      teamId: "team_1",
+      teamRebound: true,
+      rebound: {
+        type: "offensive",
+      },
+    });
+
+    expect(result).toEqual({
+      teamId: "team_1",
+      teamRebound: true,
+      rebound: {
+        type: "offensive",
+      },
+    });
+  });
+
+  it("refuses a rebound with neither reboundPlayerId nor teamRebound", () => {
+    expect(() =>
+      validateCommandPayload("rebound", {
+        teamId: "team_1",
+        rebound: {
+          type: "offensive",
+        },
+      }),
+    ).toThrow(BadRequestException);
+
+    expect(() =>
+      validateCommandPayload("rebound", {
+        teamId: "team_1",
+        teamRebound: false,
+        rebound: {
+          type: "offensive",
+        },
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it("refuses a rebound with both reboundPlayerId and teamRebound: true", () => {
+    expect(() =>
+      validateCommandPayload("rebound", {
+        teamId: "team_1",
+        reboundPlayerId: "player_3",
+        teamRebound: true,
+        rebound: {
+          type: "defensive",
+        },
+      }),
+    ).toThrow(BadRequestException);
+  });
 });

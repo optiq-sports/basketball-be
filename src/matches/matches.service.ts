@@ -245,6 +245,8 @@ export class MatchesService {
               homeScore: true,
               awayScore: true,
               quarter: true,
+              homeJerseyColor: true,
+              awayJerseyColor: true,
             },
           },
         },
@@ -317,6 +319,8 @@ export class MatchesService {
             homeScore: true,
             awayScore: true,
             quarter: true,
+            homeJerseyColor: true,
+            awayJerseyColor: true,
           },
         },
         homeTeam: {

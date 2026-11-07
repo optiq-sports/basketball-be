@@ -13,6 +13,7 @@ import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { BootstrapSessionDto } from "./dto/bootstrap-session.dto";
 import { UpdateOrientationDto } from "./dto/update-orientation.dto";
+import { UpdateJerseyColorsDto } from "./dto/update-jersey-colors.dto";
 import { ResolveMatchKeyDto } from "./dto/resolve-match-key.dto";
 import { StatdashSessionsService } from "./statdash-sessions.service";
 import {
@@ -165,6 +166,50 @@ export class StatdashSessionsController {
       sessionId,
       dto.homeOnLeft,
       dto.homeAttacksLeft,
+    );
+  }
+
+  @Patch(":sessionId/jersey-colors")
+  @ApiOperation({ summary: "Update session jersey colors" })
+  @ApiBody({ type: UpdateJerseyColorsDto })
+  @ApiResponse({
+    status: 200,
+    description: "Jersey colors successfully updated",
+    type: StatdashSessionSnapshotDto,
+  })
+  @AppErrorResponse(
+    400,
+    "Bad Request",
+    "PATCH",
+    "/api/statdash/sessions/:sessionId/jersey-colors",
+    "Invalid #rrggbb jersey color format",
+  )
+  @AppErrorResponse(
+    401,
+    "Unauthorized",
+    "PATCH",
+    "/api/statdash/sessions/:sessionId/jersey-colors",
+    "Invalid or missing access token",
+  )
+  @AppErrorResponse(
+    404,
+    "Not Found",
+    "PATCH",
+    "/api/statdash/sessions/:sessionId/jersey-colors",
+    "Session does not exist",
+  )
+  updateJerseyColors(
+    @Param("sessionId") sessionId: string,
+    @Body() dto: UpdateJerseyColorsDto,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const statisticianId =
+      user?.role === Role.STATISTICIAN ? user.id : undefined;
+    return this.statdashSessionsService.updateJerseyColors(
+      sessionId,
+      dto.homeJerseyColor ?? null,
+      dto.awayJerseyColor ?? null,
+      statisticianId,
     );
   }
 

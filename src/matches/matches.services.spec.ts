@@ -295,6 +295,15 @@ describe("MatchesService", () => {
         id: "m-assigned",
         homeTeam: { playerTeams: [] },
         awayTeam: { playerTeams: [] },
+        gameSessions: {
+          id: "session-1",
+          status: "IN_PROGRESS",
+          homeScore: 10,
+          awayScore: 8,
+          quarter: 1,
+          homeJerseyColor: "#CE1141",
+          awayJerseyColor: "#1D428A",
+        },
       });
 
       const result = await service.findOne("m-assigned", mockBroadcasterUser);
@@ -309,9 +318,35 @@ describe("MatchesService", () => {
               },
             },
           },
+          include: expect.objectContaining({
+            gameSessions: {
+              select: {
+                id: true,
+                status: true,
+                homeScore: true,
+                awayScore: true,
+                quarter: true,
+                homeJerseyColor: true,
+                awayJerseyColor: true,
+              },
+            },
+          }),
         }),
       );
       expect(result.id).toBe("m-assigned");
+      expect(
+        (result as unknown as { gameSessions: unknown[] }).gameSessions,
+      ).toEqual([
+        {
+          id: "session-1",
+          status: "IN_PROGRESS",
+          homeScore: 10,
+          awayScore: 8,
+          quarter: 1,
+          homeJerseyColor: "#CE1141",
+          awayJerseyColor: "#1D428A",
+        },
+      ]);
     });
 
     it("should throw NotFoundException in findOne if match not assigned to broadcaster", async () => {

@@ -16,6 +16,12 @@ export class GameSessionSummaryDto {
 
   @ApiProperty({ example: 4, required: false })
   quarter?: number;
+
+  @ApiProperty({ example: "#CE1141", required: false, nullable: true })
+  homeJerseyColor?: string | null;
+
+  @ApiProperty({ example: "#000000", required: false, nullable: true })
+  awayJerseyColor?: string | null;
 }
 
 export class MatchResponseDto {

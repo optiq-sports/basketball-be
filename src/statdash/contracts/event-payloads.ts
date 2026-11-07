@@ -22,7 +22,9 @@ export type AssistPayload = {
 
 export type ReboundPayload = {
   teamId: string;
-  playerId: string;
+  playerId?: string;
+  reboundPlayerId?: string;
+  teamRebound?: boolean;
   reboundType: "offensive" | "defensive";
 };
 
@@ -62,7 +64,10 @@ export type StealPayload = {
 
 export type DeadBallPayload = {
   reason:
-    "out_of_bounds" | "shot_clock_violation" | "held_ball" | "lane_violation";
+    | "out_of_bounds"
+    | "shot_clock_violation"
+    | "held_ball"
+    | "lane_violation";
   teamId?: string;
 };
 

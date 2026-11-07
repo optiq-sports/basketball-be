@@ -306,4 +306,70 @@ describe("StatdashSessionsService", () => {
       expect(prismaService.$transaction).toHaveBeenCalled();
     });
   });
+
+  describe("jersey colors (Item 50)", () => {
+    it("updates homeJerseyColor and awayJerseyColor and returns them in session snapshot", async () => {
+      prismaService.gameSession.findUnique
+        .mockResolvedValueOnce({
+          id: "session_1",
+          matchId: "match_1",
+          status: GameSessionStatus.IN_PROGRESS,
+          match: { statisticianId: "stat_1" },
+        })
+        .mockResolvedValueOnce({
+          id: "session_1",
+          matchId: "match_1",
+          status: GameSessionStatus.IN_PROGRESS,
+          quarter: 1,
+          clockSecondsRemaining: 600,
+          clockRunning: false,
+          homeScore: 0,
+          awayScore: 0,
+          homeOnLeft: true,
+          homeAttacksLeft: true,
+          homeJerseyColor: "#CE1141",
+          awayJerseyColor: "#1D428A",
+          jumpBallWinnerTeamId: null,
+          possessionTeamId: null,
+          version: 0,
+          startedAt: null,
+          endedAt: null,
+          updatedAt: new Date(),
+          match: { statisticianId: "stat_1" },
+        });
+      prismaService.gameSession.update.mockResolvedValue({});
+      prismaService.gameEvent.findMany.mockResolvedValue([]);
+      prismaService.lineupState.findFirst.mockResolvedValue(null);
+
+      const snapshot = await service.updateJerseyColors(
+        "session_1",
+        "#CE1141",
+        "#1D428A",
+        "stat_1",
+      );
+
+      expect(prismaService.gameSession.update).toHaveBeenCalledWith({
+        where: { id: "session_1" },
+        data: {
+          homeJerseyColor: "#CE1141",
+          awayJerseyColor: "#1D428A",
+        },
+      });
+      expect(redisService.invalidateSessionSnapshotCache).toHaveBeenCalledWith(
+        "session_1",
+      );
+      expect(snapshot.homeJerseyColor).toBe("#CE1141");
+      expect(snapshot.awayJerseyColor).toBe("#1D428A");
+    });
+
+    it("rejects invalid jersey color format", async () => {
+      await expect(
+        service.updateJerseyColors("session_1", "red", "#1D428A"),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.updateJerseyColors("session_1", "#CE1141", "#12345"),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

@@ -64,6 +64,8 @@ export class ClientApiService {
             status: true,
             quarter: true,
             clockSecondsRemaining: true,
+            homeJerseyColor: true,
+            awayJerseyColor: true,
           },
         },
       },

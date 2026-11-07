@@ -7,6 +7,9 @@ export class ProjectionTotalsDto {
   @ApiProperty({ example: 10 })
   rebounds: number;
 
+  @ApiPropertyOptional({ example: 2 })
+  teamRebounds?: number;
+
   @ApiProperty({ example: 5 })
   assists: number;
 
@@ -234,6 +237,9 @@ export class TimelineEventDto {
 
   @ApiProperty({ example: "player_1", nullable: true, required: false })
   playerId?: string | null;
+
+  @ApiPropertyOptional({ example: true })
+  teamRebound?: boolean;
 
   @ApiProperty({ example: "made 2-point jumpshot" })
   description: string;

@@ -57,6 +57,12 @@ export class StatdashSessionDto {
   @ApiProperty({ example: true })
   homeAttacksLeft: boolean;
 
+  @ApiProperty({ example: "#CE1141", nullable: true })
+  homeJerseyColor: string | null;
+
+  @ApiProperty({ example: "#000000", nullable: true })
+  awayJerseyColor: string | null;
+
   @ApiProperty({ example: "team_1", nullable: true })
   jumpBallWinnerTeamId: string | null;
 
@@ -132,6 +138,12 @@ export class StatdashSessionSnapshotDto {
     homeOnLeft: boolean;
     homeAttacksLeft: boolean;
   };
+
+  @ApiProperty({ example: "#CE1141", nullable: true })
+  homeJerseyColor: string | null;
+
+  @ApiProperty({ example: "#000000", nullable: true })
+  awayJerseyColor: string | null;
 
   @ApiProperty({ example: "team_1", nullable: true })
   jumpBallWinnerTeamId: string | null;

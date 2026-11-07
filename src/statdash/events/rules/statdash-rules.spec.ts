@@ -136,4 +136,39 @@ describe("Statdash rules", () => {
       expect(clockResumeRes.sessionUpdates?.clockRunning).toBe(true);
     });
   });
+
+  describe("rebound rules and possession", () => {
+    it("sets possessionTeamId from teamId on player rebound and team rebound", () => {
+      const playerReb = applyCommandRules(
+        "rebound",
+        {
+          teamId: "home_team",
+          reboundPlayerId: "p1",
+          rebound: { type: "defensive" },
+        },
+        context,
+      );
+      expect(playerReb.sessionUpdates?.possessionTeamId).toBe("home_team");
+      expect(playerReb.emittedEvents[0].payload).toMatchObject({
+        teamId: "home_team",
+        reboundPlayerId: "p1",
+      });
+
+      const teamReb = applyCommandRules(
+        "rebound",
+        {
+          teamId: "away_team",
+          teamRebound: true,
+          rebound: { type: "offensive" },
+        },
+        context,
+      );
+      expect(teamReb.sessionUpdates?.possessionTeamId).toBe("away_team");
+      expect(teamReb.emittedEvents[0].payload).toMatchObject({
+        teamId: "away_team",
+        teamRebound: true,
+      });
+      expect(teamReb.emittedEvents[0].payload.reboundPlayerId).toBeUndefined();
+    });
+  });
 });

@@ -293,6 +293,8 @@ model GameSession {
   jumpBallWinnerTeamId  String?             @map("jump_ball_winner_team_id")
   homeOnLeft            Boolean             @default(true) @map("home_on_left")
   homeAttacksLeft       Boolean             @default(true) @map("home_attacks_left")
+  homeJerseyColor       String?             @map("home_jersey_color")
+  awayJerseyColor       String?             @map("away_jersey_color")
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
   events                GameEvent[]

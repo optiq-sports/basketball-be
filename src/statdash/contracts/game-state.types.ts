@@ -20,6 +20,8 @@ export type StatdashGameState = GameClockState &
     sessionId: string;
     matchId: string;
     version: number;
+    homeJerseyColor: string | null;
+    awayJerseyColor: string | null;
     possessionTeamId: string | null;
     jumpBallWinnerTeamId: string | null;
     startedAt: string | null;

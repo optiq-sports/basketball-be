@@ -55,6 +55,22 @@ export function applyCommandRules(
       clockSecondsRemaining: payload.clockSecondsRemaining,
     };
   }
+  if (commandType === "jump_ball") {
+    const winner =
+      (typeof payload.winningTeamId === "string"
+        ? payload.winningTeamId
+        : undefined) ??
+      (typeof payload.jumpBallWinnerTeamId === "string"
+        ? payload.jumpBallWinnerTeamId
+        : undefined);
+    if (winner) {
+      result.sessionUpdates = {
+        ...result.sessionUpdates,
+        jumpBallWinnerTeamId: winner,
+        possessionTeamId: winner,
+      };
+    }
+  }
   if (
     typeof payload.possessionTeamId === "string" ||
     payload.possessionTeamId === null

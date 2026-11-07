@@ -42,7 +42,8 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     this.unsubscribe = this.redisService.subscribeSessionUpdates((payload) => {
       const envelope = payload as
-        { originNodeId?: string; update?: StatdashRealtimeUpdate } | undefined;
+        | { originNodeId?: string; update?: StatdashRealtimeUpdate }
+        | undefined;
       if (!envelope?.update) return;
       if (envelope.originNodeId === this.nodeId) return;
       this.emitUpdate(envelope.update);
@@ -66,16 +67,20 @@ export class StatdashRealtimeService implements OnModuleInit, OnModuleDestroy {
     );
     const live$ = this.updates$.pipe(
       filter((update) => update.sessionId === sessionId),
-      map((update): MessageEvent => ({
-        type: "statdash-update",
-        data: update,
-      })),
+      map(
+        (update): MessageEvent => ({
+          type: "statdash-update",
+          data: update,
+        }),
+      ),
     );
     const replay$ = from(replay).pipe(
-      map((update): MessageEvent => ({
-        type: "statdash-update",
-        data: update,
-      })),
+      map(
+        (update): MessageEvent => ({
+          type: "statdash-update",
+          data: update,
+        }),
+      ),
     );
 
     // Heartbeat every 15s emitting an SSE comment frame (: ping\n\n) to keep idle streams alive

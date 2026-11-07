@@ -583,4 +583,137 @@ describe("StatdashProjectionsService", () => {
       await expect(service.getBoxScore("sess_1", user)).rejects.toThrow();
     });
   });
+
+  describe("team rebounds (Item 49)", () => {
+    it("counts a team rebound in teamTotals (rebounds, oreb/dreb, teamRebounds) while no player line changes", () => {
+      const events = [
+        {
+          id: "e1",
+          eventType: "rebound",
+          sequence: 1,
+          payload: {
+            teamId: "home_team",
+            reboundPlayerId: "p_home_1",
+            rebound: { type: "defensive" },
+            period: 1,
+          },
+        },
+        {
+          id: "e2",
+          eventType: "rebound",
+          sequence: 2,
+          payload: {
+            teamId: "home_team",
+            teamRebound: true,
+            rebound: { type: "offensive" },
+            period: 1,
+          },
+        },
+        {
+          id: "e3",
+          eventType: "rebound",
+          sequence: 3,
+          payload: {
+            teamId: "away_team",
+            teamRebound: true,
+            rebound: { type: "defensive" },
+            period: 1,
+          },
+        },
+      ];
+
+      const boxScore = service.buildBoxScoreFromEvents(events, events.length, {
+        homeTeamId: "home_team",
+        awayTeamId: "away_team",
+      });
+
+      // Only p_home_1 is in players, with 1 defensive rebound
+      expect(Object.keys(boxScore.players)).toEqual(["p_home_1"]);
+      expect(boxScore.players.p_home_1.rebounds).toBe(1);
+      expect(boxScore.players.p_home_1.dreb).toBe(1);
+      expect(boxScore.players.p_home_1.oreb).toBe(0);
+
+      // Home team totals include 1 player dreb + 1 team oreb
+      expect(boxScore.teamTotals?.home_team.rebounds).toBe(2);
+      expect(boxScore.teamTotals?.home_team.dreb).toBe(1);
+      expect(boxScore.teamTotals?.home_team.oreb).toBe(1);
+      expect(boxScore.teamTotals?.home_team.teamRebounds).toBe(1);
+      expect(boxScore.teamTotals?.home.teamRebounds).toBe(1);
+
+      // Away team totals include 1 team dreb and 0 players
+      expect(boxScore.teamTotals?.away_team.rebounds).toBe(1);
+      expect(boxScore.teamTotals?.away_team.dreb).toBe(1);
+      expect(boxScore.teamTotals?.away_team.oreb).toBe(0);
+      expect(boxScore.teamTotals?.away_team.teamRebounds).toBe(1);
+      expect(boxScore.teamTotals?.away.teamRebounds).toBe(1);
+
+      // Overall totals
+      expect(boxScore.totals.rebounds).toBe(3);
+      expect(boxScore.totals.oreb).toBe(1);
+      expect(boxScore.totals.dreb).toBe(2);
+      expect(boxScore.totals.teamRebounds).toBe(2);
+    });
+
+    it("includes teamId and teamRebound: true with no player on timeline for team rebounds", async () => {
+      redisService.getProjectionCached.mockResolvedValue(null);
+      prisma.gameEvent.findMany.mockResolvedValue([
+        {
+          id: "e_team_reb",
+          sequence: 1,
+          eventType: "rebound",
+          period: 1,
+          clockSecondsRemaining: 500,
+          payload: {
+            teamId: "home_team",
+            teamRebound: true,
+            rebound: { type: "offensive" },
+          },
+        },
+      ]);
+      prisma.gameSession.findUnique.mockResolvedValue({
+        id: "s1",
+        status: "IN_PROGRESS",
+        match: {
+          id: "m1",
+          homeTeamId: "home_team",
+          awayTeamId: "away_team",
+          status: "LIVE",
+        },
+      });
+
+      const timeline = (await service.getTimeline("s1")) as Array<
+        Record<string, unknown>
+      >;
+
+      expect(timeline).toHaveLength(1);
+      expect(timeline[0]).toMatchObject({
+        id: "e_team_reb",
+        eventType: "rebound",
+        teamId: "home_team",
+        playerId: null,
+        teamRebound: true,
+        description: "offensive rebound",
+      });
+    });
+
+    it("updates possessionTeamId from teamId on every rebound during replayScoreFromEvents", () => {
+      const events = [
+        {
+          id: "e1",
+          eventType: "rebound",
+          sequence: 1,
+          payload: {
+            teamId: "away_team",
+            teamRebound: true,
+            rebound: { type: "defensive" },
+          },
+        },
+      ];
+      const replay = service.replayScoreFromEvents(events, 1, {
+        homeTeamId: "home_team",
+        awayTeamId: "away_team",
+      });
+      expect(replay.possessionTeamId).toBe("away_team");
+    });
+  });
 });

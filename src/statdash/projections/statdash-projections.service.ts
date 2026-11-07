@@ -8,6 +8,7 @@ import { AuthenticatedUser } from "../../common/interfaces/user.interface";
 type ProjectionTotals = {
   points: number;
   rebounds: number;
+  teamRebounds?: number;
   assists: number;
   blocks: number;
   steals: number;
@@ -296,6 +297,8 @@ export class StatdashProjectionsService {
       }
 
       const { teamId, playerId } = this.extractTimelineTeamAndPlayer(payload);
+      const isTeamRebound =
+        event.eventType === "rebound" && payload.teamRebound === true;
       const rawEvent = event as Record<string, unknown>;
       const clockSecondsRemaining =
         typeof rawEvent.clockSecondsRemaining === "number"
@@ -311,7 +314,8 @@ export class StatdashProjectionsService {
         period: eventPeriod,
         clockSecondsRemaining,
         teamId,
-        playerId,
+        playerId: isTeamRebound ? null : playerId,
+        ...(isTeamRebound ? { teamRebound: true } : {}),
         description: this.buildTimelineDescription(event.eventType, payload),
         homeScore,
         awayScore,
@@ -586,7 +590,8 @@ export class StatdashProjectionsService {
         const payload = event.payload as Record<string, unknown>;
         const targetEventId = payload.targetEventId as string | undefined;
         const correctedPayload = payload.correctedPayload as
-          Record<string, unknown> | undefined;
+          | Record<string, unknown>
+          | undefined;
         if (targetEventId && correctedPayload) {
           corrections.set(targetEventId, correctedPayload);
         }
@@ -699,6 +704,22 @@ export class StatdashProjectionsService {
       if (typeof payload.clockSecondsRemaining === "number") {
         clockSecondsRemaining = payload.clockSecondsRemaining;
       }
+      if (event.eventType === "rebound" && typeof payload.teamId === "string") {
+        possessionTeamId = payload.teamId;
+      }
+      if (event.eventType === "jump_ball") {
+        const winner =
+          (typeof payload.winningTeamId === "string"
+            ? payload.winningTeamId
+            : undefined) ??
+          (typeof payload.jumpBallWinnerTeamId === "string"
+            ? payload.jumpBallWinnerTeamId
+            : undefined);
+        if (winner) {
+          jumpBallWinnerTeamId = winner;
+          possessionTeamId = winner;
+        }
+      }
       if (
         typeof payload.possessionTeamId === "string" ||
         payload.possessionTeamId === null
@@ -792,9 +813,10 @@ export class StatdashProjectionsService {
         photo?: string | null;
       }
     > = {};
-    const totals: ProjectionTotals = {
+    const totals: ProjectionTotals & { teamRebounds: number } = {
       points: 0,
       rebounds: 0,
+      teamRebounds: 0,
       assists: 0,
       blocks: 0,
       steals: 0,
@@ -815,6 +837,54 @@ export class StatdashProjectionsService {
       plusMinus: 0,
       eff: 0,
       secondsPlayed: 0,
+    };
+
+    const createEmptyTeamTotals = (): ProjectionTotals & {
+      teamRebounds: number;
+    } => ({
+      points: 0,
+      rebounds: 0,
+      teamRebounds: 0,
+      assists: 0,
+      blocks: 0,
+      steals: 0,
+      fouls: 0,
+      turnovers: 0,
+      fga: 0,
+      fgm: 0,
+      fg3a: 0,
+      fg3m: 0,
+      twoPa: 0,
+      twoPm: 0,
+      threePa: 0,
+      threePm: 0,
+      fta: 0,
+      ftm: 0,
+      oreb: 0,
+      dreb: 0,
+      plusMinus: 0,
+      eff: 0,
+      secondsPlayed: 0,
+    });
+
+    const teamTotals: Record<
+      string,
+      ProjectionTotals & { teamRebounds: number }
+    > = {};
+    if (teamContext?.homeTeamId) {
+      teamTotals[teamContext.homeTeamId] = createEmptyTeamTotals();
+      teamTotals.home = teamTotals[teamContext.homeTeamId];
+    }
+    if (teamContext?.awayTeamId) {
+      teamTotals[teamContext.awayTeamId] = createEmptyTeamTotals();
+      teamTotals.away = teamTotals[teamContext.awayTeamId];
+    }
+
+    const ensureTeamTotals = (tId: string) => {
+      if (!teamTotals[tId]) {
+        teamTotals[tId] = createEmptyTeamTotals();
+      }
+      return teamTotals[tId];
     };
 
     const ensurePlayer = (pId: string, tId?: string | null) => {
@@ -930,17 +1000,27 @@ export class StatdashProjectionsService {
         continue;
       }
 
-      const playerId =
-        (payload.playerId as string | undefined) ??
-        (payload.shooterPlayerId as string | undefined) ??
-        (payload.foulerPlayerId as string | undefined) ??
-        (payload.reboundPlayerId as string | undefined) ??
-        (payload.turnoverPlayerId as string | undefined) ??
-        (payload.assistPlayerId as string | undefined);
+      const isTeamRebound =
+        event.eventType === "rebound" && payload.teamRebound === true;
+
+      const playerId = isTeamRebound
+        ? undefined
+        : ((payload.playerId as string | undefined) ??
+          (payload.shooterPlayerId as string | undefined) ??
+          (payload.foulerPlayerId as string | undefined) ??
+          (payload.reboundPlayerId as string | undefined) ??
+          (payload.turnoverPlayerId as string | undefined) ??
+          (payload.assistPlayerId as string | undefined));
 
       const eventTeamId = (payload.teamId as string | undefined) ?? null;
 
-      if (!playerId && event.eventType !== "assist") continue;
+      if (
+        !playerId &&
+        event.eventType !== "assist" &&
+        event.eventType !== "rebound"
+      ) {
+        continue;
+      }
 
       if (playerId) {
         ensurePlayer(playerId, eventTeamId);
@@ -1067,7 +1147,8 @@ export class StatdashProjectionsService {
         }
         case "assist": {
           const aId = (payload.assistPlayerId ?? payload.playerId) as
-            string | undefined;
+            | string
+            | undefined;
           if (aId) {
             ensurePlayer(aId, eventTeamId);
             players[aId].assists += 1;
@@ -1076,15 +1157,41 @@ export class StatdashProjectionsService {
           break;
         }
         case "rebound": {
-          if (playerId) {
+          const reboundObj = payload.rebound as
+            | Record<string, unknown>
+            | undefined;
+          const reboundType =
+            reboundObj?.type ?? payload.type ?? payload.reboundType;
+          const isOffensive = reboundType === "offensive";
+
+          if (playerId && !isTeamRebound) {
             players[playerId].rebounds += 1;
             totals.rebounds += 1;
-            if (payload.type === "offensive") {
+            if (isOffensive) {
               players[playerId].oreb += 1;
               totals.oreb += 1;
             } else {
               players[playerId].dreb += 1;
               totals.dreb += 1;
+            }
+          } else if (isTeamRebound || (!playerId && eventTeamId)) {
+            totals.rebounds += 1;
+            totals.teamRebounds += 1;
+            if (isOffensive) {
+              totals.oreb += 1;
+            } else {
+              totals.dreb += 1;
+            }
+
+            if (eventTeamId) {
+              const t = ensureTeamTotals(eventTeamId);
+              t.rebounds += 1;
+              t.teamRebounds += 1;
+              if (isOffensive) {
+                t.oreb += 1;
+              } else {
+                t.dreb += 1;
+              }
             }
           }
           break;
@@ -1120,41 +1227,6 @@ export class StatdashProjectionsService {
       }
     }
 
-    const createEmptyTotals = (): ProjectionTotals => ({
-      points: 0,
-      rebounds: 0,
-      assists: 0,
-      blocks: 0,
-      steals: 0,
-      fouls: 0,
-      turnovers: 0,
-      fga: 0,
-      fgm: 0,
-      fg3a: 0,
-      fg3m: 0,
-      twoPa: 0,
-      twoPm: 0,
-      threePa: 0,
-      threePm: 0,
-      fta: 0,
-      ftm: 0,
-      oreb: 0,
-      dreb: 0,
-      plusMinus: 0,
-      eff: 0,
-      secondsPlayed: 0,
-    });
-
-    const teamTotals: Record<string, ProjectionTotals> = {};
-    if (teamContext?.homeTeamId) {
-      teamTotals[teamContext.homeTeamId] = createEmptyTotals();
-      teamTotals.home = teamTotals[teamContext.homeTeamId];
-    }
-    if (teamContext?.awayTeamId) {
-      teamTotals[teamContext.awayTeamId] = createEmptyTotals();
-      teamTotals.away = teamTotals[teamContext.awayTeamId];
-    }
-
     for (const p of Object.values(players)) {
       p.eff =
         p.points +
@@ -1170,10 +1242,7 @@ export class StatdashProjectionsService {
       totals.plusMinus += p.plusMinus;
 
       if (p.teamId) {
-        if (!teamTotals[p.teamId]) {
-          teamTotals[p.teamId] = createEmptyTotals();
-        }
-        const t = teamTotals[p.teamId];
+        const t = ensureTeamTotals(p.teamId);
         t.points += p.points;
         t.rebounds += p.rebounds;
         t.assists += p.assists;
@@ -1268,6 +1337,10 @@ export class StatdashProjectionsService {
       (typeof shot?.teamId === "string" ? shot.teamId : null) ||
       null;
 
+    if (payload.teamRebound === true) {
+      return { teamId, playerId: null };
+    }
+
     let playerId: string | null = null;
     if (typeof payload.playerId === "string") {
       playerId = payload.playerId;
@@ -1322,7 +1395,8 @@ export class StatdashProjectionsService {
       }
       case "turnover": {
         const turnover = payload.turnover as
-          Record<string, unknown> | undefined;
+          | Record<string, unknown>
+          | undefined;
         const type = turnover?.type || payload.type;
         return type
           ? `${String(type).replace(/_/g, " ")} turnover`
