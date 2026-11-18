@@ -8,49 +8,10 @@ import helmet from "helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ClientApiModule } from "./client-api/client-api.module";
 import type { Request, Response, NextFunction } from "express";
-
-function resolveCorsOrigin(): (
-  origin: string | undefined,
-  callback: (err: Error | null, allow?: boolean) => void,
-) => void {
-  const raw = process.env.CORS_ORIGINS?.trim();
-  if (!raw) {
-    return (_origin, callback) => {
-      callback(null, true);
-    };
-  }
-  const allowed = new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
-
-  const platformUrls = [
-    process.env.PORTAL_URL,
-    process.env.ADMIN_URL,
-    process.env.BROADCAST_URL,
-    process.env.STATDASH_URL,
-  ];
-
-  for (const rawUrl of platformUrls) {
-    if (rawUrl) {
-      try {
-        allowed.add(new URL(rawUrl).origin);
-      } catch {
-        allowed.add(rawUrl.replace(/\/$/, ""));
-      }
-    }
-  }
-
-  return (origin, callback) => {
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-    callback(null, allowed.has(origin) || origin === "app://statdash");
-  };
-}
+import {
+  createCorsDelegate,
+  resolveCorsOrigin,
+} from "./common/utils/cors.util";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -87,25 +48,9 @@ async function bootstrap() {
       },
     }),
   );
-  app.enableCors({
-    origin: resolveCorsOrigin(),
-    credentials: true,
-    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Accept",
-      "X-Requested-With",
-      "x-api-key",
-      "X-Api-Key",
-      "x-embed-token",
-      "X-Embed-Token",
-      "x-overlay-token",
-      "X-Overlay-Token",
-      "x-token",
-      "X-Token",
-    ],
-  });
+
+  const appOrigin = resolveCorsOrigin();
+  app.enableCors(createCorsDelegate(appOrigin));
 
   // Global validation pipe
   app.useGlobalPipes(

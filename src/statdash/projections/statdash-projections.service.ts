@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../common/redis/redis.service";
@@ -33,6 +33,8 @@ type ProjectionTotals = {
 
 @Injectable()
 export class StatdashProjectionsService {
+  private readonly logger = new Logger(StatdashProjectionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
@@ -51,6 +53,7 @@ export class StatdashProjectionsService {
         match: {
           select: {
             clientId: true,
+            statisticianId: true,
             broadcasters: { select: { userId: true } },
           },
         },
@@ -77,13 +80,25 @@ export class StatdashProjectionsService {
       return;
     }
 
-    if (
-      user?.role === "CLIENT" ||
-      user?.role === "ADMIN" ||
-      user?.role === "STATISTICIAN"
-    ) {
+    if (user?.role === Role.STATISTICIAN) {
+      const isAssigned = session.match?.statisticianId === user.id;
+      const isClientMatch =
+        session.match?.clientId &&
+        user.clientIds &&
+        user.clientIds.includes(session.match.clientId);
+
+      if (!isAssigned && !isClientMatch) {
+        throw new NotFoundException({
+          code: "SD_SESSION_NOT_FOUND",
+          message: "Session does not exist",
+        });
+      }
+      return;
+    }
+
+    if (user?.role === "CLIENT" || user?.role === "ADMIN") {
       if (
-        session.match.clientId &&
+        session.match?.clientId &&
         (!user.clientIds || !user.clientIds.includes(session.match.clientId))
       ) {
         throw new NotFoundException({
@@ -94,7 +109,7 @@ export class StatdashProjectionsService {
     }
   }
 
-  async getBoxScore(sessionId: string, user?: any) {
+  async getBoxScore(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
@@ -125,7 +140,7 @@ export class StatdashProjectionsService {
     return rebuilt.boxScore;
   }
 
-  async getShotChart(sessionId: string, user?: any) {
+  async getShotChart(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const cached = await this.redisService.getProjectionCached(
       sessionId,
@@ -163,7 +178,7 @@ export class StatdashProjectionsService {
   async getPlayerGameProjection(
     sessionId: string,
     playerId: string,
-    user?: any,
+    user?: AuthenticatedUser,
   ) {
     // getBoxScore already checks session access, but we do it anyway if needed or let getBoxScore handle it.
     // We must pass user to getBoxScore.
@@ -171,7 +186,7 @@ export class StatdashProjectionsService {
     return box.players[playerId] ?? this.emptyPlayerProjection(playerId);
   }
 
-  async getMatchSummary(sessionId: string, user?: any) {
+  async getMatchSummary(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const session = await this.prisma.gameSession.findUnique({
       where: { id: sessionId },
@@ -375,7 +390,7 @@ export class StatdashProjectionsService {
     return timeline;
   }
 
-  async rebuildAndPersist(sessionId: string, user?: any) {
+  async rebuildAndPersist(sessionId: string, user?: AuthenticatedUser) {
     await this.checkSessionAccess(sessionId, user);
     const [events, sessionForTeamContext] = await Promise.all([
       this.getSessionEvents(sessionId),
@@ -487,7 +502,7 @@ export class StatdashProjectionsService {
       }
     }
 
-    const [updatedSession, storedProjection] = await this.prisma.$transaction([
+    const txResults = (await this.prisma.$transaction([
       this.prisma.gameSession.update({
         where: { id: sessionId },
         data: {
@@ -535,7 +550,13 @@ export class StatdashProjectionsService {
           version: replay.version,
         },
       }),
-    ]);
+    ])) as unknown[];
+    const updatedSession = txResults[0] as {
+      version: number;
+      homeScore: number;
+      awayScore: number;
+    };
+    const storedProjection = (txResults[2] ?? txResults[1]) as { id: string };
 
     await this.syncMatchStatsFromBoxScore(
       sessionForTeamContext.match.id,
@@ -732,10 +753,10 @@ export class StatdashProjectionsService {
 
       if (event.eventType === "substitution") {
         if (payload.homeLineup && Array.isArray(payload.homeLineup)) {
-          homeLineup = payload.homeLineup as string[];
+          homeLineup = [...(payload.homeLineup as string[])];
         }
         if (payload.awayLineup && Array.isArray(payload.awayLineup)) {
-          awayLineup = payload.awayLineup as string[];
+          awayLineup = [...(payload.awayLineup as string[])];
         }
 
         if (payload.playerOutId && payload.playerInId && payload.teamId) {
@@ -745,7 +766,17 @@ export class StatdashProjectionsService {
               : payload.teamId === teamContext?.awayTeamId
                 ? awayLineup
                 : null;
-          if (targetLineup) {
+          const carriesLineup =
+            targetLineup === homeLineup
+              ? Array.isArray(payload.homeLineup)
+              : targetLineup === awayLineup
+                ? Array.isArray(payload.awayLineup)
+                : Boolean(
+                    Array.isArray(payload.homeLineup) ||
+                    Array.isArray(payload.awayLineup),
+                  );
+
+          if (!carriesLineup && targetLineup) {
             const index = targetLineup.indexOf(payload.playerOutId as string);
             if (index !== -1) {
               targetLineup[index] = payload.playerInId as string;
@@ -988,7 +1019,17 @@ export class StatdashProjectionsService {
               : payload.teamId === teamContext?.awayTeamId
                 ? awayLineup
                 : null;
-          if (targetLineup) {
+          const carriesLineup =
+            targetLineup === homeLineup
+              ? Array.isArray(payload.homeLineup)
+              : targetLineup === awayLineup
+                ? Array.isArray(payload.awayLineup)
+                : Boolean(
+                    Array.isArray(payload.homeLineup) ||
+                    Array.isArray(payload.awayLineup),
+                  );
+
+          if (!carriesLineup && targetLineup) {
             const index = targetLineup.indexOf(outId);
             if (index !== -1) {
               targetLineup[index] = inId;
@@ -1437,30 +1478,65 @@ export class StatdashProjectionsService {
 
   private async syncMatchStatsFromBoxScore(
     matchId: string,
-    players: Record<string, ProjectionTotals & { playerId: string }>,
+    players: Record<
+      string,
+      ProjectionTotals & { playerId: string; teamId?: string | null }
+    >,
   ) {
     const entries = Object.values(players);
     if (entries.length === 0) return;
 
     const playerIds = entries.map((entry) => entry.playerId);
-    const matchPlayers = await this.prisma.matchPlayer.findMany({
-      where: {
-        matchId,
-        playerId: { in: playerIds },
-      },
-      select: {
-        playerId: true,
-        teamId: true,
-      },
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: { homeTeamId: true, awayTeamId: true },
     });
+
+    const matchPlayers =
+      (await this.prisma.matchPlayer.findMany({
+        where: {
+          matchId,
+          playerId: { in: playerIds },
+        },
+        select: {
+          playerId: true,
+          teamId: true,
+        },
+      })) ?? [];
     const playerToTeam = new Map<string, string>();
     for (const row of matchPlayers) {
       playerToTeam.set(row.playerId, row.teamId);
     }
 
+    const fallbackPlayerTeams = match
+      ? ((await this.prisma.playerTeam.findMany({
+          where: {
+            playerId: { in: playerIds },
+            teamId: { in: [match.homeTeamId, match.awayTeamId] },
+          },
+          select: {
+            playerId: true,
+            teamId: true,
+          },
+        })) ?? [])
+      : [];
+    const fallbackMap = new Map<string, string>();
+    for (const pt of fallbackPlayerTeams) {
+      fallbackMap.set(pt.playerId, pt.teamId);
+    }
+
     for (const entry of entries) {
-      const teamId = playerToTeam.get(entry.playerId);
-      if (!teamId) continue;
+      const teamId =
+        entry.teamId ||
+        playerToTeam.get(entry.playerId) ||
+        fallbackMap.get(entry.playerId);
+
+      if (!teamId) {
+        this.logger.warn(
+          `Player ${entry.playerId} in match ${matchId} has no associated team; skipping MatchStat sync.`,
+        );
+        continue;
+      }
 
       await this.prisma.matchStat.upsert({
         where: {

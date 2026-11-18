@@ -35,6 +35,16 @@ export class CreateStatisticianDto {
   name?: string;
 
   @ApiProperty({
+    example: "cmuv056p50000c9proo4a12nu",
+    required: false,
+    description:
+      "Optional client ID to link the statistician to (defaults to current admin's client)",
+  })
+  @IsString()
+  @IsOptional()
+  clientId?: string;
+
+  @ApiProperty({
     enum: UserStatus,
     example: UserStatus.ACTIVE,
     required: false,
