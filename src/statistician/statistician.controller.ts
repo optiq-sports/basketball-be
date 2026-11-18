@@ -86,8 +86,11 @@ export class StatisticianController {
     "/api/statistician",
     "User with this email already exists",
   )
-  create(@Body() createStatisticianDto: CreateStatisticianDto) {
-    return this.statisticianService.create(createStatisticianDto);
+  create(
+    @Body() createStatisticianDto: CreateStatisticianDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.statisticianService.create(createStatisticianDto, user);
   }
 
   @Get()

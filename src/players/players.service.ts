@@ -11,7 +11,7 @@ import { CreatePlayerDto } from "./dto/create-player.dto";
 import { CreatePlayerForTeamDto } from "./dto/create-player-for-team.dto";
 import { BulkCreatePlayersForTeamDto } from "./dto/bulk-create-players-for-team.dto";
 import { UpdatePlayerDto } from "./dto/update-player.dto";
-import { Prisma, Player, PlayerTeam, PlayerPosition } from "@prisma/client";
+import { Prisma, Player, PlayerPosition } from "@prisma/client";
 import {
   BulkCreatePlayersResponseDto,
   PlayerResponseDto,
@@ -26,6 +26,28 @@ import * as xlsx from "xlsx";
 
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
+
+export interface BulkUploadError {
+  row: number;
+  error: string;
+}
+
+export interface BulkUploadDetail {
+  row: number;
+  status: string;
+  player: string;
+  matchScore: string;
+  existingPlayerId: string;
+  action: string;
+}
+
+export interface BulkUploadResult {
+  totalProcessed: number;
+  created: number;
+  duplicatesFound: number;
+  errors: BulkUploadError[];
+  details: BulkUploadDetail[];
+}
 
 @Injectable()
 export class PlayersService {
@@ -262,22 +284,41 @@ export class PlayersService {
         }
 
         // Assign player to team
-        try {
-          await tx.playerTeam.create({
+        const existingPt = await tx.playerTeam.findFirst({
+          where: {
+            playerId: player.id,
+            teamId: createPlayerDto.teamId,
+            jerseyNumber: createPlayerDto.jerseyNumber,
+          },
+        });
+
+        if (existingPt) {
+          await tx.playerTeam.update({
+            where: { id: existingPt.id },
             data: {
-              playerId: player.id,
-              teamId: createPlayerDto.teamId,
-              jerseyNumber: createPlayerDto.jerseyNumber,
               isActive: true,
+              leftAt: null,
             },
           });
-        } catch (error: any) {
-          if (error.code === "P2002") {
-            throw new ConflictException(
-              `Jersey number ${createPlayerDto.jerseyNumber} is already taken in this team`,
-            );
+        } else {
+          try {
+            await tx.playerTeam.create({
+              data: {
+                playerId: player.id,
+                teamId: createPlayerDto.teamId,
+                jerseyNumber: createPlayerDto.jerseyNumber,
+                isActive: true,
+              },
+            });
+          } catch (error: unknown) {
+            const prismaError = error as { code?: string };
+            if (prismaError.code === "P2002") {
+              throw new ConflictException(
+                `Jersey number ${createPlayerDto.jerseyNumber} is already taken in this team`,
+              );
+            }
+            throw error;
           }
-          throw error;
         }
 
         // Return player with team info
@@ -444,22 +485,41 @@ export class PlayersService {
         }
 
         // Assign player to team
-        try {
-          await tx.playerTeam.create({
+        const existingPt = await tx.playerTeam.findFirst({
+          where: {
+            playerId: player.id,
+            teamId: bulkDto.teamId,
+            jerseyNumber: playerData.jerseyNumber,
+          },
+        });
+
+        if (existingPt) {
+          await tx.playerTeam.update({
+            where: { id: existingPt.id },
             data: {
-              playerId: player.id,
-              teamId: bulkDto.teamId,
-              jerseyNumber: playerData.jerseyNumber,
               isActive: true,
+              leftAt: null,
             },
           });
-        } catch (error: any) {
-          if (error.code === "P2002") {
-            throw new ConflictException(
-              `Jersey number ${playerData.jerseyNumber} is already taken in this team`,
-            );
+        } else {
+          try {
+            await tx.playerTeam.create({
+              data: {
+                playerId: player.id,
+                teamId: bulkDto.teamId,
+                jerseyNumber: playerData.jerseyNumber,
+                isActive: true,
+              },
+            });
+          } catch (error: unknown) {
+            const prismaError = error as { code?: string };
+            if (prismaError.code === "P2002") {
+              throw new ConflictException(
+                `Jersey number ${playerData.jerseyNumber} is already taken in this team`,
+              );
+            }
+            throw error;
           }
-          throw error;
         }
 
         // Add to result
@@ -1069,7 +1129,182 @@ export class PlayersService {
   /**
    * Process Bulk Upload from Excel
    */
-  async processBulkUpload(teamId: string, file: any) {
+  /**
+   * Normalize and map human-readable position names to PlayerPosition enum.
+   */
+  mapPlayerPosition(rawPosition: unknown): {
+    position?: PlayerPosition;
+    error?: string;
+  } {
+    if (
+      rawPosition === undefined ||
+      rawPosition === null ||
+      String(rawPosition).trim() === ""
+    ) {
+      return { position: undefined };
+    }
+
+    const str = String(rawPosition).trim();
+    // Ignore case, spaces, underscores, hyphens, parentheses, commas
+    const normalized = str.toLowerCase().replace(/[\s_\-(),]/g, "");
+
+    const positionMap: Record<string, PlayerPosition> = {
+      // Point Guard
+      pg: PlayerPosition.POINT_GUARD,
+      pointguard: PlayerPosition.POINT_GUARD,
+      guardpoint: PlayerPosition.POINT_GUARD,
+      point: PlayerPosition.POINT_GUARD,
+      "1": PlayerPosition.POINT_GUARD,
+
+      // Shooting Guard
+      sg: PlayerPosition.SHOOTING_GUARD,
+      shootingguard: PlayerPosition.SHOOTING_GUARD,
+      guardshooting: PlayerPosition.SHOOTING_GUARD,
+      offguard: PlayerPosition.SHOOTING_GUARD,
+      twoguard: PlayerPosition.SHOOTING_GUARD,
+      "2": PlayerPosition.SHOOTING_GUARD,
+
+      // Small Forward
+      sf: PlayerPosition.SMALL_FORWARD,
+      smallforward: PlayerPosition.SMALL_FORWARD,
+      forwardsmall: PlayerPosition.SMALL_FORWARD,
+      "3": PlayerPosition.SMALL_FORWARD,
+
+      // Power Forward
+      pf: PlayerPosition.POWER_FORWARD,
+      powerforward: PlayerPosition.POWER_FORWARD,
+      forwardpower: PlayerPosition.POWER_FORWARD,
+      bigforward: PlayerPosition.POWER_FORWARD,
+      "4": PlayerPosition.POWER_FORWARD,
+
+      // Center
+      c: PlayerPosition.CENTER,
+      center: PlayerPosition.CENTER,
+      "5": PlayerPosition.CENTER,
+    };
+
+    const mapped = positionMap[normalized];
+    if (mapped) {
+      return { position: mapped };
+    }
+
+    return {
+      error: `Position '${str}' isn't one of PG, SG, SF, PF, C (Point Guard, Shooting Guard, Small Forward, Power Forward, Center)`,
+    };
+  }
+
+  /**
+   * Parse date of birth from Excel date cell or text date (e.g. 2010-08-15, 15/08/2010).
+   */
+  parseDateOfBirth(rawDob: unknown): {
+    date?: Date;
+    error?: string;
+  } {
+    if (
+      rawDob === undefined ||
+      rawDob === null ||
+      String(rawDob).trim() === ""
+    ) {
+      return { date: undefined };
+    }
+
+    if (rawDob instanceof Date) {
+      if (isNaN(rawDob.getTime())) {
+        return { error: `Invalid date of birth: '${rawDob}'` };
+      }
+      // Check for Excel serial misread as ms (year 1970 within seconds of epoch)
+      if (
+        rawDob.getUTCFullYear() === 1970 &&
+        rawDob.getUTCMonth() === 0 &&
+        rawDob.getUTCDate() === 1 &&
+        rawDob.getTime() < 86400000
+      ) {
+        return {
+          error: `Invalid date of birth: Excel date serial was not parsed correctly`,
+        };
+      }
+      // Convert to UTC midnight based on the local calendar date from xlsx
+      const utcDate = new Date(
+        Date.UTC(rawDob.getFullYear(), rawDob.getMonth(), rawDob.getDate()),
+      );
+      return { date: utcDate };
+    }
+
+    if (typeof rawDob === "number") {
+      if (rawDob > 25569) {
+        // Excel serial date (days since 1899-12-30)
+        const jsDate = new Date(Math.round((rawDob - 25569) * 86400 * 1000));
+        if (!isNaN(jsDate.getTime())) {
+          return { date: jsDate };
+        }
+      }
+      return { error: `Invalid date of birth: '${rawDob}'` };
+    }
+
+    const s = String(rawDob).trim();
+
+    // 1. YYYY-MM-DD or YYYY/MM/DD
+    const isoMatch = /^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})(?:T.*)?$/.exec(s);
+    if (isoMatch) {
+      const year = parseInt(isoMatch[1], 10);
+      const month = parseInt(isoMatch[2], 10) - 1;
+      const day = parseInt(isoMatch[3], 10);
+      const d = new Date(Date.UTC(year, month, day));
+      if (
+        d.getUTCFullYear() === year &&
+        d.getUTCMonth() === month &&
+        d.getUTCDate() === day
+      ) {
+        return { date: d };
+      }
+      return { error: `Invalid date of birth: '${s}'` };
+    }
+
+    // 2. DD/MM/YYYY or DD-MM-YYYY
+    const dmyMatch = /^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})$/.exec(s);
+    if (dmyMatch) {
+      let day = parseInt(dmyMatch[1], 10);
+      let month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+
+      // If month > 11 and day <= 12, could be MM/DD/YYYY
+      if (month > 11 && day <= 12) {
+        const temp = day - 1;
+        day = month + 1;
+        month = temp;
+      }
+
+      const d = new Date(Date.UTC(year, month, day));
+      if (
+        d.getUTCFullYear() === year &&
+        d.getUTCMonth() === month &&
+        d.getUTCDate() === day
+      ) {
+        return { date: d };
+      }
+      return { error: `Invalid date of birth: '${s}'` };
+    }
+
+    // 3. Fallback date parse
+    const fallback = new Date(s);
+    if (
+      !isNaN(fallback.getTime()) &&
+      fallback.getUTCFullYear() >= 1920 &&
+      fallback.getUTCFullYear() <= new Date().getFullYear() + 1
+    ) {
+      return { date: fallback };
+    }
+
+    return { error: `Invalid date of birth: '${s}'` };
+  }
+
+  /**
+   * Process Bulk Upload from Excel
+   */
+  async processBulkUpload(
+    teamId: string,
+    file: { buffer: Buffer },
+  ): Promise<BulkUploadResult> {
     this.logger.log(`Processing bulk upload for team ${teamId}`);
 
     const team = await this.prisma.team.findUnique({ where: { id: teamId } });
@@ -1077,40 +1312,35 @@ export class PlayersService {
       throw new NotFoundException(`Team with ID ${teamId} not found`);
     }
 
-    const workbook = xlsx.read(file.buffer, { type: "buffer" });
+    const workbook = xlsx.read(file.buffer, {
+      type: "buffer",
+      cellDates: true,
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     // Read raw data
-    const rawData = xlsx.utils.sheet_to_json(worksheet);
+    const rawData =
+      xlsx.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
-    const result = {
+    const result: BulkUploadResult = {
       totalProcessed: rawData.length,
       created: 0,
       duplicatesFound: 0,
-      errors: [] as any[],
-      details: [] as any[],
+      errors: [],
+      details: [],
     };
 
     if (rawData.length === 0) {
       return result;
     }
 
-    // Process each row
-    // Use transaction? Maybe per-row is safer for partial success, or all-or-nothing?
-    // Requirement implies "Admin uploads -> System runs checks".
-    // If we have duplicates, we might want to just REPORT them and not block the rest,
-    // OR create the valid ones and report duplicates.
-    // Let's create valid ones and report duplicates/potential duplicates.
-
-    for (const [index, row] of (rawData as any[]).entries()) {
+    for (const [index, row] of rawData.entries()) {
       const rowNumber = index + 2; // Excel row number (1-header, 0-indexed)
       try {
         // Normalize row keys to lowercase and trim whitespace
-        const normalizedRow: Record<string, any> = {};
-        for (const key in row) {
-          if (Object.prototype.hasOwnProperty.call(row, key)) {
-            normalizedRow[key.trim().toLowerCase()] = row[key];
-          }
+        const normalizedRow: Record<string, unknown> = {};
+        for (const key of Object.keys(row)) {
+          normalizedRow[key.trim().toLowerCase()] = row[key];
         }
 
         // Basic Mapping & Validation
@@ -1127,14 +1357,68 @@ export class PlayersService {
           continue;
         }
 
+        const rawPos = normalizedRow["position"];
+        const posResult = this.mapPlayerPosition(rawPos);
+        if (posResult.error) {
+          result.errors.push({
+            row: rowNumber,
+            error: posResult.error,
+          });
+          continue;
+        }
+
+        const rawDob = normalizedRow["date of birth"] ?? normalizedRow["dob"];
+        const dobResult = this.parseDateOfBirth(rawDob);
+        if (dobResult.error) {
+          result.errors.push({
+            row: rowNumber,
+            error: dobResult.error,
+          });
+          continue;
+        }
+
         const nationalityVal =
           normalizedRow["country"] || normalizedRow["nationality"];
         const jerseyVal =
-          normalizedRow["jersey number"] ||
-          normalizedRow["jersey"] ||
-          normalizedRow["jerseynumber"];
+          normalizedRow["jersey number"] ??
+          normalizedRow["jersey"] ??
+          normalizedRow["jerseynumber"] ??
+          normalizedRow["jersey_number"] ??
+          normalizedRow["number"] ??
+          normalizedRow["#"];
 
-        const candidate = {
+        let parsedJersey: number | undefined;
+        if (
+          jerseyVal !== undefined &&
+          jerseyVal !== null &&
+          String(jerseyVal).trim() !== ""
+        ) {
+          const num = parseInt(String(jerseyVal).trim(), 10);
+          if (!isNaN(num)) {
+            parsedJersey = num;
+          }
+        }
+
+        if (parsedJersey === undefined) {
+          result.errors.push({
+            row: rowNumber,
+            error: "Jersey number missing",
+          });
+          continue;
+        }
+
+        const candidate: {
+          firstName: string;
+          lastName: string;
+          email?: string;
+          height?: string;
+          phone?: string;
+          dateOfBirth?: Date;
+          nationality?: string;
+          jerseyNumber: number;
+          position?: PlayerPosition;
+          gender?: string;
+        } = {
           firstName: String(firstName).trim(),
           lastName: String(lastName).trim(),
           email: normalizedRow["email"]
@@ -1146,20 +1430,12 @@ export class PlayersService {
           phone: normalizedRow["phone"]
             ? String(normalizedRow["phone"])
             : undefined,
-          dateOfBirth:
-            normalizedRow["date of birth"] || normalizedRow["dob"]
-              ? new Date(normalizedRow["date of birth"] || normalizedRow["dob"])
-              : undefined,
+          dateOfBirth: dobResult.date,
           nationality: nationalityVal
             ? String(nationalityVal).trim()
             : undefined,
-          jerseyNumber:
-            jerseyVal !== undefined && jerseyVal !== null && jerseyVal !== ""
-              ? parseInt(String(jerseyVal))
-              : undefined,
-          position: normalizedRow["position"]
-            ? (normalizedRow["position"] as PlayerPosition)
-            : undefined,
+          jerseyNumber: parsedJersey,
+          position: posResult.position,
           gender: normalizedRow["gender"]
             ? String(normalizedRow["gender"]).trim()
             : undefined,
@@ -1186,23 +1462,8 @@ export class PlayersService {
           // Step 1 - Exact Match Found -> Use existing UUID/Link it
           // Step 2 - Potential Match Found -> Skip and flag for Admin review
           if (teamId && duplicateCheck.matchType === "EXACT_MATCH") {
-            // First check whether this player is already in the team
-            const alreadyInTeam = await this.prisma.playerTeam.findFirst({
-              where: {
-                teamId,
-                playerId: duplicateCheck.existingPlayer.id,
-                isActive: true,
-              },
-            });
-
-            // If already on the team, don't check their jersey number again
-            if (alreadyInTeam) {
-              result.details[result.details.length - 1].action =
-                "ALREADY_IN_TEAM";
-              continue;
-            }
-
-            // Check whether another active player is using this jersey number
+            let canLink = true;
+            // Check jersey availability if provided
             if (candidate.jerseyNumber) {
               const existingJersey = await this.prisma.playerTeam.findFirst({
                 where: {
@@ -1211,36 +1472,49 @@ export class PlayersService {
                   isActive: true,
                 },
               });
-
               if (existingJersey) {
                 result.errors.push({
                   row: rowNumber,
                   error: `Jersey ${candidate.jerseyNumber} taken`,
                 });
-                continue;
+                canLink = false;
               }
             }
 
-            // Link the existing player to the team
-            try {
-              await this.prisma.playerTeam.create({
-                data: {
-                  playerId: duplicateCheck.existingPlayer.id,
+            if (canLink) {
+              // Check if already in team
+              const alreadyInTeam = await this.prisma.playerTeam.findFirst({
+                where: {
                   teamId,
-                  jerseyNumber: candidate.jerseyNumber || 0,
+                  playerId: duplicateCheck.existingPlayer.id,
                   isActive: true,
                 },
               });
-            } catch (error: any) {
-              if (error.code === "P2002") {
-                throw new ConflictException(
-                  `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
-                );
-              }
-              throw error;
-            }
 
-            result.details[result.details.length - 1].action = "LINKED";
+              if (!alreadyInTeam) {
+                try {
+                  await this.prisma.playerTeam.create({
+                    data: {
+                      playerId: duplicateCheck.existingPlayer.id,
+                      teamId,
+                      jerseyNumber: candidate.jerseyNumber || 0, // Fallback to 0 or null if optional
+                      isActive: true,
+                    },
+                  });
+                } catch (error: any) {
+                  if (error.code === "P2002") {
+                    throw new ConflictException(
+                      `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
+                    );
+                  }
+                  throw error;
+                }
+                result.details[result.details.length - 1].action = "LINKED";
+              } else {
+                result.details[result.details.length - 1].action =
+                  "ALREADY_IN_TEAM";
+              }
+            }
           }
         } else {
           // Create New
@@ -1256,49 +1530,84 @@ export class PlayersService {
             if (existingJersey) {
               result.errors.push({
                 row: rowNumber,
-                error: `Jersey ${candidate.jerseyNumber} taken`,
+                status: duplicateCheck.matchType,
+                player: `${candidate.firstName} ${candidate.lastName}`,
+                matchScore: duplicateCheck.similarityScore.toFixed(2),
+                existingPlayerId: duplicateCheck.existingPlayer.id,
+                action: "LINKED",
               });
-              continue;
+            } else {
+              result.details.push({
+                row: rowNumber,
+                status: duplicateCheck.matchType,
+                player: `${candidate.firstName} ${candidate.lastName}`,
+                matchScore: duplicateCheck.similarityScore.toFixed(2),
+                existingPlayerId: duplicateCheck.existingPlayer.id,
+                action: "ALREADY_IN_TEAM",
+              });
             }
+          } else {
+            result.details.push({
+              row: rowNumber,
+              status: duplicateCheck.matchType,
+              player: `${candidate.firstName} ${candidate.lastName}`,
+              matchScore: duplicateCheck.similarityScore.toFixed(2),
+              existingPlayerId: duplicateCheck.existingPlayer.id,
+              action: "SKIPPED",
+            });
           }
+        } else {
+          // Create New Player and link in one transaction
+          await this.prisma.$transaction(async (tx) => {
+            const newPlayer = await tx.player.create({
+              data: {
+                firstName: candidate.firstName,
+                lastName: candidate.lastName,
+                email: candidate.email,
+                height: candidate.height,
+                phone: candidate.phone,
+                dateOfBirth: candidate.dateOfBirth,
+                nationality: candidate.nationality,
+                gender: candidate.gender,
+                position: candidate.position,
+              },
+            });
 
-          const newPlayer = await this.prisma.player.create({
-            data: {
-              firstName: candidate.firstName,
-              lastName: candidate.lastName,
-              email: candidate.email, // Unique constraint key!
-              height: candidate.height,
-              phone: candidate.phone,
-              dateOfBirth: candidate.dateOfBirth,
-              nationality: candidate.nationality,
-              gender: candidate.gender,
-              position: candidate.position,
-            } as any,
-          });
-
-          if (teamId) {
-            try {
-              await this.prisma.playerTeam.create({
-                data: {
+            if (teamId) {
+              const existingPt = await tx.playerTeam.findFirst({
+                where: {
                   playerId: newPlayer.id,
                   teamId,
-                  jerseyNumber: candidate.jerseyNumber || 0,
-                  isActive: true,
+                  jerseyNumber: candidate.jerseyNumber,
                 },
               });
-            } catch (error: any) {
-              if (error.code === "P2002") {
-                throw new ConflictException(
-                  `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
-                );
+
+              if (existingPt) {
+                await tx.playerTeam.update({
+                  where: { id: existingPt.id },
+                  data: {
+                    isActive: true,
+                    leftAt: null,
+                  },
+                });
+              } else {
+                await tx.playerTeam.create({
+                  data: {
+                    playerId: newPlayer.id,
+                    teamId,
+                    jerseyNumber: candidate.jerseyNumber,
+                    isActive: true,
+                  },
+                });
               }
-              throw error;
             }
-          }
+          });
+
           result.created++;
         }
-      } catch (error: any) {
-        result.errors.push({ row: rowNumber, error: error.message });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        result.errors.push({ row: rowNumber, error: msg });
       }
     }
 

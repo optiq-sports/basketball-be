@@ -18,12 +18,11 @@ import { AssignBroadcastersDto } from "./dto/assign-broadcasters.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { Role, MatchStatus } from "@prisma/client";
+import { Role } from "@prisma/client";
 import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
@@ -78,7 +77,10 @@ export class MatchesController {
     "/api/matches",
     "Tournament or Teams not found",
   )
-  create(@Body() createMatchDto: CreateMatchDto, @CurrentUser() user: any) {
+  create(
+    @Body() createMatchDto: CreateMatchDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.matchesService.create(createMatchDto, user);
   }
 
@@ -214,10 +216,17 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
+  @AppErrorResponse(
+    409,
+    "Conflict",
+    "PATCH",
+    "/api/matches/:id",
+    "Match key is already taken",
+  )
   update(
     @Param("id") id: string,
     @Body() updateMatchDto: UpdateMatchDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.matchesService.update(id, updateMatchDto, user);
   }
@@ -248,7 +257,7 @@ export class MatchesController {
     "/api/matches/:id",
     "Match not found",
   )
-  remove(@Param("id") id: string, @CurrentUser() user: any) {
+  remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.matchesService.remove(id, user);
   }
 }

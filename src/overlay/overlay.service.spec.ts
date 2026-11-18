@@ -260,6 +260,55 @@ describe("OverlayService", () => {
         updatedAt: storedDate,
       });
     });
+
+    it("should return blank state when broadcasterId is provided and broadcaster has no scene saved, without falling back", async () => {
+      mockPrisma.overlayScene.findFirst.mockResolvedValue(null);
+
+      const state = await service.getSceneState(
+        "client_1",
+        "match_1",
+        "usr_broadcaster_empty",
+      );
+      expect(state).toEqual({
+        activeScene: "blank",
+        visible: false,
+        scorebugVisible: true,
+        autoDismissAt: null,
+        payload: { v: 1 },
+        updatedAt: expect.any(Date),
+      });
+      // Ensure findFirst was only called once (with broadcasterId), not a second time without broadcasterId
+      expect(mockPrisma.overlayScene.findFirst).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.overlayScene.findFirst).toHaveBeenCalledWith({
+        where: {
+          matchId: "match_1",
+          broadcasterId: "usr_broadcaster_empty",
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+    });
+
+    it("should fall back to match-level scene when broadcasterId is not provided", async () => {
+      const matchSceneDate = new Date();
+      mockPrisma.overlayScene.findFirst.mockResolvedValue({
+        activeScene: "match_intro",
+        visible: true,
+        scorebugVisible: true,
+        autoDismissAt: null,
+        payload: { v: 1 },
+        updatedAt: matchSceneDate,
+      });
+
+      const state = await service.getSceneState("client_1", "match_1");
+      expect(state.activeScene).toBe("match_intro");
+      expect(mockPrisma.overlayScene.findFirst).toHaveBeenCalledWith({
+        where: {
+          matchId: "match_1",
+          clientId: "client_1",
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+    });
   });
 
   describe("saveSceneState, upsertScene & patchScene", () => {

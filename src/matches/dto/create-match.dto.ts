@@ -70,4 +70,13 @@ export class CreateMatchDto {
   @IsOptional()
   @IsEnum(MatchStage)
   stage?: MatchStage;
+
+  @ApiProperty({
+    example: "A8B2C4D1",
+    description: "Optional custom match key / code for statistician access",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  matchKey?: string;
 }

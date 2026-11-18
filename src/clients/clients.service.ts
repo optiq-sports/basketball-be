@@ -352,14 +352,7 @@ export class ClientsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Ensure user's role is CLIENT
-      if (user.role !== Role.CLIENT) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { role: Role.CLIENT },
-        });
-      }
-
+      // Preserve existing user role (e.g. ADMIN, STATISTICIAN) rather than demoting to CLIENT
       // Check if already assigned
       const existing = await tx.clientUser.findUnique({
         where: {
@@ -456,6 +449,12 @@ export class ClientsService {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const tokenPrefix = `emb_${rawKey.slice(0, 8)}...`;
 
+    // Until we decide who may grant the scope, accept it only from ADMIN and SUPER_ADMIN
+    const scopes =
+      (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) && dto.scopes
+        ? dto.scopes
+        : [];
+
     const created = await this.prisma.$transaction(async (tx) => {
       const embedToken = await tx.clientEmbedToken.create({
         data: {
@@ -464,6 +463,7 @@ export class ClientsService {
           tokenHash,
           tokenPrefix,
           allowedOrigins: dto.allowedOrigins,
+          scopes,
           isActive: true,
         },
       });
@@ -475,7 +475,7 @@ export class ClientsService {
         action: "CREATE_EMBED_TOKEN",
         entityType: "client_embed_token",
         entityId: embedToken.id,
-        after: { id: embedToken.id, name: embedToken.name, clientId },
+        after: { id: embedToken.id, name: embedToken.name, clientId, scopes },
       });
 
       return embedToken;
@@ -488,6 +488,7 @@ export class ClientsService {
       token, // Return ONCE
       tokenPrefix: created.tokenPrefix,
       allowedOrigins: created.allowedOrigins,
+      scopes: created.scopes,
       isActive: created.isActive,
       createdAt: created.createdAt,
     };
@@ -504,6 +505,7 @@ export class ClientsService {
         name: true,
         tokenPrefix: true,
         allowedOrigins: true,
+        scopes: true,
         isActive: true,
         revokedAt: true,
         lastUsedAt: true,

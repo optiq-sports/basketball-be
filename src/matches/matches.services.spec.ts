@@ -2,7 +2,11 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { MatchesService } from "./matches.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MatchStatus, Role } from "@prisma/client";
-import { NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
 import { AuthenticatedUser } from "src/common/interfaces/user.interface";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 
@@ -140,7 +144,28 @@ describe("MatchesService", () => {
 
       const result = await service.create(createDto, mockUser);
       expect(result).toEqual({ id: "match1" });
-      expect(mockPrismaService.match.create).toHaveBeenCalled();
+      expect(mockPrismaService.match.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            matchKey: expect.stringMatching(
+              /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/,
+            ),
+          }),
+        }),
+      );
+    });
+
+    it("should throw ConflictException if custom matchKey is already taken", async () => {
+      mockPrismaService.tournament.findFirst.mockResolvedValue({});
+      mockPrismaService.team.findUnique.mockResolvedValue({});
+      mockPrismaService.tournamentTeam.findUnique.mockResolvedValue({});
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "existing_match",
+      });
+
+      await expect(
+        service.create({ ...createDto, matchKey: "TAKENKEY" }, mockUser),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -221,10 +246,24 @@ describe("MatchesService", () => {
       expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            id: "m_broadcast",
-            OR: [
-              { clientId: { in: ["broadcast_client_1"] } },
-              { tournament: { clientId: { in: ["broadcast_client_1"] } } },
+            AND: [
+              {
+                OR: [
+                  { id: "m_broadcast" },
+                  {
+                    matchKey: {
+                      equals: "m_broadcast",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+              {
+                OR: [
+                  { clientId: { in: ["broadcast_client_1"] } },
+                  { tournament: { clientId: { in: ["broadcast_client_1"] } } },
+                ],
+              },
             ],
           },
         }),
@@ -245,6 +284,44 @@ describe("MatchesService", () => {
       expect(mockPrismaService.match.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ homeScore: 25 }),
+        }),
+      );
+    });
+
+    it("should throw ConflictException if matchKey is already taken by another match", async () => {
+      mockPrismaService.match.findFirst
+        .mockResolvedValueOnce({
+          id: "m1",
+          matchKey: "OLD_KEY",
+        })
+        .mockResolvedValueOnce({
+          id: "m2",
+          matchKey: "TAKEN_KEY",
+        });
+
+      await expect(
+        service.update("m1", { matchKey: "TAKEN_KEY" }, mockUser),
+      ).rejects.toThrow(
+        new ConflictException('Match key "TAKEN_KEY" is already taken'),
+      );
+    });
+
+    it("should allow updating match with custom matchKey when available", async () => {
+      mockPrismaService.match.findFirst
+        .mockResolvedValueOnce({
+          id: "m1",
+          matchKey: "OLD_KEY",
+        })
+        .mockResolvedValueOnce(null);
+      mockPrismaService.match.update.mockResolvedValue({
+        id: "m1",
+        matchKey: "NEW_KEY",
+      });
+
+      await service.update("m1", { matchKey: "new_key" }, mockUser);
+      expect(mockPrismaService.match.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ matchKey: "NEW_KEY" }),
         }),
       );
     });
@@ -311,12 +388,26 @@ describe("MatchesService", () => {
       expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            id: "m-assigned",
-            broadcasters: {
-              some: {
-                userId: "broadcaster-1",
+            AND: [
+              {
+                OR: [
+                  { id: "m-assigned" },
+                  {
+                    matchKey: {
+                      equals: "m-assigned",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
               },
-            },
+              {
+                broadcasters: {
+                  some: {
+                    userId: "broadcaster-1",
+                  },
+                },
+              },
+            ],
           },
           include: expect.objectContaining({
             gameSessions: {
@@ -374,8 +465,16 @@ describe("MatchesService", () => {
         });
 
       mockPrismaService.user.findMany.mockResolvedValueOnce([
-        { id: "b-1" },
-        { id: "b-2" },
+        {
+          id: "b-1",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-1" }],
+        },
+        {
+          id: "b-2",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-1" }],
+        },
       ]);
 
       const result = await service.assignBroadcasters(
@@ -408,43 +507,226 @@ describe("MatchesService", () => {
       expect(result.id).toBe("m-1");
     });
 
-    it("should throw BadRequestException if one or more broadcaster IDs are invalid", async () => {
+    it("should throw BadRequestException naming failed IDs and reasons if invalid", async () => {
       mockPrismaService.match.findFirst.mockResolvedValueOnce({
         id: "m-1",
         clientId: "client-1",
         broadcasters: [],
       });
 
-      mockPrismaService.user.findMany.mockResolvedValueOnce([{ id: "b-1" }]); // b-2 missing or not BROADCASTER
+      mockPrismaService.user.findMany.mockResolvedValueOnce([
+        {
+          id: "b-1",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-1" }],
+        },
+        {
+          id: "b-admin",
+          role: Role.ADMIN,
+          clientUsers: [{ clientId: "client-1" }],
+        },
+      ]); // b-missing not found, b-admin not a broadcaster
 
       await expect(
-        service.assignBroadcasters("m-1", ["b-1", "b-2"], mockUser),
-      ).rejects.toThrow(BadRequestException);
+        service.assignBroadcasters(
+          "m-1",
+          ["b-1", "b-admin", "b-missing"],
+          mockUser,
+        ),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "One or more broadcaster IDs are invalid: b-admin (not a broadcaster), b-missing (not found)",
+        ),
+      );
     });
 
-    it("should refuse broadcaster not linked to match client", async () => {
+    it("should refuse broadcaster not linked to match client and name the ID", async () => {
       mockPrismaService.match.findFirst.mockResolvedValueOnce({
         id: "m-1",
         clientId: "client-1",
         broadcasters: [],
       });
 
-      // User exists and is broadcaster, but not returned because not linked to client-1
-      mockPrismaService.user.findMany.mockResolvedValueOnce([]);
+      // User exists and is broadcaster, but linked to client-2
+      mockPrismaService.user.findMany.mockResolvedValueOnce([
+        {
+          id: "b-other-client",
+          role: Role.BROADCASTER,
+          clientUsers: [{ clientId: "client-2" }],
+        },
+      ]);
 
       await expect(
         service.assignBroadcasters("m-1", ["b-other-client"], mockUser),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.user.findMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: ["b-other-client"] },
-          role: Role.BROADCASTER,
-          clientUsers: {
-            some: { clientId: "client-1" },
-          },
-        },
-        select: { id: true },
+      ).rejects.toThrow(
+        new BadRequestException(
+          "One or more broadcaster IDs are invalid: b-other-client (other client)",
+        ),
+      );
+    });
+  });
+
+  describe("statistician scoping in findAll and findOne", () => {
+    const statisticianUser: AuthenticatedUser = {
+      id: "stat-1",
+      name: "Stat User",
+      email: "stat@example.com",
+      role: Role.STATISTICIAN,
+      clientIds: [],
+    };
+
+    const statisticianWithClients: AuthenticatedUser = {
+      id: "stat-2",
+      name: "Stat With Clients",
+      email: "stat2@example.com",
+      role: Role.STATISTICIAN,
+      clientIds: ["client-alpha"],
+    };
+
+    it("should allow statistician without clientIds to see matches assigned to them in findAll", async () => {
+      mockPrismaService.match.findMany.mockResolvedValueOnce([
+        { id: "m-assigned-stat", statisticianId: "stat-1" },
+      ]);
+      mockPrismaService.match.count.mockResolvedValueOnce(1);
+
+      const result = await service.findAll(
+        statisticianUser,
+        { page: 1, limit: 10 },
+        statisticianUser.id,
+      );
+
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            statisticianId: "stat-1",
+          }),
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
+    it("should allow statistician with clientIds to see assigned matches and unassigned matches in their clients", async () => {
+      mockPrismaService.match.findMany.mockResolvedValueOnce([
+        { id: "m-assigned-stat", statisticianId: "stat-2" },
+      ]);
+      mockPrismaService.match.count.mockResolvedValueOnce(1);
+
+      await service.findAll(
+        statisticianWithClients,
+        { page: 1, limit: 10 },
+        statisticianWithClients.id,
+      );
+
+      expect(mockPrismaService.match.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { statisticianId: "stat-2" },
+              {
+                statisticianId: null,
+                OR: [
+                  { clientId: { in: ["client-alpha"] } },
+                  { tournament: { clientId: { in: ["client-alpha"] } } },
+                ],
+              },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it("should allow statistician to open assigned match in findOne regardless of client", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-assigned-stat",
+        clientId: "different-client",
+        statisticianId: "stat-1",
       });
+
+      const result = await service.findOne("m-assigned-stat", statisticianUser);
+
+      expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              {
+                OR: [
+                  { id: "m-assigned-stat" },
+                  {
+                    matchKey: {
+                      equals: "m-assigned-stat",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+              {
+                OR: [
+                  { statisticianId: "stat-1" },
+                  {
+                    statisticianId: null,
+                    OR: [
+                      {
+                        matchKey: {
+                          equals: "m-assigned-stat",
+                          mode: "insensitive",
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+      expect(result.id).toBe("m-assigned-stat");
+    });
+
+    it("should allow statistician to open match using matchKey directly", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce({
+        id: "m-assigned-stat",
+        matchKey: "MATCH123",
+        statisticianId: "stat-1",
+      });
+
+      const result = await service.findOne("MATCH123", statisticianUser);
+
+      expect(mockPrismaService.match.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { id: "MATCH123" },
+                  {
+                    matchKey: {
+                      equals: "MATCH123",
+                      mode: "insensitive",
+                    },
+                  },
+                ],
+              },
+            ]),
+          }),
+        }),
+      );
+      expect(result.id).toBe("m-assigned-stat");
+    });
+
+    it("should throw NotFoundException in findOne if match is not assigned to statistician", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.findOne("m-assigned-to-other", statisticianUser),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should refuse statistician outside client from opening unassigned match by id", async () => {
+      mockPrismaService.match.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.findOne("unassigned_cuid_from_other_client", statisticianUser),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
