@@ -1186,8 +1186,23 @@ export class PlayersService {
           // Step 1 - Exact Match Found -> Use existing UUID/Link it
           // Step 2 - Potential Match Found -> Skip and flag for Admin review
           if (teamId && duplicateCheck.matchType === "EXACT_MATCH") {
-            let canLink = true;
-            // Check jersey availability if provided
+            // First check whether this player is already in the team
+            const alreadyInTeam = await this.prisma.playerTeam.findFirst({
+              where: {
+                teamId,
+                playerId: duplicateCheck.existingPlayer.id,
+                isActive: true,
+              },
+            });
+
+            // If already on the team, don't check their jersey number again
+            if (alreadyInTeam) {
+              result.details[result.details.length - 1].action =
+                "ALREADY_IN_TEAM";
+              continue;
+            }
+
+            // Check whether another active player is using this jersey number
             if (candidate.jerseyNumber) {
               const existingJersey = await this.prisma.playerTeam.findFirst({
                 where: {
@@ -1196,49 +1211,36 @@ export class PlayersService {
                   isActive: true,
                 },
               });
+
               if (existingJersey) {
                 result.errors.push({
                   row: rowNumber,
                   error: `Jersey ${candidate.jerseyNumber} taken`,
                 });
-                canLink = false;
+                continue;
               }
             }
 
-            if (canLink) {
-              // Check if already in team
-              const alreadyInTeam = await this.prisma.playerTeam.findFirst({
-                where: {
-                  teamId,
+            // Link the existing player to the team
+            try {
+              await this.prisma.playerTeam.create({
+                data: {
                   playerId: duplicateCheck.existingPlayer.id,
+                  teamId,
+                  jerseyNumber: candidate.jerseyNumber || 0,
                   isActive: true,
                 },
               });
-
-              if (!alreadyInTeam) {
-                try {
-                  await this.prisma.playerTeam.create({
-                    data: {
-                      playerId: duplicateCheck.existingPlayer.id,
-                      teamId,
-                      jerseyNumber: candidate.jerseyNumber || 0, // Fallback to 0 or null if optional
-                      isActive: true,
-                    },
-                  });
-                } catch (error: any) {
-                  if (error.code === "P2002") {
-                    throw new ConflictException(
-                      `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
-                    );
-                  }
-                  throw error;
-                }
-                result.details[result.details.length - 1].action = "LINKED";
-              } else {
-                result.details[result.details.length - 1].action =
-                  "ALREADY_IN_TEAM";
+            } catch (error: any) {
+              if (error.code === "P2002") {
+                throw new ConflictException(
+                  `Jersey number ${candidate.jerseyNumber} is already taken in this team`,
+                );
               }
+              throw error;
             }
+
+            result.details[result.details.length - 1].action = "LINKED";
           }
         } else {
           // Create New
