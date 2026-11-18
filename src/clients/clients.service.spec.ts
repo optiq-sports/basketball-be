@@ -86,6 +86,7 @@ describe("ClientsService", () => {
 
   const mockUser: AuthenticatedUser = {
     id: "user1",
+    name: "User One",
     email: "test@example.com",
     role: Role.CLIENT,
     clientIds: ["client1"],
@@ -93,6 +94,7 @@ describe("ClientsService", () => {
 
   const adminUser: AuthenticatedUser = {
     id: "admin1",
+    name: "Admin One",
     email: "admin@example.com",
     role: Role.ADMIN,
     clientIds: ["client1"],
@@ -100,6 +102,7 @@ describe("ClientsService", () => {
 
   const otherAdmin: AuthenticatedUser = {
     id: "admin2",
+    name: "Admin Two",
     email: "admin2@example.com",
     role: Role.ADMIN,
     clientIds: ["client2"],
@@ -107,6 +110,7 @@ describe("ClientsService", () => {
 
   const superAdminUser: AuthenticatedUser = {
     id: "superadmin1",
+    name: "Super Admin",
     email: "super@example.com",
     role: Role.SUPER_ADMIN,
     clientIds: [],
@@ -214,17 +218,13 @@ describe("ClientsService", () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it("should update user role to CLIENT if not already CLIENT", async () => {
+    it("should preserve user role (e.g. ADMIN) and not overwrite it to CLIENT", async () => {
       (prisma.client.findUnique as jest.Mock).mockResolvedValue({
         id: "client1",
       });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: "u1",
         role: Role.ADMIN,
-      });
-      (prisma.user.update as jest.Mock).mockResolvedValue({
-        id: "u1",
-        role: Role.CLIENT,
       });
       (prisma.clientUser.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.clientUser.create as jest.Mock).mockResolvedValue({
@@ -234,11 +234,51 @@ describe("ClientsService", () => {
 
       await service.assignUserToClient("client1", { userId: "u1" }, adminUser);
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: "u1" },
-        data: { role: Role.CLIENT },
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.clientUser.create).toHaveBeenCalledWith({
+        data: {
+          clientId: "client1",
+          userId: "u1",
+        },
       });
-      expect(prisma.clientUser.create).toHaveBeenCalled();
+    });
+
+    it("should allow assigning a BROADCASTER user to multiple clients while preserving role", async () => {
+      (prisma.client.findUnique as jest.Mock).mockResolvedValue({
+        id: "client2",
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "broadcaster-1",
+        role: Role.BROADCASTER,
+      });
+      (prisma.clientUser.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.clientUser.create as jest.Mock).mockResolvedValue({
+        clientId: "client2",
+        userId: "broadcaster-1",
+      });
+
+      const superUser: AuthenticatedUser = {
+        id: "super-1",
+        email: "super@example.com",
+        name: "Super Admin",
+        role: Role.SUPER_ADMIN,
+      };
+
+      const result = await service.assignUserToClient(
+        "client2",
+        { userId: "broadcaster-1" },
+        superUser,
+      );
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.clientUser.create).toHaveBeenCalledWith({
+        data: {
+          clientId: "client2",
+          userId: "broadcaster-1",
+        },
+      });
+      expect(result.clientId).toBe("client2");
+      expect(result.userId).toBe("broadcaster-1");
     });
 
     it("should throw BadRequestException if assigning a SUPER_ADMIN", async () => {
@@ -342,6 +382,80 @@ describe("ClientsService", () => {
           allowedOrigins: ["https://example.com"],
           tokenHash: expect.any(String),
           tokenPrefix: expect.any(String),
+          scopes: [],
+        }),
+      });
+    });
+
+    it("should allow ADMIN and SUPER_ADMIN to grant scopes to embed token", async () => {
+      (prisma.client.findUnique as jest.Mock).mockResolvedValue({
+        id: "client1",
+      });
+
+      const adminUser: AuthenticatedUser = {
+        id: "admin1",
+        email: "admin@example.com",
+        role: Role.ADMIN,
+        clientIds: ["client1"],
+      };
+
+      (prisma.clientEmbedToken.create as jest.Mock).mockResolvedValue({
+        id: "emb_2",
+        clientId: "client1",
+        name: "Chart Widget",
+        allowedOrigins: ["https://example.com"],
+        scopes: ["advanced_analytics"],
+        isActive: true,
+        createdAt: new Date(),
+      });
+
+      const result = await service.createEmbedToken(adminUser, {
+        name: "Chart Widget",
+        allowedOrigins: ["https://example.com"],
+        clientId: "client1",
+        scopes: ["advanced_analytics"],
+      });
+
+      expect(prisma.clientEmbedToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          scopes: ["advanced_analytics"],
+        }),
+      });
+      expect(result.scopes).toEqual(["advanced_analytics"]);
+    });
+
+    it("should ignore scopes when non-admin caller provides scopes", async () => {
+      (prisma.client.findUnique as jest.Mock).mockResolvedValue({
+        id: "client1",
+      });
+
+      const clientUser: AuthenticatedUser = {
+        id: "client_user1",
+        email: "client@example.com",
+        role: Role.CLIENT,
+        clientIds: ["client1"],
+      };
+
+      (prisma.clientEmbedToken.create as jest.Mock).mockResolvedValue({
+        id: "emb_3",
+        clientId: "client1",
+        name: "Chart Widget",
+        allowedOrigins: ["https://example.com"],
+        scopes: [],
+        isActive: true,
+        createdAt: new Date(),
+      });
+
+      await service.createEmbedToken(clientUser, {
+        name: "Chart Widget",
+        allowedOrigins: ["https://example.com"],
+        clientId: "client1",
+        scopes: ["advanced_analytics"],
+      });
+
+      expect(prisma.clientEmbedToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          scopes: [],
         }),
       });
     });

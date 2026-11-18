@@ -1,4 +1,4 @@
-import { PartialType, ApiProperty } from "@nestjs/swagger";
+import { PartialType, ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { CreateMatchDto } from "./create-match.dto";
 import {
   IsOptional,
@@ -110,4 +110,12 @@ export class UpdateMatchDto extends PartialType(CreateMatchDto) {
   @ValidateIf((object, value) => value !== null)
   @IsString()
   statisticianId?: string | null;
+
+  @ApiPropertyOptional({
+    example: "A8B2C4D1",
+    description: "Optional custom match key / code for statistician access",
+  })
+  @IsOptional()
+  @IsString()
+  matchKey?: string;
 }

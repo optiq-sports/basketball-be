@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateBroadcasterDto } from "./dto/create-broadcaster.dto";
@@ -52,6 +53,19 @@ export class BroadcasterService {
       createBroadcasterDto.clientId ||
       (actorUser?.role === Role.ADMIN ? actorUser.clientIds?.[0] : undefined);
 
+    if (!targetClientId) {
+      throw new BadRequestException(
+        "clientId is required when actor has no assigned client",
+      );
+    }
+
+    const client = await this.prisma.client.findUnique({
+      where: { id: targetClientId },
+    });
+    if (!client) {
+      throw new NotFoundException(`Client with ID ${targetClientId} not found`);
+    }
+
     if (existingUser) {
       if (actorUser?.role === Role.ADMIN) {
         throw new ConflictException("User with this email already exists");
@@ -78,11 +92,31 @@ export class BroadcasterService {
       const updatedUser = await this.prisma.user.findUnique({
         where: { id: existingUser.id },
         omit: { password: true },
-        include: { profile: true },
+        include: {
+          profile: true,
+          clientUsers: {
+            include: {
+              client: { select: { id: true, name: true } },
+            },
+          },
+        },
       });
 
+      const clientIds = (updatedUser?.clientUsers || []).map(
+        (cu) => cu.clientId,
+      );
+      const clients = (updatedUser?.clientUsers || [])
+        .filter((cu) => cu.client)
+        .map((cu) => ({
+          id: cu.client.id,
+          name: cu.client.name,
+        }));
+      const { clientUsers: _cu, ...rest } = updatedUser || {};
+
       return {
-        ...updatedUser,
+        ...rest,
+        clientIds,
+        clients,
         emailSent: false,
       };
     }
@@ -155,7 +189,14 @@ export class BroadcasterService {
       return tx.user.findUnique({
         where: { id: user.id },
         omit: { password: true },
-        include: { profile: true },
+        include: {
+          profile: true,
+          clientUsers: {
+            include: {
+              client: { select: { id: true, name: true } },
+            },
+          },
+        },
       });
     });
 
@@ -165,18 +206,44 @@ export class BroadcasterService {
       Role.BROADCASTER,
     );
 
+    const clientIds = (createdUser?.clientUsers || []).map((cu) => cu.clientId);
+    const clients = (createdUser?.clientUsers || [])
+      .filter((cu) => cu.client)
+      .map((cu) => ({
+        id: cu.client.id,
+        name: cu.client.name,
+      }));
+    const { clientUsers: _cu, ...rest } = createdUser || {};
+
     return {
-      ...createdUser,
+      ...rest,
+      clientIds,
+      clients,
       emailSent: Boolean(emailSent),
     };
   }
 
   async findAll(filterDto: BroadcasterFilterDto, user?: AuthenticatedUser) {
-    const { status, page = 1, limit = 10 } = filterDto || {};
+    const { status, page = 1, limit = 10, clientId } = filterDto || {};
 
     const where: Prisma.UserWhereInput = { role: Role.BROADCASTER };
 
-    if (user && user.role === Role.ADMIN) {
+    if (clientId) {
+      if (
+        user &&
+        user.role === Role.ADMIN &&
+        (!user.clientIds || !user.clientIds.includes(clientId))
+      ) {
+        throw new ForbiddenException(
+          "Not authorized to view broadcasters for this client",
+        );
+      }
+      where.clientUsers = {
+        some: {
+          clientId,
+        },
+      };
+    } else if (user && user.role === Role.ADMIN) {
       where.clientUsers = {
         some: {
           clientId: { in: user.clientIds || [] },
@@ -207,13 +274,37 @@ export class BroadcasterService {
         take,
         orderBy,
         omit: { password: true },
-        include: { profile: true },
+        include: {
+          profile: true,
+          clientUsers: {
+            include: {
+              client: { select: { id: true, name: true } },
+            },
+          },
+        },
       }),
       this.prisma.user.count({ where }),
     ]);
 
+    const formattedItems = items.map((item) => {
+      const clientUsers = item.clientUsers || [];
+      const clientIds = clientUsers.map((cu) => cu.clientId);
+      const clients = clientUsers
+        .filter((cu) => cu.client)
+        .map((cu) => ({
+          id: cu.client.id,
+          name: cu.client.name,
+        }));
+      const { clientUsers: _cu, ...rest } = item;
+      return {
+        ...rest,
+        clientIds,
+        clients,
+      };
+    });
+
     return new PaginatedResponseDto(
-      items,
+      formattedItems,
       new PageMetaDto({ page, limit, itemCount }),
     );
   }
@@ -224,7 +315,11 @@ export class BroadcasterService {
       omit: { password: true },
       include: {
         profile: true,
-        clientUsers: true,
+        clientUsers: {
+          include: {
+            client: { select: { id: true, name: true } },
+          },
+        },
       },
     });
 
@@ -272,10 +367,19 @@ export class BroadcasterService {
       awayScore: mb.match.awayScore,
     }));
 
+    const clientIds = broadcaster.clientUsers.map((cu) => cu.clientId);
+    const clients = broadcaster.clientUsers
+      .filter((cu) => cu.client)
+      .map((cu) => ({
+        id: cu.client.id,
+        name: cu.client.name,
+      }));
     const { clientUsers: _cu, ...broadcasterData } = broadcaster;
 
     return {
       ...broadcasterData,
+      clientIds,
+      clients,
       assignedMatches,
     };
   }

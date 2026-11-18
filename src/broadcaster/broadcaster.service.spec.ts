@@ -8,6 +8,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
 
@@ -32,6 +33,9 @@ describe("BroadcasterService", () => {
     },
     clientUser: {
       create: jest.fn(),
+    },
+    client: {
+      findUnique: jest.fn(),
     },
     matchBroadcaster: {
       findMany: jest.fn(),
@@ -69,6 +73,10 @@ describe("BroadcasterService", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrismaService.client.findUnique.mockResolvedValue({
+      id: "client-1",
+      name: "Client 1",
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -127,6 +135,27 @@ describe("BroadcasterService", () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it("should throw BadRequestException if actor has no client and sends no clientId", async () => {
+      await expect(
+        service.create({ email: "new@example.com" }, mockSuperAdmin),
+      ).rejects.toThrow(
+        new BadRequestException(
+          "clientId is required when actor has no assigned client",
+        ),
+      );
+    });
+
+    it("should throw NotFoundException if specified clientId does not exist", async () => {
+      mockPrismaService.client.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.create(
+          { email: "new@example.com", clientId: "non-existent" },
+          mockSuperAdmin,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
     it("should allow SUPER_ADMIN to link existing broadcaster to a new client", async () => {
       mockPrismaService.user.findUnique
         .mockResolvedValueOnce({
@@ -141,6 +170,12 @@ describe("BroadcasterService", () => {
           name: "Existing Broadcaster",
           role: Role.BROADCASTER,
           profile: { fullName: "Existing Broadcaster" },
+          clientUsers: [
+            {
+              clientId: "client-1",
+              client: { id: "client-1", name: "Client 1" },
+            },
+          ],
         });
 
       mockPrismaService.clientUser.create.mockResolvedValueOnce({
@@ -159,6 +194,8 @@ describe("BroadcasterService", () => {
       });
       expect(result.id).toBe("broadcaster-1");
       expect(result.emailSent).toBe(false);
+      expect(result.clientIds).toEqual(["client-1"]);
+      expect(result.clients).toEqual([{ id: "client-1", name: "Client 1" }]);
     });
 
     it("should create a new broadcaster user, profile, clientUser, and send welcome email", async () => {
@@ -171,6 +208,12 @@ describe("BroadcasterService", () => {
           role: Role.BROADCASTER,
           status: UserStatus.ACTIVE,
           profile: { id: "p-1", fullName: "New Broadcaster" },
+          clientUsers: [
+            {
+              clientId: "client-1",
+              client: { id: "client-1", name: "Client 1" },
+            },
+          ],
         });
 
       mockPrismaService.user.create.mockResolvedValueOnce({
@@ -214,6 +257,8 @@ describe("BroadcasterService", () => {
       );
       expect(result.emailSent).toBe(true);
       expect(result.id).toBe("new-user-1");
+      expect(result.clientIds).toEqual(["client-1"]);
+      expect(result.clients).toEqual([{ id: "client-1", name: "Client 1" }]);
     });
   });
 
@@ -227,6 +272,12 @@ describe("BroadcasterService", () => {
           role: Role.BROADCASTER,
           status: UserStatus.ACTIVE,
           profile: null,
+          clientUsers: [
+            {
+              clientId: "client-1",
+              client: { id: "client-1", name: "Client 1" },
+            },
+          ],
         },
       ]);
       mockPrismaService.user.count.mockResolvedValueOnce(1);
@@ -244,7 +295,35 @@ describe("BroadcasterService", () => {
         }),
       );
       expect(result.items).toHaveLength(1);
+      expect(result.items[0].clientIds).toEqual(["client-1"]);
+      expect(result.items[0].clients).toEqual([
+        { id: "client-1", name: "Client 1" },
+      ]);
       expect(result.meta.itemCount).toBe(1);
+    });
+
+    it("should filter by clientId when provided", async () => {
+      mockPrismaService.user.findMany.mockResolvedValueOnce([]);
+      mockPrismaService.user.count.mockResolvedValueOnce(0);
+
+      await service.findAll({ clientId: "client-1" }, mockAdminUser);
+
+      expect(mockPrismaService.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            role: Role.BROADCASTER,
+            clientUsers: {
+              some: { clientId: "client-1" },
+            },
+          }),
+        }),
+      );
+    });
+
+    it("should reject ADMIN filtering by clientId not assigned to them", async () => {
+      await expect(
+        service.findAll({ clientId: "other-client" }, mockAdminUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -274,7 +353,12 @@ describe("BroadcasterService", () => {
         id: "b-1",
         email: "b1@example.com",
         role: Role.BROADCASTER,
-        clientUsers: [{ clientId: "client-1" }],
+        clientUsers: [
+          {
+            clientId: "client-1",
+            client: { id: "client-1", name: "Client 1" },
+          },
+        ],
         profile: { fullName: "Broadcaster 1" },
       });
 
@@ -299,6 +383,8 @@ describe("BroadcasterService", () => {
       const result = await service.findOne("b-1", mockAdminUser);
 
       expect(result.id).toBe("b-1");
+      expect(result.clientIds).toEqual(["client-1"]);
+      expect(result.clients).toEqual([{ id: "client-1", name: "Client 1" }]);
       expect(result.assignedMatches).toHaveLength(1);
       expect(result.assignedMatches[0].matchId).toBe("match-1");
     });

@@ -48,7 +48,10 @@ export class StatdashSessionsService {
     // Look up match by id or matchKey first without narrowing by statistician
     const match = await this.prisma.match.findFirst({
       where: {
-        OR: [{ id: normalizedMatchKey }, { matchKey: normalizedMatchKey }],
+        OR: [
+          { id: normalizedMatchKey },
+          { matchKey: { equals: normalizedMatchKey, mode: "insensitive" } },
+        ],
       },
       include: {
         gameSessions: true,
@@ -138,9 +141,36 @@ export class StatdashSessionsService {
       });
     }
 
+    if (session && !session.match?.statisticianId && statisticianId) {
+      const statClientUsers = await this.prisma.clientUser.findMany({
+        where: { userId: statisticianId },
+        select: { clientId: true },
+      });
+      const statClientIds = new Set(statClientUsers.map((c) => c.clientId));
+      const isInClient = Boolean(
+        session.match?.clientId && statClientIds.has(session.match.clientId),
+      );
+
+      if (isInClient) {
+        await this.prisma.match.update({
+          where: { id: session.matchId },
+          data: { statisticianId },
+        });
+        if (session.match) {
+          session.match.statisticianId = statisticianId;
+        }
+      }
+    }
+
     if (!session && input.matchId) {
-      const match = await this.prisma.match.findUnique({
-        where: { id: input.matchId },
+      const normalizedMatchId = input.matchId.trim();
+      const match = await this.prisma.match.findFirst({
+        where: {
+          OR: [
+            { id: normalizedMatchId },
+            { matchKey: { equals: normalizedMatchId, mode: "insensitive" } },
+          ],
+        },
       });
       if (!match) {
         throw new NotFoundException({
@@ -161,19 +191,38 @@ export class StatdashSessionsService {
         });
       }
 
-      // Claim the match if it is unassigned
+      // Claim the match if it is unassigned and accessible (found by key OR in client)
       if (!match.statisticianId && statisticianId) {
+        const statClientUsers = await this.prisma.clientUser.findMany({
+          where: { userId: statisticianId },
+          select: { clientId: true },
+        });
+        const statClientIds = new Set(statClientUsers.map((c) => c.clientId));
+        const isInClient = statClientIds.has(match.clientId);
+        const wasFoundByKey = Boolean(
+          match.matchKey &&
+          match.matchKey.toUpperCase() === normalizedMatchId.toUpperCase(),
+        );
+
+        if (!isInClient && !wasFoundByKey) {
+          throw new NotFoundException({
+            code: "SD_SESSION_MATCH_NOT_FOUND",
+            message: "Match does not exist",
+          });
+        }
+
         await this.prisma.match.update({
           where: { id: match.id },
           data: { statisticianId },
         });
+        match.statisticianId = statisticianId;
       }
 
       session = await this.prisma.gameSession.upsert({
-        where: { matchId: input.matchId },
+        where: { matchId: match.id },
         update: {},
         create: {
-          matchId: input.matchId,
+          matchId: match.id,
           homeScore: match.homeScore,
           awayScore: match.awayScore,
         },

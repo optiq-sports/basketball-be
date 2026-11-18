@@ -74,6 +74,14 @@ export class BroadcasterAssignedMatchDto {
   awayScore?: number | null;
 }
 
+export class BroadcasterClientSummaryDto {
+  @ApiProperty({ example: "client_123" })
+  id: string;
+
+  @ApiProperty({ example: "Organization 1" })
+  name: string;
+}
+
 export class BroadcasterResponseDto {
   @ApiProperty({ example: "user_123" })
   id: string;
@@ -107,4 +115,17 @@ export class BroadcasterResponseDto {
     description: "Matches assigned to this broadcaster",
   })
   assignedMatches?: BroadcasterAssignedMatchDto[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ["client_123"],
+    description: "Client IDs this broadcaster belongs to",
+  })
+  clientIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [BroadcasterClientSummaryDto],
+    description: "Clients this broadcaster belongs to",
+  })
+  clients?: BroadcasterClientSummaryDto[];
 }
