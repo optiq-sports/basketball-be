@@ -45,6 +45,12 @@ export class StatdashSessionDto {
   @ApiProperty({ example: 600 })
   clockSecondsRemaining: number;
 
+  @ApiProperty({ example: false })
+  clockRunning: boolean;
+
+  @ApiProperty({ example: "2024-01-01T00:00:00.000Z" })
+  clockUpdatedAt: Date;
+
   @ApiProperty({ example: 82 })
   homeScore: number;
 
@@ -126,6 +132,12 @@ export class StatdashSessionSnapshotDto {
 
   @ApiProperty({ example: 600 })
   clockSecondsRemaining: number;
+
+  @ApiProperty({ example: false })
+  clockRunning: boolean;
+
+  @ApiProperty({ example: "2024-01-01T00:00:00.000Z" })
+  clockUpdatedAt: Date;
 
   @ApiProperty({ example: { home: 82, away: 76 } })
   score: {

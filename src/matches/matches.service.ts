@@ -21,6 +21,11 @@ import { MatchFilterDto } from "./dto/match-filter.dto";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import {
+  checkMatchCategoryCompatibility,
+  MismatchApprovalRecord,
+  resolveMismatchApproval,
+} from "../common/utils/category.util";
 
 @Injectable()
 export class MatchesService {
@@ -96,6 +101,23 @@ export class MatchesService {
       );
     }
 
+    const compatibility = checkMatchCategoryCompatibility(
+      homeTeam.category,
+      awayTeam.category,
+      tournament.category,
+    );
+    let approvalData: Partial<MismatchApprovalRecord> = {};
+    if (!compatibility.compatible) {
+      approvalData = resolveMismatchApproval({
+        approveMismatch: createMatchDto.approveMismatch,
+        mismatchReason: createMatchDto.mismatchReason,
+        user,
+        code: compatibility.code ?? "MATCH_CATEGORY_MISMATCH",
+        message:
+          compatibility.message ?? "Match team categories are not compatible",
+      });
+    }
+
     let matchKey: string;
     if (createMatchDto.matchKey?.trim()) {
       const customKey = createMatchDto.matchKey.trim().toUpperCase();
@@ -131,6 +153,7 @@ export class MatchesService {
         statisticianId: createMatchDto.statisticianId,
         clientId: tournament.clientId,
         matchKey,
+        ...approvalData,
         scheduledDate: new Date(
           createMatchDto.scheduledDate.endsWith("Z") ||
             createMatchDto.scheduledDate.includes("+") ||

@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { TournamentDivision, TournamentFormat } from "@prisma/client";
+import { Category, TournamentDivision, TournamentFormat } from "@prisma/client";
 
 export class TournamentTeamResponseDto {
   @ApiProperty({ example: "tt_123" })
@@ -13,6 +13,26 @@ export class TournamentTeamResponseDto {
 
   @ApiProperty({ example: "A", required: false, nullable: true })
   group?: string | null;
+
+  @ApiProperty({ example: false, required: false })
+  mismatchApproved?: boolean;
+
+  @ApiProperty({ example: "admin_1", required: false, nullable: true })
+  mismatchApprovedById?: string | null;
+
+  @ApiProperty({
+    example: "2024-01-01T00:00:00Z",
+    required: false,
+    nullable: true,
+  })
+  mismatchApprovedAt?: Date | null;
+
+  @ApiProperty({
+    example: "Approved exception",
+    required: false,
+    nullable: true,
+  })
+  mismatchReason?: string | null;
 
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   createdAt: Date;
@@ -39,6 +59,14 @@ export class TournamentResponseDto {
     example: TournamentDivision.DIVISION_1,
   })
   division: TournamentDivision;
+
+  @ApiProperty({
+    enum: Category,
+    example: Category.MEN,
+    required: false,
+    nullable: true,
+  })
+  category?: Category | null;
 
   @ApiProperty({
     enum: TournamentFormat,

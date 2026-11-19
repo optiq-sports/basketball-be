@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Category } from "@prisma/client";
 import {
   PlayerResponseDto,
   PlayerTeamResponseDto,
@@ -13,6 +14,14 @@ export class TeamResponseDto {
 
   @ApiProperty({ example: "CHI" })
   code: string;
+
+  @ApiProperty({
+    enum: Category,
+    example: Category.MEN,
+    required: false,
+    nullable: true,
+  })
+  category?: Category | null;
 
   @ApiProperty({ example: "#CE1141", required: false })
   color?: string;

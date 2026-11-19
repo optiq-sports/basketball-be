@@ -4,8 +4,7 @@ import {
   IsDateString,
   IsOptional,
   IsEnum,
-  IsInt,
-  Min,
+  IsBoolean,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { MatchStatus, MatchStage } from "@prisma/client";
@@ -79,4 +78,22 @@ export class CreateMatchDto {
   @IsOptional()
   @IsString()
   matchKey?: string;
+
+  @ApiProperty({
+    example: false,
+    description: "ADMIN/SUPER_ADMIN approval for a category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  approveMismatch?: boolean;
+
+  @ApiProperty({
+    example: "Approved exhibition match",
+    description: "Reason for approving a category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  mismatchReason?: string;
 }

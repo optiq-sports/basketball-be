@@ -91,6 +91,26 @@ export class MatchResponseDto {
   @ApiProperty({ example: "2024-01-01T00:00:00Z" })
   updatedAt: Date;
 
+  @ApiProperty({ example: false, required: false })
+  mismatchApproved?: boolean;
+
+  @ApiProperty({ example: "admin_1", required: false, nullable: true })
+  mismatchApprovedById?: string | null;
+
+  @ApiProperty({
+    example: "2024-01-01T00:00:00Z",
+    required: false,
+    nullable: true,
+  })
+  mismatchApprovedAt?: Date | null;
+
+  @ApiProperty({
+    example: "Approved exhibition",
+    required: false,
+    nullable: true,
+  })
+  mismatchReason?: string | null;
+
   @ApiProperty({
     example: "A8B2C4D1",
     description: "Unique match key / code for statistician access",

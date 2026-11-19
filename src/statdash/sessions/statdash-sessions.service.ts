@@ -317,8 +317,8 @@ export class StatdashSessionsService {
 
   async updateJerseyColors(
     sessionId: string,
-    homeJerseyColor: string | null,
-    awayJerseyColor: string | null,
+    homeJerseyColor?: string | null,
+    awayJerseyColor?: string | null,
     statisticianId?: string,
   ) {
     const hexColorRegex = /^#[0-9a-fA-F]{6}$/;
@@ -369,12 +369,20 @@ export class StatdashSessionsService {
       });
     }
 
+    const data: {
+      homeJerseyColor?: string | null;
+      awayJerseyColor?: string | null;
+    } = {};
+    if (homeJerseyColor !== undefined) {
+      data.homeJerseyColor = homeJerseyColor;
+    }
+    if (awayJerseyColor !== undefined) {
+      data.awayJerseyColor = awayJerseyColor;
+    }
+
     await this.prisma.gameSession.update({
       where: { id: sessionId },
-      data: {
-        homeJerseyColor: homeJerseyColor ?? null,
-        awayJerseyColor: awayJerseyColor ?? null,
-      },
+      data,
     });
 
     await this.redisService.invalidateSessionSnapshotCache(sessionId);

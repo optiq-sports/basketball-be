@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { StatdashProjectionsService } from "../statdash/projections/statdash-projections.service";
 import { StatdashRealtimeService } from "../statdash/realtime/statdash-realtime.service";
-import { MatchStatus } from "@prisma/client";
+import { Category, MatchStatus } from "@prisma/client";
 import { map } from "rxjs/operators";
 import { MessageEvent } from "@nestjs/common";
 import { Observable } from "rxjs";
@@ -306,6 +306,7 @@ export class ClientApiService {
         id: true,
         name: true,
         code: true,
+        category: true,
         color: true,
         logo: true,
         country: true,
@@ -346,6 +347,7 @@ export class ClientApiService {
         id: true,
         name: true,
         code: true,
+        category: true,
         color: true,
         logo: true,
         country: true,
@@ -405,6 +407,7 @@ export class ClientApiService {
         id: true,
         name: true,
         division: true,
+        category: true,
         format: true,
         code: true,
         startDate: true,
@@ -430,6 +433,7 @@ export class ClientApiService {
         id: true,
         name: true,
         division: true,
+        category: true,
         format: true,
         code: true,
         startDate: true,
@@ -477,6 +481,7 @@ export class ClientApiService {
   async getTournamentStandings(
     clientId: string | undefined,
     tournamentId: string,
+    teamCategory?: Category,
   ) {
     if (!clientId) throw new NotFoundException("Client ID is missing");
     const tournament = await this.prisma.tournament.findFirst({
@@ -490,6 +495,7 @@ export class ClientApiService {
                 name: true,
                 code: true,
                 logo: true,
+                category: true,
               },
             },
           },
@@ -512,6 +518,7 @@ export class ClientApiService {
       teamName: string;
       teamCode: string;
       teamLogo: string | null;
+      teamCategory: Category | null;
       group: string | null;
       played: number;
       won: number;
@@ -527,11 +534,14 @@ export class ClientApiService {
     const teamStats = new Map<string, TeamStat>();
 
     for (const tt of tournament.teams) {
+      const cat = tt.team.category ?? null;
+      if (teamCategory && cat !== teamCategory) continue;
       teamStats.set(tt.team.id, {
         teamId: tt.team.id,
         teamName: tt.team.name,
         teamCode: tt.team.code,
         teamLogo: tt.team.logo,
+        teamCategory: cat,
         group: tt.group ?? null,
         played: 0,
         won: 0,
@@ -598,6 +608,7 @@ export class ClientApiService {
         teamName: stat.teamName,
         teamCode: stat.teamCode,
         teamLogo: stat.teamLogo,
+        teamCategory: stat.teamCategory,
         group: stat.group,
         played: stat.played,
         won: stat.won,
@@ -628,6 +639,7 @@ export class ClientApiService {
     tournamentId: string,
     category: string = "points",
     limit: number = 10,
+    teamCategory?: Category,
   ) {
     if (!clientId) throw new NotFoundException("Client ID is missing");
     const tournament = await this.prisma.tournament.findFirst({
@@ -674,7 +686,7 @@ export class ClientApiService {
       teamIds.length > 0
         ? await this.prisma.team.findMany({
             where: { id: { in: teamIds } },
-            select: { id: true, name: true, code: true },
+            select: { id: true, name: true, code: true, category: true },
           })
         : [];
     const teamMap = new Map(teams.map((t) => [t.id, t]));
@@ -687,6 +699,7 @@ export class ClientApiService {
       teamId: string;
       teamName: string;
       teamCode: string;
+      teamCategory: Category | null;
       matchIds: Set<string>;
       totals: Record<string, number>;
     };
@@ -698,7 +711,11 @@ export class ClientApiService {
         id: stat.teamId,
         name: "Unknown",
         code: "UNK",
+        category: null,
       };
+      if (teamCategory && team.category !== teamCategory) {
+        continue;
+      }
 
       if (!aggMap.has(stat.playerId)) {
         aggMap.set(stat.playerId, {
@@ -709,6 +726,7 @@ export class ClientApiService {
           teamId: team.id,
           teamName: team.name,
           teamCode: team.code,
+          teamCategory: team.category ?? null,
           matchIds: new Set<string>(),
           totals: {
             points: 0,
@@ -770,6 +788,7 @@ export class ClientApiService {
             teamId: p.teamId,
             teamName: p.teamName,
             teamCode: p.teamCode,
+            teamCategory: p.teamCategory,
             gamesPlayed,
             totalValue,
             perGameValue,

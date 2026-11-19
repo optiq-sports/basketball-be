@@ -1,5 +1,6 @@
 import { PartialType, ApiProperty } from "@nestjs/swagger";
 import { CreatePlayerDto } from "./create-player.dto";
+import { Gender } from "@prisma/client";
 import {
   IsOptional,
   IsString,
@@ -91,10 +92,15 @@ export class UpdatePlayerDto extends PartialType(CreatePlayerDto) {
   @IsString()
   nationality?: string;
 
-  @ApiProperty({ example: "Male", description: "Gender", required: false })
+  @ApiProperty({
+    enum: Gender,
+    example: Gender.MALE,
+    description: "Gender",
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  gender?: string;
+  @IsEnum(Gender)
+  gender?: Gender;
 
   // These allow the frontend to update jersey number within a specific team in one request
   @ApiProperty({

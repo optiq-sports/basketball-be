@@ -9,7 +9,7 @@ import {
   Min,
   Max,
 } from "class-validator";
-import { PlayerPosition } from "@prisma/client";
+import { PlayerPosition, Gender } from "@prisma/client";
 
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -83,6 +83,16 @@ export class CreatePlayerDto {
   @IsOptional()
   @IsString()
   nationality?: string;
+
+  @ApiProperty({
+    enum: Gender,
+    example: Gender.MALE,
+    description: "Gender of the player (MALE, FEMALE)",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
 
   @ApiProperty({
     example: false,

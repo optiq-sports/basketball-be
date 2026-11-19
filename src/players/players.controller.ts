@@ -124,8 +124,11 @@ export class PlayersController {
     "/api/players/team",
     "Requires ADMIN or STATISTICIAN role",
   )
-  createForTeam(@Body() createPlayerDto: CreatePlayerForTeamDto) {
-    return this.playersService.createForTeam(createPlayerDto);
+  createForTeam(
+    @Body() createPlayerDto: CreatePlayerForTeamDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.playersService.createForTeam(createPlayerDto, user);
   }
 
   /**
@@ -163,8 +166,11 @@ export class PlayersController {
     "/api/players/team/bulk",
     "Requires ADMIN or STATISTICIAN role",
   )
-  bulkCreateForTeam(@Body() bulkDto: BulkCreatePlayersForTeamDto) {
-    return this.playersService.bulkCreateForTeam(bulkDto);
+  bulkCreateForTeam(
+    @Body() bulkDto: BulkCreatePlayersForTeamDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.playersService.bulkCreateForTeam(bulkDto, user);
   }
 
   /**

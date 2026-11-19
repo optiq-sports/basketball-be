@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional } from "class-validator";
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsOptional,
+  IsBoolean,
+} from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class AddTeamToTournamentDto {
@@ -19,4 +25,22 @@ export class AddTeamToTournamentDto {
   @IsOptional()
   @IsString()
   group?: string;
+
+  @ApiProperty({
+    example: false,
+    description: "ADMIN/SUPER_ADMIN approval for a category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  approveMismatch?: boolean;
+
+  @ApiProperty({
+    example: "Approved exhibition entry",
+    description: "Reason for approving a category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  mismatchReason?: string;
 }

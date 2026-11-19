@@ -11,7 +11,7 @@ import { CreatePlayerDto } from "./dto/create-player.dto";
 import { CreatePlayerForTeamDto } from "./dto/create-player-for-team.dto";
 import { BulkCreatePlayersForTeamDto } from "./dto/bulk-create-players-for-team.dto";
 import { UpdatePlayerDto } from "./dto/update-player.dto";
-import { Prisma, Player, PlayerPosition } from "@prisma/client";
+import { Prisma, Player, PlayerPosition, Gender } from "@prisma/client";
 import {
   BulkCreatePlayersResponseDto,
   PlayerResponseDto,
@@ -26,6 +26,12 @@ import * as xlsx from "xlsx";
 
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 import { AuthenticatedUser } from "../common/interfaces/user.interface";
+import {
+  isPlayerCompatibleWithTeam,
+  MismatchApprovalRecord,
+  parseGenderValue,
+  resolveMismatchApproval,
+} from "../common/utils/category.util";
 
 export interface BulkUploadError {
   row: number;
@@ -129,7 +135,8 @@ export class PlayersService {
           : null,
         phone: createPlayerDto.phone,
         nationality: createPlayerDto.nationality,
-      } as any,
+        gender: createPlayerDto.gender,
+      },
     });
 
     return this.formatPlayerResponse(player);
@@ -141,6 +148,7 @@ export class PlayersService {
    */
   async createForTeam(
     createPlayerDto: CreatePlayerForTeamDto,
+    user?: AuthenticatedUser,
   ): Promise<PlayerResponseDto> {
     this.logger.log(
       `Creating player for team: ${createPlayerDto.firstName} ${createPlayerDto.lastName} (Team: ${createPlayerDto.teamId}, Jersey: ${createPlayerDto.jerseyNumber})`,
@@ -155,6 +163,17 @@ export class PlayersService {
       throw new NotFoundException(
         `Team with ID ${createPlayerDto.teamId} not found`,
       );
+    }
+
+    let approvalData: Partial<MismatchApprovalRecord> = {};
+    if (!isPlayerCompatibleWithTeam(createPlayerDto.gender, team.category)) {
+      approvalData = resolveMismatchApproval({
+        approveMismatch: createPlayerDto.approveMismatch,
+        mismatchReason: createPlayerDto.mismatchReason,
+        user,
+        code: "PLAYER_TEAM_CATEGORY_MISMATCH",
+        message: `Player gender (${createPlayerDto.gender}) does not match team category (${team.category})`,
+      });
     }
 
     // Check if jersey number is already taken in this team
@@ -279,7 +298,22 @@ export class PlayersService {
                 : null,
               phone: createPlayerDto.phone,
               nationality: createPlayerDto.nationality,
-            } as any,
+              gender: createPlayerDto.gender,
+            },
+          });
+        }
+
+        // Check existing player's gender if not supplied in DTO
+        if (
+          !createPlayerDto.gender &&
+          !isPlayerCompatibleWithTeam(player.gender, team.category)
+        ) {
+          approvalData = resolveMismatchApproval({
+            approveMismatch: createPlayerDto.approveMismatch,
+            mismatchReason: createPlayerDto.mismatchReason,
+            user,
+            code: "PLAYER_TEAM_CATEGORY_MISMATCH",
+            message: `Player gender (${player.gender}) does not match team category (${team.category})`,
           });
         }
 
@@ -298,6 +332,7 @@ export class PlayersService {
             data: {
               isActive: true,
               leftAt: null,
+              ...approvalData,
             },
           });
         } else {
@@ -308,6 +343,7 @@ export class PlayersService {
                 teamId: createPlayerDto.teamId,
                 jerseyNumber: createPlayerDto.jerseyNumber,
                 isActive: true,
+                ...approvalData,
               },
             });
           } catch (error: unknown) {
@@ -334,6 +370,7 @@ export class PlayersService {
    */
   async bulkCreateForTeam(
     bulkDto: BulkCreatePlayersForTeamDto,
+    user?: AuthenticatedUser,
   ): Promise<BulkCreatePlayersResponseDto> {
     this.logger.log(
       `Bulk creating ${bulkDto.players.length} players for team ${bulkDto.teamId}`,
@@ -478,10 +515,23 @@ export class PlayersService {
                   : null,
                 phone: playerData.phone,
                 nationality: playerData.nationality,
-              } as any,
+                gender: playerData.gender,
+              },
             });
             result.created++;
           }
+        }
+
+        let approvalData: Partial<MismatchApprovalRecord> = {};
+        const effectiveGender = playerData.gender ?? player.gender;
+        if (!isPlayerCompatibleWithTeam(effectiveGender, team.category)) {
+          approvalData = resolveMismatchApproval({
+            approveMismatch: bulkDto.approveMismatch,
+            mismatchReason: bulkDto.mismatchReason,
+            user,
+            code: "PLAYER_TEAM_CATEGORY_MISMATCH",
+            message: `Player ${player.firstName} ${player.lastName} (${effectiveGender}) does not match team category (${team.category})`,
+          });
         }
 
         // Assign player to team
@@ -499,6 +549,7 @@ export class PlayersService {
             data: {
               isActive: true,
               leftAt: null,
+              ...approvalData,
             },
           });
         } else {
@@ -509,6 +560,7 @@ export class PlayersService {
                 teamId: bulkDto.teamId,
                 jerseyNumber: playerData.jerseyNumber,
                 isActive: true,
+                ...approvalData,
               },
             });
           } catch (error: unknown) {
@@ -1417,7 +1469,7 @@ export class PlayersService {
           nationality?: string;
           jerseyNumber: number;
           position?: PlayerPosition;
-          gender?: string;
+          gender?: Gender;
         } = {
           firstName: String(firstName).trim(),
           lastName: String(lastName).trim(),
@@ -1436,27 +1488,18 @@ export class PlayersService {
             : undefined,
           jerseyNumber: parsedJersey,
           position: posResult.position,
-          gender: normalizedRow["gender"]
-            ? String(normalizedRow["gender"]).trim()
-            : undefined,
+          gender: parseGenderValue(normalizedRow["gender"]),
         };
 
-        // Check if jersey is already taken in this team by an active player
-        if (teamId) {
-          const existingJersey = await this.prisma.playerTeam.findFirst({
-            where: {
-              teamId,
-              jerseyNumber: candidate.jerseyNumber,
-              isActive: true,
-            },
+        if (
+          teamId &&
+          !isPlayerCompatibleWithTeam(candidate.gender, team?.category)
+        ) {
+          result.errors.push({
+            row: rowNumber,
+            error: `Gender (${candidate.gender}) does not match team category (${team?.category})`,
           });
-          if (existingJersey) {
-            result.errors.push({
-              row: rowNumber,
-              error: `Jersey ${candidate.jerseyNumber} taken`,
-            });
-            continue;
-          }
+          continue;
         }
 
         // 1. Deduplication Check
@@ -1472,7 +1515,7 @@ export class PlayersService {
           // Step 1 - Exact Match Found -> Use existing UUID/Link it
           // Step 2 - Potential Match Found -> Skip and flag for Admin review
           if (teamId && duplicateCheck.matchType === "EXACT_MATCH") {
-            // Check if already active in team
+            // Check if already active in team before checking jersey clashes
             const alreadyInTeam = await this.prisma.playerTeam.findFirst({
               where: {
                 teamId,
@@ -1481,7 +1524,32 @@ export class PlayersService {
               },
             });
 
-            if (!alreadyInTeam) {
+            if (alreadyInTeam) {
+              result.details.push({
+                row: rowNumber,
+                status: duplicateCheck.matchType,
+                player: `${candidate.firstName} ${candidate.lastName}`,
+                matchScore: duplicateCheck.similarityScore.toFixed(2),
+                existingPlayerId: duplicateCheck.existingPlayer.id,
+                action: "ALREADY_IN_TEAM",
+              });
+            } else {
+              const existingJersey = await this.prisma.playerTeam.findFirst({
+                where: {
+                  teamId,
+                  jerseyNumber: candidate.jerseyNumber,
+                  isActive: true,
+                  playerId: { not: duplicateCheck.existingPlayer.id },
+                },
+              });
+              if (existingJersey) {
+                result.errors.push({
+                  row: rowNumber,
+                  error: `Jersey ${candidate.jerseyNumber} taken`,
+                });
+                continue;
+              }
+
               await this.prisma.$transaction(async (tx) => {
                 const existingPt = await tx.playerTeam.findFirst({
                   where: {
@@ -1519,15 +1587,6 @@ export class PlayersService {
                 existingPlayerId: duplicateCheck.existingPlayer.id,
                 action: "LINKED",
               });
-            } else {
-              result.details.push({
-                row: rowNumber,
-                status: duplicateCheck.matchType,
-                player: `${candidate.firstName} ${candidate.lastName}`,
-                matchScore: duplicateCheck.similarityScore.toFixed(2),
-                existingPlayerId: duplicateCheck.existingPlayer.id,
-                action: "ALREADY_IN_TEAM",
-              });
             }
           } else {
             result.details.push({
@@ -1540,6 +1599,24 @@ export class PlayersService {
             });
           }
         } else {
+          // Check if jersey is already taken in this team by an active player
+          if (teamId) {
+            const existingJersey = await this.prisma.playerTeam.findFirst({
+              where: {
+                teamId,
+                jerseyNumber: candidate.jerseyNumber,
+                isActive: true,
+              },
+            });
+            if (existingJersey) {
+              result.errors.push({
+                row: rowNumber,
+                error: `Jersey ${candidate.jerseyNumber} taken`,
+              });
+              continue;
+            }
+          }
+
           // Create New Player and link in one transaction
           await this.prisma.$transaction(async (tx) => {
             const newPlayer = await tx.player.create({

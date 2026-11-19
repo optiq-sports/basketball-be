@@ -742,6 +742,72 @@ describe("PlayersService", () => {
       expect(result.created).toBe(1);
       expect(result.errors).toHaveLength(0);
     });
+
+    it("reports ALREADY_IN_TEAM instead of Jersey taken when re-uploading an existing player on the team, and still refuses a new player with a taken jersey (Item 48)", async () => {
+      mockPrismaService.team.findUnique.mockResolvedValue({
+        id: "team-1",
+        category: "MEN",
+      });
+
+      // Row 1: existing player already on team with jersey 7
+      // Row 2: new player trying to use jersey 7
+      mockDeduplicationService.findDuplicatePlayer
+        .mockResolvedValueOnce({
+          matchType: "EXACT_MATCH",
+          similarityScore: 100,
+          matchedFields: ["name"],
+          existingPlayer: {
+            id: "p-existing",
+            firstName: "Jane",
+            lastName: "Doe",
+          },
+        })
+        .mockResolvedValueOnce({
+          matchType: "NO_MATCH",
+          similarityScore: 0,
+          matchedFields: [],
+        });
+
+      mockPrismaService.playerTeam.findFirst
+        // Row 1: alreadyInTeam check -> found!
+        .mockResolvedValueOnce({
+          id: "pt-1",
+          teamId: "team-1",
+          playerId: "p-existing",
+          jerseyNumber: 7,
+          isActive: true,
+        })
+        // Row 2: existingJersey check -> taken by p-existing!
+        .mockResolvedValueOnce({
+          id: "pt-1",
+          teamId: "team-1",
+          playerId: "p-existing",
+          jerseyNumber: 7,
+          isActive: true,
+        });
+
+      const wsData = [
+        ["First Name", "Last Name", "Position", "Date of Birth", "Jersey"],
+        ["Jane", "Doe", "PG", "15/08/2000", 7],
+        ["New", "Sign", "SG", "15/08/2001", 7],
+      ];
+      const ws = xlsx.utils.aoa_to_sheet(wsData);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
+      const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      const result = await service.processBulkUpload("team-1", { buffer });
+
+      expect(result.duplicatesFound).toBe(1);
+      expect(result.details).toEqual([
+        expect.objectContaining({
+          row: 2,
+          action: "ALREADY_IN_TEAM",
+          existingPlayerId: "p-existing",
+        }),
+      ]);
+      expect(result.errors).toEqual([{ row: 3, error: "Jersey 7 taken" }]);
+    });
   });
 
   describe("assignToTeam and removeFromTeam", () => {

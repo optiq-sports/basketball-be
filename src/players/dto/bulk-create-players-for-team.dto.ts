@@ -8,11 +8,12 @@ import {
   IsEnum,
   IsEmail,
   IsDateString,
+  IsBoolean,
   Min,
   Max,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { PlayerPosition } from "@prisma/client";
+import { PlayerPosition, Gender } from "@prisma/client";
 import { ApiProperty } from "@nestjs/swagger";
 
 class PlayerDataDto {
@@ -91,6 +92,16 @@ class PlayerDataDto {
   @IsOptional()
   @IsString()
   nationality?: string;
+
+  @ApiProperty({
+    enum: Gender,
+    example: Gender.MALE,
+    description: "Gender of the player (MALE, FEMALE)",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
 }
 
 export class BulkCreatePlayersForTeamDto {
@@ -107,4 +118,23 @@ export class BulkCreatePlayersForTeamDto {
   @ValidateNested({ each: true })
   @Type(() => PlayerDataDto)
   players: PlayerDataDto[];
+
+  @ApiProperty({
+    example: false,
+    description:
+      "ADMIN/SUPER_ADMIN approval for a gender/team category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  approveMismatch?: boolean;
+
+  @ApiProperty({
+    example: "Approved exhibition roster",
+    description: "Reason for approving a gender/team category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  mismatchReason?: string;
 }

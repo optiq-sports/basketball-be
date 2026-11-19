@@ -8,7 +8,7 @@ import {
   Min,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
-import { TournamentDivision, TournamentFormat } from "@prisma/client";
+import { Category, TournamentDivision, TournamentFormat } from "@prisma/client";
 
 export class CreateTournamentDto {
   @ApiProperty({
@@ -27,6 +27,16 @@ export class CreateTournamentDto {
   @IsEnum(TournamentDivision)
   @IsNotEmpty()
   division: TournamentDivision;
+
+  @ApiProperty({
+    enum: Category,
+    example: Category.MEN,
+    description: "Category of the tournament (MEN, WOMEN, MIXED)",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Category)
+  category?: Category;
 
   @ApiProperty({
     example: 82,

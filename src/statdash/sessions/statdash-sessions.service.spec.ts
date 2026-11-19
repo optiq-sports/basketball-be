@@ -496,5 +496,48 @@ describe("StatdashSessionsService", () => {
         service.updateJerseyColors("session_1", "#CE1141", "#12345"),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it("preserves omitted jersey color on partial update (Item 50)", async () => {
+      prismaService.gameSession.findUnique
+        .mockResolvedValueOnce({
+          id: "session_1",
+          matchId: "match_1",
+          status: GameSessionStatus.IN_PROGRESS,
+          match: { statisticianId: "stat_1" },
+        })
+        .mockResolvedValueOnce({
+          id: "session_1",
+          matchId: "match_1",
+          status: GameSessionStatus.IN_PROGRESS,
+          quarter: 1,
+          clockSecondsRemaining: 600,
+          clockRunning: false,
+          homeScore: 0,
+          awayScore: 0,
+          homeOnLeft: true,
+          homeAttacksLeft: true,
+          homeJerseyColor: "#CE1141",
+          awayJerseyColor: "#1D428A",
+          jumpBallWinnerTeamId: null,
+          possessionTeamId: null,
+          version: 0,
+          startedAt: null,
+          endedAt: null,
+          updatedAt: new Date(),
+          match: { statisticianId: "stat_1" },
+        });
+      prismaService.gameSession.update.mockResolvedValue({});
+      prismaService.gameEvent.findMany.mockResolvedValue([]);
+      prismaService.lineupState.findFirst.mockResolvedValue(null);
+
+      await service.updateJerseyColors("session_1", "#CE1141", undefined);
+
+      expect(prismaService.gameSession.update).toHaveBeenCalledWith({
+        where: { id: "session_1" },
+        data: {
+          homeJerseyColor: "#CE1141",
+        },
+      });
+    });
   });
 });

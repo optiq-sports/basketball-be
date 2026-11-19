@@ -155,6 +155,49 @@ describe("MatchesService", () => {
       );
     });
 
+    it("rejects match fixture with mismatched team categories unless approved by ADMIN/SUPER_ADMIN (Item 54)", async () => {
+      mockPrismaService.tournament.findFirst.mockResolvedValue({
+        id: "tour1",
+        clientId: "c1",
+        category: "MIXED",
+      });
+      mockPrismaService.team.findUnique
+        .mockResolvedValueOnce({ id: "team1", category: "MEN" })
+        .mockResolvedValueOnce({ id: "team2", category: "WOMEN" });
+      mockPrismaService.tournamentTeam.findUnique.mockResolvedValue({});
+
+      await expect(service.create(createDto, mockUser)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      mockPrismaService.team.findUnique
+        .mockResolvedValueOnce({ id: "team1", category: "MEN" })
+        .mockResolvedValueOnce({ id: "team2", category: "WOMEN" });
+      mockPrismaService.match.create.mockResolvedValue({
+        id: "match_approved",
+        mismatchApproved: true,
+      });
+
+      const approved = await service.create(
+        {
+          ...createDto,
+          approveMismatch: true,
+          mismatchReason: "Charity exhibition",
+        },
+        mockUser,
+      );
+      expect(approved.id).toBe("match_approved");
+      expect(mockPrismaService.match.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            mismatchApproved: true,
+            mismatchApprovedById: mockUser.id,
+            mismatchReason: "Charity exhibition",
+          }),
+        }),
+      );
+    });
+
     it("should throw ConflictException if custom matchKey is already taken", async () => {
       mockPrismaService.tournament.findFirst.mockResolvedValue({});
       mockPrismaService.team.findUnique.mockResolvedValue({});
