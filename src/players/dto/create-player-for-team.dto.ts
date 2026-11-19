@@ -6,10 +6,11 @@ import {
   IsEnum,
   IsEmail,
   IsDateString,
+  IsBoolean,
   Min,
   Max,
 } from "class-validator";
-import { PlayerPosition } from "@prisma/client";
+import { PlayerPosition, Gender } from "@prisma/client";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class CreatePlayerForTeamDto {
@@ -95,10 +96,39 @@ export class CreatePlayerForTeamDto {
   nationality?: string;
 
   @ApiProperty({
+    enum: Gender,
+    example: Gender.MALE,
+    description: "Gender of the player (MALE, FEMALE)",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @ApiProperty({
     example: false,
     description: "Bypass deduplication check",
     required: false,
   })
   @IsOptional()
   confirmDuplicate?: boolean;
+
+  @ApiProperty({
+    example: false,
+    description:
+      "ADMIN/SUPER_ADMIN approval for a gender/team category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  approveMismatch?: boolean;
+
+  @ApiProperty({
+    example: "Approved exhibition roster",
+    description: "Reason for approving a gender/team category mismatch",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  mismatchReason?: string;
 }

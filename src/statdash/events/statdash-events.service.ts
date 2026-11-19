@@ -329,6 +329,9 @@ export class StatdashEventsService {
           }
 
           const resultingVersion = command.expectedVersion + batchSize;
+          const clockChanged =
+            ruleResult.sessionUpdates?.clockSecondsRemaining !== undefined ||
+            ruleResult.sessionUpdates?.clockRunning !== undefined;
           const updatedSession = await tx.gameSession.update({
             where: { id: session.id },
             data: {
@@ -347,6 +350,7 @@ export class StatdashEventsService {
                 ruleResult.sessionUpdates?.clockRunning !== undefined
                   ? ruleResult.sessionUpdates.clockRunning
                   : undefined,
+              clockUpdatedAt: clockChanged ? new Date() : undefined,
               possessionTeamId:
                 ruleResult.sessionUpdates?.possessionTeamId !== undefined
                   ? ruleResult.sessionUpdates.possessionTeamId
@@ -862,7 +866,6 @@ export class StatdashEventsService {
           sessionId: command.sessionId,
           commandType: command.commandType,
           payload: command.payload,
-          expectedVersion: command.expectedVersion,
         }),
       )
       .digest("hex");

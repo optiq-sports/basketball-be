@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { Role } from "@prisma/client";
+import { SkipThrottle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -38,6 +39,7 @@ export class StatdashEventsController {
   constructor(private readonly statdashEventsService: StatdashEventsService) {}
 
   @Post("command")
+  @SkipThrottle()
   @ApiOperation({ summary: "Submit a new game event command" })
   @ApiBody({ type: StatdashCommandDto })
   @ApiResponse({

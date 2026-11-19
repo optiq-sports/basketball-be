@@ -483,4 +483,84 @@ describe("StatdashEventsService", () => {
       }),
     );
   });
+
+  it("ignores expectedVersion in hashRequest so idempotency retries with newer version succeed", async () => {
+    const commandV1 = {
+      sessionId: "session_1",
+      commandType: "shot" as const,
+      payload: {
+        teamId: "home",
+        shooterPlayerId: "p1",
+        shot: { value: 2, result: "made", type: "jumpshot" },
+      },
+      expectedVersion: 1,
+      idempotencyKey: "idem_retry",
+    };
+    const hashV1 = (
+      service as unknown as { hashRequest: (c: typeof commandV1) => string }
+    ).hashRequest(commandV1);
+    const hashV5 = (
+      service as unknown as { hashRequest: (c: typeof commandV1) => string }
+    ).hashRequest({ ...commandV1, expectedVersion: 5 });
+
+    expect(hashV1).toBe(hashV5);
+  });
+
+  it("updates clockUpdatedAt when clockRunning or clockSecondsRemaining changes (Item 52)", async () => {
+    redisService.getIdempotencyResultCached.mockResolvedValue(null);
+    tx.gameSession.findUnique.mockResolvedValue({
+      id: "session_1",
+      matchId: "match_1",
+      version: 1,
+      quarter: 1,
+      clockSecondsRemaining: 600,
+      homeScore: 0,
+      awayScore: 0,
+      match: { homeTeamId: "home", awayTeamId: "away" },
+    });
+    tx.idempotencyRecord.findUnique.mockResolvedValue(null);
+    tx.lineupState.findFirst.mockResolvedValue(null);
+    tx.gameEvent.aggregate.mockResolvedValue({ _max: { sequence: 1 } });
+    tx.gameEvent.create.mockResolvedValue({
+      id: "ge_clock",
+      sequence: 2,
+      eventType: "clock",
+      createdAt: new Date(),
+    });
+    tx.gameSession.update.mockResolvedValue({
+      id: "session_1",
+      version: 2,
+      homeScore: 0,
+      awayScore: 0,
+      clockRunning: true,
+      clockUpdatedAt: new Date(),
+      clockSecondsRemaining: 590,
+    });
+    tx.idempotencyRecord.create.mockResolvedValue({});
+
+    await service.handleCommand(
+      {
+        sessionId: "session_1",
+        commandType: "clock",
+        payload: {
+          period: 1,
+          isRunning: true,
+          clockSecondsRemaining: 590,
+        },
+        expectedVersion: 1,
+        idempotencyKey: "idem_clock",
+      },
+      "actor_1",
+    );
+
+    expect(tx.gameSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          clockRunning: true,
+          clockSecondsRemaining: 590,
+          clockUpdatedAt: expect.any(Date),
+        }),
+      }),
+    );
+  });
 });

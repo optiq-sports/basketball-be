@@ -1,4 +1,4 @@
-import { PlayerPosition } from "@prisma/client";
+import { Gender, PlayerPosition } from "@prisma/client";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class PlayerTeamResponseDto {
@@ -22,6 +22,26 @@ export class PlayerTeamResponseDto {
 
   @ApiProperty({ example: "2024-12-31T00:00:00Z", required: false })
   leftAt?: Date;
+
+  @ApiProperty({ example: false, required: false })
+  mismatchApproved?: boolean;
+
+  @ApiProperty({ example: "admin_1", required: false, nullable: true })
+  mismatchApprovedById?: string | null;
+
+  @ApiProperty({
+    example: "2024-01-01T00:00:00Z",
+    required: false,
+    nullable: true,
+  })
+  mismatchApprovedAt?: Date | null;
+
+  @ApiProperty({
+    example: "Approved exhibition roster",
+    required: false,
+    nullable: true,
+  })
+  mismatchReason?: string | null;
 
   @ApiProperty({ required: false })
   team?: {
@@ -97,6 +117,14 @@ export class PlayerResponseDto {
 
   @ApiProperty({ example: "USA", required: false })
   nationality?: string;
+
+  @ApiProperty({
+    enum: Gender,
+    example: Gender.MALE,
+    required: false,
+    nullable: true,
+  })
+  gender?: Gender | null;
 
   // Top-level team shortcut fields (from first active team assignment)
   @ApiProperty({ example: "team_123", required: false })

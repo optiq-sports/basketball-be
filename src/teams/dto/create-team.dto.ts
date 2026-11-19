@@ -4,8 +4,10 @@ import {
   IsOptional,
   IsInt,
   IsEmail,
+  IsEnum,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
+import { Category } from "@prisma/client";
 
 export class CreateTeamDto {
   @ApiProperty({ example: "Chicago Bulls", description: "Name of the team" })
@@ -20,6 +22,16 @@ export class CreateTeamDto {
   @IsString()
   @IsNotEmpty()
   code: string;
+
+  @ApiProperty({
+    enum: Category,
+    example: Category.MEN,
+    description: "Category of the team (MEN, WOMEN, MIXED)",
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Category)
+  category?: Category;
 
   @ApiProperty({
     example: "#CE1141",

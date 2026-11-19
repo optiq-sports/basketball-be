@@ -26,4 +26,3 @@ export class UpdateJerseyColorsDto {
   })
   awayJerseyColor?: string | null;
 }
-

@@ -2,7 +2,11 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { Role, TournamentDivision } from "@prisma/client";
 import { TournamentsService } from "./tournaments.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { AuthenticatedUser } from "src/common/interfaces/user.interface";
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
 
@@ -86,6 +90,7 @@ describe("TournamentsService", () => {
             startDate: "2026-01-01",
             numberOfGames: 10,
             quarterDuration: 10,
+            crewChief: "John Doe",
           },
           mockUser,
         ),
@@ -105,6 +110,7 @@ describe("TournamentsService", () => {
           startDate: "2026-01-01",
           numberOfGames: 10,
           quarterDuration: 10,
+          crewChief: "John Doe",
         },
         mockUser,
       );
@@ -124,6 +130,7 @@ describe("TournamentsService", () => {
             startDate: "2026-01-01",
             numberOfGames: 10,
             quarterDuration: 10,
+            crewChief: "John Doe",
           },
           mockUser,
         ),
@@ -265,6 +272,39 @@ describe("TournamentsService", () => {
 
       await service.addTeams("t1", { teamIds: ["team1", "team2"] }, mockUser);
       expect(mockPrismaService.tournamentTeam.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects team category mismatch without approveMismatch, and stores approval when approved by ADMIN/SUPER_ADMIN (Item 54)", async () => {
+      mockPrismaService.tournament.findFirst.mockResolvedValue({
+        id: "t1",
+        category: "MEN",
+      });
+      mockPrismaService.team.findMany.mockResolvedValue([
+        { id: "team_w", name: "Women Team", category: "WOMEN" },
+      ]);
+
+      await expect(
+        service.addTeams("t1", { teamIds: ["team_w"] }, mockUser),
+      ).rejects.toThrow(BadRequestException);
+
+      await service.addTeams(
+        "t1",
+        {
+          teamIds: ["team_w"],
+          approveMismatch: true,
+          mismatchReason: "Exhibition bracket",
+        },
+        mockUser,
+      );
+      expect(mockPrismaService.tournamentTeam.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            mismatchApproved: true,
+            mismatchApprovedById: mockUser.id,
+            mismatchReason: "Exhibition bracket",
+          }),
+        }),
+      );
     });
   });
 

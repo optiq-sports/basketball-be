@@ -145,6 +145,7 @@ describe("ClientApiController", () => {
     expect(service.getTournamentStandings).toHaveBeenCalledWith(
       "client_id_1",
       "tourn_1",
+      undefined,
     );
   });
 
@@ -165,6 +166,7 @@ describe("ClientApiController", () => {
       "tourn_1",
       LeaderCategory.POINTS,
       10,
+      undefined,
     );
   });
 

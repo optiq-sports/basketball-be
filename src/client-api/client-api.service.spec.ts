@@ -487,6 +487,42 @@ describe("ClientApiService", () => {
       expect(teamB?.points).toBe(1);
       expect(teamB?.streak).toBe("L1");
     });
+
+    it("filters tournament standings by teamCategory when provided (Item 54)", async () => {
+      (prisma.tournament.findFirst as jest.Mock).mockResolvedValue({
+        id: "tourn_1",
+        teams: [
+          {
+            team: {
+              id: "team_m",
+              name: "Men A",
+              code: "MA",
+              logo: null,
+              category: "MEN",
+            },
+          },
+          {
+            team: {
+              id: "team_w",
+              name: "Women A",
+              code: "WA",
+              logo: null,
+              category: "WOMEN",
+            },
+          },
+        ],
+        matches: [],
+      });
+
+      const womenStandings = await service.getTournamentStandings(
+        "client_1",
+        "tourn_1",
+        "WOMEN",
+      );
+      expect(womenStandings).toHaveLength(1);
+      expect(womenStandings[0].teamId).toBe("team_w");
+      expect(womenStandings[0].teamCategory).toBe("WOMEN");
+    });
   });
 
   describe("getTournamentLeaders", () => {

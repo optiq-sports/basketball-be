@@ -20,6 +20,11 @@ import { getTenantFilter } from "../common/filters/tenant.filter";
 import { buildPrismaPagination } from "../common/utils/pagination.util";
 
 import { AuditLogsService } from "../audit-logs/audit-logs.service";
+import {
+  isTeamCompatibleWithTournament,
+  MismatchApprovalRecord,
+  resolveMismatchApproval,
+} from "../common/utils/category.util";
 
 @Injectable()
 export class TournamentsService {
@@ -301,6 +306,22 @@ export class TournamentsService {
       throw new NotFoundException("One or more teams not found");
     }
 
+    const mismatchedTeams = teams.filter(
+      (team) =>
+        !isTeamCompatibleWithTournament(team.category, tournament.category),
+    );
+
+    let approvalData: Partial<MismatchApprovalRecord> = {};
+    if (mismatchedTeams.length > 0) {
+      approvalData = resolveMismatchApproval({
+        approveMismatch: addTeamDto.approveMismatch,
+        mismatchReason: addTeamDto.mismatchReason,
+        user,
+        code: "TOURNAMENT_TEAM_CATEGORY_MISMATCH",
+        message: `Team(s) ${mismatchedTeams.map((t) => `${t.name} (${t.category})`).join(", ")} do not match tournament category (${tournament.category})`,
+      });
+    }
+
     // Add teams to tournament (skip if already exists)
     await Promise.all(
       addTeamDto.teamIds.map((teamId) =>
@@ -313,11 +334,13 @@ export class TournamentsService {
           },
           update: {
             group: addTeamDto.group,
+            ...approvalData,
           },
           create: {
             tournamentId: id,
             teamId,
             group: addTeamDto.group,
+            ...approvalData,
           },
         }),
       ),

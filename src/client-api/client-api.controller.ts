@@ -8,6 +8,7 @@ import {
   Query,
   ForbiddenException,
 } from "@nestjs/common";
+import { Category } from "@prisma/client";
 import { ClientApiService } from "./client-api.service";
 import { ApiKeyGuard } from "../auth/guards/api-key.guard";
 import {
@@ -244,11 +245,13 @@ export class ClientApiController {
     @Req() req: AppRequest,
     @Param("tournamentId") tournamentId: string,
     @Query("clientId") clientId?: string,
+    @Query("teamCategory") teamCategory?: Category,
   ) {
     const authorizedClientId = this.getAuthorizedClientId(req, clientId);
     return this.clientApiService.getTournamentStandings(
       authorizedClientId,
       tournamentId,
+      teamCategory,
     );
   }
 
@@ -283,6 +286,7 @@ export class ClientApiController {
     @Param("tournamentId") tournamentId: string,
     @Query() query: ClientLeadersQueryDto,
     @Query("clientId") clientId?: string,
+    @Query("teamCategory") teamCategory?: Category,
   ) {
     const authorizedClientId = this.getAuthorizedClientId(req, clientId);
     return this.clientApiService.getTournamentLeaders(
@@ -290,6 +294,7 @@ export class ClientApiController {
       tournamentId,
       query.category,
       query.limit,
+      teamCategory,
     );
   }
 
